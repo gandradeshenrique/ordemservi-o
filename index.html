@@ -627,9 +627,22 @@
     </button>
     <input type="file" id="import-file" accept=".json" style="display:none" onchange="importData(event)">
 
-    <div class="sidebar-footer">
-      Dados salvos no navegador<br>(armazenamento local).
-      Exporte regularmente para backup.
+    <div class="sidebar-footer" style="display:flex;flex-direction:column;gap:6px;align-items:flex-start;">
+      <div style="display:flex;align-items:center;gap:8px;width:100%;">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="color:var(--accent);flex-shrink:0;">
+          <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/>
+        </svg>
+        <span id="sidebar-user" style="font-size:13px;color:var(--text);font-weight:500;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">—</span>
+      </div>
+      <button onclick="logout()" style="background:none;border:1px solid var(--border);border-radius:6px;color:var(--text-dim);font-size:12px;padding:5px 10px;cursor:pointer;width:100%;text-align:left;display:flex;align-items:center;gap:6px;transition:all .2s;"
+        onmouseover="this.style.borderColor='var(--red)';this.style.color='var(--red)'"
+        onmouseout="this.style.borderColor='var(--border)';this.style.color='var(--text-dim)'">
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/>
+        </svg>
+        Sair
+      </button>
+      <div style="font-size:10px;color:var(--text-faint);">Dados sincronizados com Supabase</div>
     </div>
   </div>
 
@@ -809,8 +822,8 @@
         </div>
       </div>
       <div class="field">
-        <label>Chamado</label>
-        <input type="text" id="os-chamado" placeholder="Nº do chamado / protocolo (opcional)">
+        <label>Chamado *</label>
+        <input type="text" id="os-chamado" placeholder="Nº do chamado / protocolo">
       </div>
     </fieldset>
 
@@ -843,8 +856,8 @@
           
         </div>
         <div class="field">
-          <label>IMEI / Nº de série</label>
-          <input type="text" id="os-imei" placeholder="Opcional">
+          <label>IMEI / Nº de série *</label>
+          <input type="text" id="os-imei" placeholder="IMEI ou nº de série">
         </div>
       </div>
       <div class="field">
@@ -1041,9 +1054,27 @@
           <input type="date" id="os-data-prevista">
         </div>
       </div>
+      <div class="field-row">
+        <div class="field">
+          <label>Forma de pagamento</label>
+          <select id="os-pagamento">
+            <option value="">— Selecione —</option>
+            <option>Dinheiro</option>
+            <option>Cartão de débito</option>
+            <option>Cartão de crédito</option>
+            <option>PIX</option>
+            <option>Transferência</option>
+            <option>A combinar</option>
+          </select>
+        </div>
+        <div class="field">
+          <label>Prazo de garantia (dias)</label>
+          <input type="number" id="os-garantia" placeholder="Ex: 90" min="0" step="1">
+        </div>
+      </div>
       <div class="field mb-0">
-        <label>Observações / garantia</label>
-        <textarea id="os-observacoes" placeholder="Ex: Garantia de 90 dias para a peça e serviço."></textarea>
+        <label>Observações</label>
+        <textarea id="os-observacoes" placeholder="Observações adicionais sobre a OS..."></textarea>
       </div>
     </fieldset>
 
@@ -1193,127 +1224,152 @@
    e "Importar dados" para restaurar.
    ========================================================= */
 
+/* =========================================================
+   SUPABASE — Configuração e camada de dados
+   ========================================================= */
+const SB_URL = 'https://zrghmwdzxslpuyglsvnq.supabase.co';
+const SB_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InpyZ2htd2R6eHNscHV5Z2xzdm5xIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODIwOTE0NzksImV4cCI6MjA5NzY2NzQ3OX0.l2KE4vTA7CsXBGdRIfuBFqiHBACSueXUO8neEKXsOX4';
+
+function sbHeaders(extra){
+  return {
+    'apikey': SB_KEY,
+    'Authorization': 'Bearer ' + SB_KEY,
+    'Content-Type': 'application/json',
+    'Prefer': 'return=representation',
+    ...extra
+  };
+}
+
+async function sbGet(table, params=''){
+  const r = await fetch(`${SB_URL}/rest/v1/${table}?${params}`, { headers: sbHeaders() });
+  if(!r.ok) throw new Error(`GET ${table} ${r.status}`);
+  return r.json();
+}
+
+async function sbPost(table, body){
+  const r = await fetch(`${SB_URL}/rest/v1/${table}`, {
+    method:'POST', headers: sbHeaders(), body: JSON.stringify(body)
+  });
+  if(!r.ok) throw new Error(`POST ${table} ${r.status}: ${await r.text()}`);
+  return r.json();
+}
+
+async function sbPatch(table, id_col, id_val, body){
+  const r = await fetch(`${SB_URL}/rest/v1/${table}?${id_col}=eq.${encodeURIComponent(id_val)}`, {
+    method:'PATCH', headers: sbHeaders(), body: JSON.stringify(body)
+  });
+  if(!r.ok) throw new Error(`PATCH ${table} ${r.status}: ${await r.text()}`);
+  return r.json();
+}
+
+async function sbDelete(table, id_col, id_val){
+  const r = await fetch(`${SB_URL}/rest/v1/${table}?${id_col}=eq.${encodeURIComponent(id_val)}`, {
+    method:'DELETE', headers: sbHeaders({'Prefer':''})
+  });
+  if(!r.ok) throw new Error(`DELETE ${table} ${r.status}`);
+}
+
+async function sbGetConfig(chave){
+  const rows = await sbGet('configuracoes', `chave=eq.${chave}&select=valor`);
+  return rows.length ? rows[0].valor : null;
+}
+
+async function sbSetConfig(chave, valor){
+  await fetch(`${SB_URL}/rest/v1/configuracoes?chave=eq.${chave}`, {
+    method:'PATCH', headers: sbHeaders(), body: JSON.stringify({valor: String(valor)})
+  });
+}
+
+/* =========================================================
+   STATE — cache local durante a sessão
+   ========================================================= */
 let state = {
   nextOSNumber: 1001,
   os: [],
   stock: [],
   clients: [],
-  history: {} // osId -> [ {date, text} ]
+  history: {}
 };
 
-// ---------- Dados de exemplo (seed) ----------
-function seedData(){
-  state.clients = [
-    { id:'c1', nome:'Maria Souza', telefone:'(11) 98888-1234', email:'maria.souza@email.com', endereco:'', observacoes:'' },
-    { id:'c2', nome:'João Pedro Lima', telefone:'(11) 97777-5566', email:'', endereco:'', observacoes:'' },
-    { id:'c3', nome:'Ana Carolina', telefone:'(11) 96666-9090', email:'', endereco:'', observacoes:'' },
-    { id:'c4', nome:'Carlos Eduardo', telefone:'(11) 95555-3322', email:'', endereco:'', observacoes:'' },
-  ];
+/* =========================================================
+   CARREGAR DADOS DO SUPABASE
+   ========================================================= */
+async function loadFromSupabase(){
+  showLoadingOverlay(true);
+  try {
+    const [clients, stock, os, cfg] = await Promise.all([
+      sbGet('clientes', 'order=nome.asc'),
+      sbGet('estoque',  'order=nome.asc'),
+      sbGet('ordens_servico', 'order=numero.desc'),
+      sbGetConfig('next_os_number')
+    ]);
 
-  state.stock = [
-    { id: 'p1', codigo:'TEL-S21-001', nome:'Tela LCD Galaxy S21', categoria:'Tela', compativel:'Galaxy S21, S21 5G', quantidade:4, minimo:2, local:'Gaveta 3', custo:280, venda:450 },
-    { id: 'p2', codigo:'BAT-IP12-002', nome:'Bateria iPhone 12', categoria:'Bateria', compativel:'iPhone 12, 12 Pro', quantidade:1, minimo:3, local:'Gaveta 1', custo:90, venda:180 },
-    { id: 'p3', codigo:'CON-USBC-010', nome:'Conector de carga USB-C', categoria:'Conector', compativel:'Multimarcas USB-C', quantidade:12, minimo:5, local:'Gaveta 5', custo:15, venda:60 },
-    { id: 'p4', codigo:'TEL-A32-004', nome:'Tela AMOLED Galaxy A32', categoria:'Tela', compativel:'Galaxy A32', quantidade:0, minimo:2, local:'Gaveta 3', custo:220, venda:380 },
-    { id: 'p5', codigo:'CAM-IP11-007', nome:'Câmera traseira iPhone 11', categoria:'Câmera', compativel:'iPhone 11', quantidade:5, minimo:2, local:'Gaveta 4', custo:120, venda:250 },
-  ];
+    state.clients = clients.map(c => ({
+      id: c.id, nome: c.nome, telefone: c.telefone || '',
+      email: c.email || '', cpfcnpj: c.cpfcnpj || '',
+      endereco: c.endereco || '', observacoes: c.observacoes || ''
+    }));
 
-  const today = new Date();
-  const fmt = d => d.toISOString().slice(0,10);
-  const daysAgo = n => { const d = new Date(today); d.setDate(d.getDate()-n); return fmt(d); };
-  const daysFromNow = n => { const d = new Date(today); d.setDate(d.getDate()+n); return fmt(d); };
+    state.stock = stock.map(s => ({
+      id: s.id, codigo: s.codigo || '', nome: s.nome,
+      categoria: s.categoria || '', compativel: s.compativel || '',
+      quantidade: s.quantidade || 0, minimo: s.minimo || 0,
+      local: s.local || '', custo: s.custo || 0, venda: s.venda || 0
+    }));
 
-  state.os = [
-    {
-      id: 'os1', numero: 1001,
-      clienteId:'c1', clienteNome:'Maria Souza', clienteTelefone:'(11) 98888-1234',
-      aparelho:'Samsung Galaxy S21', imei:'354982',
-      defeito:'Tela quebrada após queda', senha:'',
-      acessorios:'Capinha preta',
-      diagnostico:'Tela LCD danificada, troca necessária.',
-      parts:[ { stockId:'p1', nome:'Tela LCD Galaxy S21', qtd:1, preco:450 } ],
-      maoObra: 60,
-      total: 510,
-      status:'Em andamento',
-      dataEntrada: daysAgo(3),
-      dataPrevista: daysFromNow(1),
-      observacoes:'Garantia de 90 dias para a peça.'
-    },
-    {
-      id: 'os2', numero: 1002,
-      clienteId:'c2', clienteNome:'João Pedro Lima', clienteTelefone:'(11) 97777-5566',
-      aparelho:'iPhone 12', imei:'',
-      defeito:'Bateria descarrega rápido',
-      senha:'2580',
-      acessorios:'Nenhum',
-      diagnostico:'Bateria com desgaste acima de 85%.',
-      parts:[],
-      maoObra: 0,
-      total: 0,
-      status:'Aguardando peça',
-      dataEntrada: daysAgo(5),
-      dataPrevista: daysFromNow(2),
-      observacoes:''
-    },
-    {
-      id: 'os3', numero: 1003,
-      clienteId:'c3', clienteNome:'Ana Carolina', clienteTelefone:'(11) 96666-9090',
-      aparelho:'Galaxy A32', imei:'',
-      defeito:'Tela não acende após contato com água',
-      senha:'',
-      acessorios:'Carregador',
-      diagnostico:'Aguardando avaliação completa de placa.',
-      parts:[],
-      maoObra: 0,
-      total: 0,
-      status:'Aberto',
-      dataEntrada: daysAgo(1),
-      dataPrevista: daysFromNow(4),
-      observacoes:''
-    },
-    {
-      id: 'os4', numero: 1000,
-      clienteId:'c4', clienteNome:'Carlos Eduardo', clienteTelefone:'(11) 95555-3322',
-      aparelho:'iPhone 11', imei:'',
-      defeito:'Câmera traseira não foca',
-      senha:'',
-      acessorios:'',
-      diagnostico:'Módulo de câmera com defeito, substituído.',
-      parts:[ { stockId:'p5', nome:'Câmera traseira iPhone 11', qtd:1, preco:250 } ],
-      maoObra: 50,
-      total: 300,
-      status:'Entregue',
-      dataEntrada: daysAgo(10),
-      dataPrevista: daysAgo(6),
-      observacoes:'Garantia de 90 dias.'
-    },
-  ];
+    state.os = os.map(o => ({
+      id: o.id, numero: o.numero,
+      clienteId: o.cliente_id, clienteNome: o.cliente_nome || '',
+      clienteTelefone: o.cliente_telefone || '',
+      chamado: o.chamado || '', aparelho: o.aparelho || '',
+      imei: o.imei || '', defeito: o.defeito || '',
+      senha: o.senha || '', acessorios: o.acessorios || '',
+      checklist: o.checklist || {},
+      diagnostico: o.diagnostico || '',
+      parts: o.parts || [],
+      aparelhosExtras: o.aparelhos_extras || [],
+      maoObra: o.mao_obra || 0, total: o.total || 0,
+      status: o.status || 'Aberto',
+      pagamento: o.pagamento || '', garantia: o.garantia || '',
+      dataEntrada: o.data_entrada || '', dataPrevista: o.data_prevista || '',
+      observacoes: o.observacoes || '',
+      historico: o.historico || []
+    }));
 
-  state.nextOSNumber = 1004;
+    // Reconstruir history a partir do campo historico de cada OS
+    state.history = {};
+    state.os.forEach(o => {
+      if(o.historico && o.historico.length) state.history[o.id] = o.historico;
+    });
 
-  state.history = {
-    os1: [
-      {date: daysAgo(3), text:'OS criada. Aparelho recebido.'},
-      {date: daysAgo(2), text:'Diagnóstico realizado: tela LCD danificada.'},
-      {date: daysAgo(1), text:'Peça separada do estoque. Reparo em andamento.'},
-    ],
-    os2: [
-      {date: daysAgo(5), text:'OS criada. Aparelho recebido.'},
-      {date: daysAgo(4), text:'Diagnóstico: bateria com desgaste.'},
-      {date: daysAgo(3), text:'Aguardando chegada da bateria compatível.'},
-    ],
-    os3: [
-      {date: daysAgo(1), text:'OS criada. Aparelho recebido para avaliação.'},
-    ],
-    os4: [
-      {date: daysAgo(10), text:'OS criada. Aparelho recebido.'},
-      {date: daysAgo(9), text:'Diagnóstico: módulo de câmera com defeito.'},
-      {date: daysAgo(8), text:'Peça substituída.'},
-      {date: daysAgo(6), text:'Aparelho entregue ao cliente.'},
-    ],
-  };
+    state.nextOSNumber = cfg ? parseInt(cfg) : 1001;
+
+  } catch(e) {
+    console.error('Erro ao carregar dados:', e);
+    showToast('Erro ao conectar ao banco de dados.', true);
+  } finally {
+    showLoadingOverlay(false);
+  }
 }
-seedData();
+
+function showLoadingOverlay(show){
+  let el = document.getElementById('loading-overlay');
+  if(!el){
+    el = document.createElement('div');
+    el.id = 'loading-overlay';
+    el.style.cssText = `position:fixed;inset:0;background:rgba(15,18,22,0.85);z-index:9999;
+      display:flex;align-items:center;justify-content:center;flex-direction:column;gap:16px;`;
+    el.innerHTML = `
+      <div style="width:44px;height:44px;border:3px solid #343c45;border-top-color:#2da0e0;
+        border-radius:50%;animation:spin .7s linear infinite;"></div>
+      <span style="color:#9aa5b1;font-size:14px;">Carregando dados...</span>
+      <style>@keyframes spin{to{transform:rotate(360deg)}}</style>`;
+    document.body.appendChild(el);
+  }
+  el.style.display = show ? 'flex' : 'none';
+}
+
+
 
 /* =========================================================
    NAVEGAÇÃO
@@ -1658,6 +1714,8 @@ function openOSModal(osId){
   document.getElementById('os-data-entrada').value = todayISO();
   document.getElementById('os-data-prevista').value = '';
   document.getElementById('os-observacoes').value = '';
+  document.getElementById('os-pagamento').value = '';
+  document.getElementById('os-garantia').value = '';
   document.getElementById('os-parts-list').innerHTML = '';
   document.getElementById('aparelhos-extras-list').innerHTML = '';
   document.getElementById('aparelho-principal-resumo').style.display = 'none';
@@ -1699,6 +1757,8 @@ function openOSModal(osId){
     document.getElementById('os-data-entrada').value = o.dataEntrada;
     document.getElementById('os-data-prevista').value = o.dataPrevista || '';
     document.getElementById('os-observacoes').value = o.observacoes || '';
+    document.getElementById('os-pagamento').value = o.pagamento || '';
+    document.getElementById('os-garantia').value = o.garantia || '';
 
     o.parts.forEach(p => addPartRow(p));
     if((o.aparelhosExtras || []).length > 0){
@@ -1797,13 +1857,24 @@ function updateOSTotal(){
 }
 
 /* ---------- Salvar OS ---------- */
-function saveOS(){
+async function saveOS(){
   const clienteId = document.getElementById('os-cliente-id').value;
   const aparelho = document.getElementById('os-aparelho').value.trim() || document.getElementById('ac-aparelho-input').value.trim();
   const defeito = document.getElementById('os-defeito').value.trim();
 
+  const chamado = document.getElementById('os-chamado').value.trim();
+  const imei    = document.getElementById('os-imei').value.trim();
+
   if(!clienteId || !aparelho || !defeito){
     showToast('Preencha os campos obrigatórios (*)', true);
+    return;
+  }
+  if(!chamado){
+    showToast('O campo Chamado é obrigatório.', true);
+    return;
+  }
+  if(!imei){
+    showToast('O campo IMEI / Nº de série é obrigatório.', true);
     return;
   }
 
@@ -1866,74 +1937,100 @@ function saveOS(){
   const dataEntrada = document.getElementById('os-data-entrada').value || todayISO();
   const dataPrevista = document.getElementById('os-data-prevista').value;
 
-  if(id){
-    // Editing existing OS
-    const o = state.os.find(x => x.id === id);
-    const oldStatus = o.status;
-    const oldParts = o.parts;
+  const osData = (osId, numero, historico) => ({
+    id: osId,
+    numero,
+    cliente_id: clienteId,
+    cliente_nome: nome,
+    cliente_telefone: telefone,
+    aparelho,
+    chamado: document.getElementById('os-chamado').value.trim(),
+    imei: document.getElementById('os-imei').value.trim(),
+    defeito,
+    senha: document.getElementById('os-senha').value.trim(),
+    checklist,
+    acessorios: [
+      document.getElementById('os-acs-capa').checked ? 'Capa' : '',
+      document.getElementById('os-acs-chip').checked ? 'Chip' : '',
+      document.getElementById('os-acs-carregador').checked ? 'Carregador' : ''
+    ].filter(Boolean).join(', '),
+    diagnostico: document.getElementById('os-diagnostico').value.trim(),
+    aparelhos_extras: aparelhosExtras,
+    parts,
+    mao_obra: maoObra,
+    total,
+    status,
+    pagamento: document.getElementById('os-pagamento').value,
+    garantia: document.getElementById('os-garantia').value,
+    data_entrada: dataEntrada,
+    data_prevista: dataPrevista,
+    observacoes: document.getElementById('os-observacoes').value.trim(),
+    historico
+  });
 
-    // Revert old stock deductions
-    oldParts.forEach(p => adjustStock(p.stockId, p.qtd)); // give back
-    // Apply new stock deductions
-    let stockError = false;
-    parts.forEach(p => {
-      const item = state.stock.find(s => s.id === p.stockId);
-      if(item && item.quantidade < p.qtd) stockError = true;
-    });
-    parts.forEach(p => adjustStock(p.stockId, -p.qtd));
+  try {
+    if(id){
+      // Editar OS existente
+      const o = state.os.find(x => x.id === id);
+      const oldStatus = o.status;
+      const oldParts  = o.parts;
 
-    Object.assign(o, {
-      clienteId, clienteNome: nome, clienteTelefone: telefone, aparelho,
-      chamado: document.getElementById('os-chamado').value.trim(),
-      imei: document.getElementById('os-imei').value.trim(),
-      defeito, senha: document.getElementById('os-senha').value.trim(),
-      checklist,
-      acessorios: [
-        document.getElementById('os-acs-capa').checked ? 'Capa' : '',
-        document.getElementById('os-acs-chip').checked ? 'Chip' : '',
-        document.getElementById('os-acs-carregador').checked ? 'Carregador' : ''
-      ].filter(Boolean).join(', '),
-      diagnostico: document.getElementById('os-diagnostico').value.trim(),
-      aparelhosExtras,
-      parts, maoObra, total, status, dataEntrada, dataPrevista,
-      observacoes: document.getElementById('os-observacoes').value.trim()
-    });
+      oldParts.forEach(p => adjustStock(p.stockId, p.qtd));
+      parts.forEach(p => adjustStock(p.stockId, -p.qtd));
 
-    if(oldStatus !== status){
-      addHistoryEntry(id, `Status alterado de "${oldStatus}" para "${status}".`);
+      if(oldStatus !== status){
+        addHistoryEntry(id, `Status alterado de "${oldStatus}" para "${status}".`);
+      } else {
+        addHistoryEntry(id, 'Ordem de serviço atualizada.');
+      }
+
+      const payload = osData(id, o.numero, state.history[id] || []);
+      await sbPatch('ordens_servico', 'id', id, payload);
+
+      Object.assign(o, {
+        clienteId, clienteNome: nome, clienteTelefone: telefone, aparelho,
+        chamado: payload.chamado, imei: payload.imei,
+        defeito, senha: payload.senha, checklist,
+        acessorios: payload.acessorios,
+        diagnostico: payload.diagnostico,
+        aparelhosExtras, parts, maoObra, total, status,
+        pagamento: payload.pagamento, garantia: payload.garantia,
+        dataEntrada, dataPrevista, observacoes: payload.observacoes,
+        historico: state.history[id] || []
+      });
+
+      showToast(`OS #${o.numero} atualizada com sucesso.`);
+
     } else {
-      addHistoryEntry(id, 'Ordem de serviço atualizada.');
+      // Nova OS
+      const numero = state.nextOSNumber++;
+      const newId  = 'os' + Date.now();
+
+      parts.forEach(p => adjustStock(p.stockId, -p.qtd));
+      addHistoryEntry(newId, 'OS criada. Aparelho recebido.');
+
+      const payload = osData(newId, numero, state.history[newId] || []);
+      await sbPost('ordens_servico', payload);
+      await sbSetConfig('next_os_number', state.nextOSNumber);
+
+      state.os.unshift({
+        id: newId, numero,
+        clienteId, clienteNome: nome, clienteTelefone: telefone,
+        aparelho, chamado: payload.chamado, imei: payload.imei,
+        defeito, senha: payload.senha, checklist,
+        acessorios: payload.acessorios,
+        diagnostico: payload.diagnostico,
+        aparelhosExtras, parts, maoObra, total, status,
+        pagamento: payload.pagamento, garantia: payload.garantia,
+        dataEntrada, dataPrevista, observacoes: payload.observacoes,
+        historico: state.history[newId] || []
+      });
+
+      showToast(`OS #${numero} criada com sucesso.`);
     }
-
-    showToast(`OS #${o.numero} atualizada com sucesso.`);
-  } else {
-    // New OS
-    const numero = state.nextOSNumber++;
-    const newId = 'os' + Date.now();
-
-    // Deduct stock
-    parts.forEach(p => adjustStock(p.stockId, -p.qtd));
-
-    state.os.push({
-      id: newId, numero,
-      clienteId, clienteNome: nome, clienteTelefone: telefone, aparelho,
-      chamado: document.getElementById('os-chamado').value.trim(),
-      imei: document.getElementById('os-imei').value.trim(),
-      defeito, senha: document.getElementById('os-senha').value.trim(),
-      checklist,
-      acessorios: [
-        document.getElementById('os-acs-capa').checked ? 'Capa' : '',
-        document.getElementById('os-acs-chip').checked ? 'Chip' : '',
-        document.getElementById('os-acs-carregador').checked ? 'Carregador' : ''
-      ].filter(Boolean).join(', '),
-      diagnostico: document.getElementById('os-diagnostico').value.trim(),
-      aparelhosExtras,
-      parts, maoObra, total, status, dataEntrada, dataPrevista,
-      observacoes: document.getElementById('os-observacoes').value.trim()
-    });
-
-    addHistoryEntry(newId, 'OS criada. Aparelho recebido.');
-    showToast(`OS #${numero} criada com sucesso.`);
+  } catch(e) {
+    showToast('Erro ao salvar OS: ' + e.message, true);
+    return;
   }
 
   closeModal('os-modal-overlay');
@@ -2118,11 +2215,18 @@ function adjustStock(stockId, delta){
   const item = state.stock.find(s => s.id === stockId);
   if(!item) return;
   item.quantidade = Math.max(0, item.quantidade + delta);
+  // Persistir no Supabase em background (sem await para não bloquear)
+  sbPatch('estoque', 'id', stockId, { quantidade: item.quantidade }).catch(console.error);
 }
 
 function addHistoryEntry(osId, text){
   if(!state.history[osId]) state.history[osId] = [];
   state.history[osId].push({ date: todayISO(), text });
+  // Persistir historico junto com a OS
+  const o = state.os.find(x => x.id === osId);
+  if(o){
+    o.historico = state.history[osId];
+  }
 }
 
 /* ---------- Visualizar OS ---------- */
@@ -2241,6 +2345,8 @@ function viewOS(osId){
             <div class="kv-row"><span class="kv-label">Status atual</span><span class="kv-value"><span class="badge ${statusBadgeClass(o.status)}">${o.status}</span></span></div>
             <div class="kv-row"><span class="kv-label">Entrada</span><span class="kv-value mono">${formatDate(o.dataEntrada)}</span></div>
             <div class="kv-row"><span class="kv-label">Previsão</span><span class="kv-value mono">${formatDate(o.dataPrevista)}</span></div>
+            ${o.pagamento ? `<div class="kv-row"><span class="kv-label">Forma de pagamento</span><span class="kv-value">${escapeHtml(o.pagamento)}</span></div>` : ''}
+            ${o.garantia ? `<div class="kv-row"><span class="kv-label">Garantia</span><span class="kv-value">${escapeHtml(String(o.garantia))} dias</span></div>` : ''}
             ${o.senha ? `<div class="kv-row"><span class="kv-label">Senha aparelho</span><span class="kv-value mono">${escapeHtml(o.senha)}</span></div>` : ''}
           </div>
 
@@ -2455,7 +2561,7 @@ function printOS(){
     <div class="p-field"><span class="p-field-label">CPF:</span><span class="p-field-value">${escapeHtml(cli.cpfcnpj||'')}</span></div>
     <div class="p-field"><span class="p-field-label">Senha:</span><span class="p-field-value">${escapeHtml(o.senha||'')}</span></div>
     <div class="p-field"><span class="p-field-label">Fone:</span><span class="p-field-value">${escapeHtml(o.clienteTelefone||'')}</span></div>
-    <div class="p-field"><span class="p-field-label">Forma de pagamento:</span><span class="p-field-value"></span></div>
+    <div class="p-field"><span class="p-field-label">Forma de pagamento:</span><span class="p-field-value">${escapeHtml(o.pagamento||'')}</span></div>
     <div class="p-field"><span class="p-field-label">End:</span><span class="p-field-value">${escapeHtml(cli.endereco||'')}</span></div>
     <div class="p-field"><span class="p-field-label">Data de Retirada:</span><span class="p-field-value">${formatDate(o.dataPrevista)||''}</span></div>
     <div class="p-field"><span class="p-field-label">Data de Entrada:</span><span class="p-field-value">${formatDate(o.dataEntrada)||''}</span></div>
@@ -2537,7 +2643,7 @@ function printOS(){
 
   <!-- GARANTIA -->
   <div class="p-garantia">
-    <strong>OS REPAROS REALIZADOS SÃO GARANTIDOS POR_____ DIAS</strong>
+    <strong>OS REPAROS REALIZADOS SÃO GARANTIDOS POR ${o.garantia ? o.garantia + ' ' : '_____'} DIAS</strong>
     <p><strong>A GARANTIA DAS PEÇAS TROCADAS NÃO COBRE MAU USO, QUEDAS, TRINCOS, UMIDADE OU ABERTURA POR TERCEIROS.</strong></p>
   </div>
   ${o.observacoes ? `<div style="font-size:9pt;text-align:center;margin-top:3pt;">${escapeHtml(o.observacoes)}</div>` : ''}
@@ -2644,7 +2750,7 @@ function openStockModal(stockId){
   openModal('stock-modal-overlay');
 }
 
-function saveStockItem(){
+async function saveStockItem(){
   const codigo = document.getElementById('stock-codigo').value.trim();
   const nome = document.getElementById('stock-nome').value.trim();
   const categoria = document.getElementById('stock-categoria').value.trim();
@@ -2665,13 +2771,21 @@ function saveStockItem(){
   };
 
   const id = document.getElementById('stock-id').value;
-  if(id){
-    const s = state.stock.find(x => x.id === id);
-    Object.assign(s, data);
-    showToast('Item de estoque atualizado.');
-  } else {
-    state.stock.push({ id: 'p' + Date.now(), ...data });
-    showToast('Item de estoque adicionado.');
+  try {
+    if(id){
+      await sbPatch('estoque', 'id', id, data);
+      const s = state.stock.find(x => x.id === id);
+      Object.assign(s, data);
+      showToast('Item de estoque atualizado.');
+    } else {
+      const newId = 'p' + Date.now();
+      await sbPost('estoque', { id: newId, ...data });
+      state.stock.push({ id: newId, ...data });
+      showToast('Item de estoque adicionado.');
+    }
+  } catch(e) {
+    showToast('Erro ao salvar estoque: ' + e.message, true);
+    return;
   }
 
   closeModal('stock-modal-overlay');
@@ -2679,12 +2793,17 @@ function saveStockItem(){
   renderDashboard();
 }
 
-function deleteStockItem(stockId){
+async function deleteStockItem(stockId){
   if(!confirm('Remover este item do estoque?')) return;
-  state.stock = state.stock.filter(s => s.id !== stockId);
-  renderStockTable();
-  renderDashboard();
-  showToast('Item removido do estoque.');
+  try {
+    await sbDelete('estoque', 'id', stockId);
+    state.stock = state.stock.filter(s => s.id !== stockId);
+    renderStockTable();
+    renderDashboard();
+    showToast('Item removido do estoque.');
+  } catch(e) {
+    showToast('Erro ao remover item: ' + e.message, true);
+  }
 }
 
 /* =========================================================
@@ -2761,7 +2880,7 @@ function openClientModal(clientId){
   openModal('client-modal-overlay');
 }
 
-function saveClient(){
+async function saveClient(){
   const nome = document.getElementById('client-nome').value.trim();
   const telefone = document.getElementById('client-telefone').value.trim();
 
@@ -2780,18 +2899,25 @@ function saveClient(){
 
   const id = document.getElementById('client-id').value;
   let savedId = id;
-  if(id){
-    const c = state.clients.find(x => x.id === id);
-    Object.assign(c, data);
-    // keep OS records in sync with updated name/phone
-    state.os.forEach(o => {
-      if(o.clienteId === id){ o.clienteNome = data.nome; o.clienteTelefone = data.telefone; }
-    });
-    showToast('Cliente atualizado.');
-  } else {
-    savedId = 'c' + Date.now();
-    state.clients.push({ id: savedId, ...data });
-    showToast('Cliente cadastrado.');
+
+  try {
+    if(id){
+      await sbPatch('clientes', 'id', id, data);
+      const c = state.clients.find(x => x.id === id);
+      Object.assign(c, data);
+      state.os.forEach(o => {
+        if(o.clienteId === id){ o.clienteNome = data.nome; o.clienteTelefone = data.telefone; }
+      });
+      showToast('Cliente atualizado.');
+    } else {
+      savedId = 'c' + Date.now();
+      await sbPost('clientes', { id: savedId, ...data });
+      state.clients.push({ id: savedId, ...data });
+      showToast('Cliente cadastrado.');
+    }
+  } catch(e) {
+    showToast('Erro ao salvar cliente: ' + e.message, true);
+    return;
   }
 
   const wasFromOS = document.getElementById('client-modal-overlay').dataset.fromOS === '1';
@@ -2799,7 +2925,6 @@ function saveClient(){
   renderClientsTable();
   renderDashboard();
 
-  // If opened from the OS form, refresh the select and pick the new client
   if(wasFromOS && document.getElementById('os-modal-overlay').classList.contains('open')){
     populateClientSelect();
     document.getElementById('os-cliente-id').value = savedId;
@@ -2807,16 +2932,21 @@ function saveClient(){
   }
 }
 
-function deleteClient(clientId){
+async function deleteClient(clientId){
   const hasOS = state.os.some(o => o.clienteId === clientId);
   if(hasOS){
     showToast('Não é possível remover: este cliente possui ordens de serviço.', true);
     return;
   }
   if(!confirm('Remover este cliente?')) return;
-  state.clients = state.clients.filter(c => c.id !== clientId);
-  renderClientsTable();
-  showToast('Cliente removido.');
+  try {
+    await sbDelete('clientes', 'id', clientId);
+    state.clients = state.clients.filter(c => c.id !== clientId);
+    renderClientsTable();
+    showToast('Cliente removido.');
+  } catch(e) {
+    showToast('Erro ao remover cliente: ' + e.message, true);
+  }
 }
 
 /* =========================================================
@@ -2862,13 +2992,42 @@ function importData(event){
 }
 
 /* =========================================================
+   AUTENTICAÇÃO — verificar sessão
+   ========================================================= */
+function getCurrentUser(){
+  try { return JSON.parse(sessionStorage.getItem('mobit_user') || 'null'); } catch{ return null; }
+}
+
+function logout(){
+  sessionStorage.removeItem('mobit_user');
+  window.location.href = 'login.html';
+}
+
+/* =========================================================
    INICIALIZAÇÃO
    ========================================================= */
-document.getElementById('os-data-entrada').value = todayISO();
-renderDashboard();
-renderOSTable();
-renderStockTable();
-renderClientsTable();
+(async function init(){
+  // Verificar sessão
+  const user = getCurrentUser();
+  if(!user){
+    window.location.href = 'login.html';
+    return;
+  }
+
+  // Mostrar nome do usuário logado na sidebar
+  const userEl = document.getElementById('sidebar-user');
+  if(userEl) userEl.textContent = user.nome || user.usuario;
+
+  document.getElementById('os-data-entrada').value = todayISO();
+
+  // Carregar dados do Supabase
+  await loadFromSupabase();
+
+  renderDashboard();
+  renderOSTable();
+  renderStockTable();
+  renderClientsTable();
+})();
 </script>
 
 </body>
