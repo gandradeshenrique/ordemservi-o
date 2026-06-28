@@ -751,7 +751,7 @@
         <table>
           <thead>
             <tr>
-              <th>Código</th><th>Item</th><th>Categoria</th><th>Compatível com</th>
+              <th>Código</th><th>Item</th><th>Detalhes</th><th>Categoria</th><th>Compatível com</th>
               <th>Qtd.</th><th>Mín.</th><th>Custo</th><th>Venda</th><th></th>
             </tr>
           </thead>
@@ -1245,7 +1245,12 @@
 
     <div class="field">
       <label>Nome do item *</label>
-      <input type="text" id="stock-nome" placeholder="Ex: Tela LCD Galaxy S21">
+      <input type="text" id="stock-nome" placeholder="Ex: Samsung A12">
+    </div>
+
+    <div class="field">
+      <label>Detalhes</label>
+      <input type="text" id="stock-detalhes" placeholder="Ex: c/ Aro, s/ Aro, OLED, Preto, Premium...">
     </div>
 
     <div class="field">
@@ -1604,7 +1609,7 @@ async function loadFromSupabase(){
 
     state.stock = stock.map(s => ({
       id: s.id, codigo: s.codigo || '', nome: s.nome,
-      categoria: s.categoria || '', compativel: s.compativel || '',
+      categoria: s.categoria || '', detalhes: s.detalhes || '', compativel: s.compativel || '',
       quantidade: s.quantidade || 0, minimo: s.minimo || 0,
       local: s.local || '', custo: s.custo || 0, venda: s.venda || 0,
       fornecedor: s.fornecedor || '', pedido: s.pedido || '', dataPedido: s.data_pedido || ''
@@ -2736,7 +2741,8 @@ function renderItensPedido(){
       <td style="padding:8px 10px; font-family:monospace; font-size:11px; color:var(--text-dim);">${escapeHtml(item.codigo||'—')}</td>
       <td style="padding:8px 10px;">
         <span style="font-size:10px; font-weight:700; color:var(--accent); background:rgba(45,160,224,0.1); border-radius:4px; padding:1px 6px; margin-right:6px;">${escapeHtml(item.categoria||'Peça')}</span>
-        ${escapeHtml(item.nome || item.descricao || '')}
+        <strong>${escapeHtml(item.nome || item.descricao || '')}</strong>
+        ${item.detalhes ? `<span style="font-size:11px; color:var(--text-dim); margin-left:5px;">${escapeHtml(item.detalhes)}</span>` : ''}
       </td>
       <td style="padding:8px 10px; text-align:center; font-weight:600;">${item.qtd}</td>
       <td style="padding:8px 10px; text-align:right; font-family:monospace;">${formatCurrency(item.preco)}</td>
@@ -2761,6 +2767,7 @@ async function salvarPedidoNoEstoque(){
     const id   = 'p' + Date.now() + Math.random().toString(36).slice(2,5);
     const row = {
       id, codigo: item.codigo || '', nome: item.nome || item.descricao || '',
+      detalhes: item.detalhes || '',
       categoria: item.categoria || 'Peça', compativel: '', quantidade: item.qtd,
       minimo: 0, local: '', custo: item.preco, venda: 0,
       fornecedor, pedido: numeroPedido, data_pedido: dataPedido
@@ -3288,6 +3295,7 @@ function renderStockTable(){
     <tr>
       <td class="mono">${escapeHtml(s.codigo)}</td>
       <td class="cell-strong">${escapeHtml(s.nome)}</td>
+      <td class="text-faint">${s.detalhes ? `<span style="font-size:11px;background:rgba(255,255,255,0.06);border-radius:4px;padding:2px 7px;">${escapeHtml(s.detalhes)}</span>` : '—'}</td>
       <td>${escapeHtml(s.categoria)}</td>
       <td class="text-faint">${escapeHtml(s.compativel || '—')}</td>
       <td class="mono">${s.quantidade}</td>
@@ -3306,6 +3314,7 @@ function openStockModal(stockId){
   document.getElementById('stock-id').value = '';
   document.getElementById('stock-codigo').value = '';
   document.getElementById('stock-nome').value = '';
+  document.getElementById('stock-detalhes').value = '';
   document.getElementById('stock-categoria').value = '';
   document.getElementById('stock-compativel').value = '';
   document.getElementById('stock-quantidade').value = '';
@@ -3324,6 +3333,7 @@ function openStockModal(stockId){
     document.getElementById('stock-id').value = s.id;
     document.getElementById('stock-codigo').value = s.codigo;
     document.getElementById('stock-nome').value = s.nome;
+    document.getElementById('stock-detalhes').value = s.detalhes || '';
     document.getElementById('stock-categoria').value = s.categoria;
     document.getElementById('stock-compativel').value = s.compativel || '';
     document.getElementById('stock-quantidade').value = s.quantidade;
@@ -3352,7 +3362,9 @@ async function saveStockItem(){
   }
 
   const data = {
-    codigo, nome, categoria,
+    codigo, nome,
+    detalhes:    document.getElementById('stock-detalhes').value.trim(),
+    categoria,
     compativel: document.getElementById('stock-compativel').value.trim(),
     quantidade: parseInt(document.getElementById('stock-quantidade').value) || 0,
     minimo: parseInt(document.getElementById('stock-minimo').value) || 0,
