@@ -619,13 +619,9 @@
     </button>
 
     <div class="nav-divider"></div>
-    <button class="nav-item" onclick="exportData()">
-      <span class="nav-icon">&#11015;</span> Exportar dados
+    <button class="nav-item" onclick="openDataModal()">
+      <span class="nav-icon">&#128196;</span> Relatórios / Dados
     </button>
-    <button class="nav-item" onclick="document.getElementById('import-file').click()">
-      <span class="nav-icon">&#11014;</span> Importar dados
-    </button>
-    <input type="file" id="import-file" accept=".json" style="display:none" onchange="importData(event)">
 
     <div class="sidebar-footer" style="display:flex;flex-direction:column;gap:6px;align-items:flex-start;">
       <div style="display:flex;align-items:center;gap:8px;width:100%;">
@@ -705,6 +701,7 @@
         <select id="os-filter-status" onchange="renderOSTable()">
           <option value="">Todos os status</option>
           <option value="Aberto">Aberto</option>
+          <option value="Aguardando aprovação">Aguardando aprovação</option>
           <option value="Em andamento">Em andamento</option>
           <option value="Aguardando peça">Aguardando peça</option>
           <option value="Concluído">Concluído</option>
@@ -734,6 +731,10 @@
           <p>Peças, componentes e acessórios</p>
         </div>
         <button class="btn btn-primary" onclick="openStockModal()">+ Novo item</button>
+        <button class="btn" onclick="openPedidoModal()" style="display:flex;align-items:center;gap:6px;">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+          Importar pedido
+        </button>
       </div>
 
       <div class="toolbar">
@@ -779,7 +780,7 @@
       <div class="table-wrap">
         <table>
           <thead>
-            <tr><th>Cliente</th><th>CPF / CNPJ</th><th>Telefone</th><th>Ordens</th><th>Total gasto</th><th>Última visita</th><th></th></tr>
+            <tr><th>Cliente</th><th>CPF / CNPJ</th><th>Tipo</th><th>Telefone</th><th>Ordens</th><th>Total gasto</th><th>Última visita</th><th></th></tr>
           </thead>
           <tbody id="clients-table-body"></tbody>
         </table>
@@ -805,7 +806,8 @@
         <label>Cliente *</label>
         <div class="ac-wrap" id="ac-cliente-wrap">
           <input type="text" id="ac-cliente-input" class="ac-input" placeholder="Digite o nome ou telefone do cliente..." autocomplete="off"
-            oninput="acFilter('cliente')" onfocus="acFilter('cliente')" onkeydown="acKeyDown(event,'cliente')">
+            oninput="acFilter('cliente')" onfocus="acFilter('cliente')" onkeydown="acKeyDown(event,'cliente')"
+            onblur="validarClienteSelecionado()">
           <div class="ac-dropdown" id="ac-cliente-list"></div>
         </div>
         <input type="hidden" id="os-cliente-id">
@@ -825,6 +827,29 @@
         <label>Chamado *</label>
         <input type="text" id="os-chamado" placeholder="Nº do chamado / protocolo">
       </div>
+
+      <!-- Campos exclusivos para Pessoa Jurídica -->
+      <div id="os-pj-fields" style="display:none;">
+        <div style="display:flex; align-items:center; gap:8px; margin-bottom:10px; padding:7px 12px; background:rgba(251,191,36,0.08); border:1px solid rgba(251,191,36,0.2); border-radius:6px;">
+          <span style="font-size:12px;">🏢</span>
+          <span style="font-size:12px; color:#f59e0b; font-weight:600;">Pessoa Jurídica — preencha os dados corporativos</span>
+        </div>
+        <div class="field-row">
+          <div class="field">
+            <label>Centro de custo</label>
+            <input type="text" id="os-centro-custo" placeholder="Ex: TI, Suporte, Financeiro...">
+          </div>
+          <div class="field">
+            <label>Chamado cliente</label>
+            <input type="text" id="os-chamado-cliente" placeholder="Nº do chamado interno do cliente">
+          </div>
+        </div>
+        <div class="field">
+          <label>Solicitante</label>
+          <input type="text" id="os-solicitante" placeholder="Nome do responsável que abriu o chamado">
+        </div>
+      </div>
+
     </fieldset>
 
     <fieldset>
@@ -865,6 +890,7 @@
         <textarea id="os-defeito" placeholder="Ex: Tela não acende, caiu na água..."></textarea>
       </div>
       <!-- CHECKLIST -->
+      <div id="os-checklist-wrap">
       <fieldset style="border:1px solid var(--border); border-radius:var(--radius); padding:14px 18px; margin-bottom:4px;">
         <legend style="font-size:13px; font-weight:600; color:var(--accent); padding:0 6px;">
           ✔ Lista de Checagem — Os itens abaixo estão em condições de utilização? <span style="color:var(--red);">*</span>
@@ -977,6 +1003,7 @@
 
         </div>
       </fieldset>
+      </div><!-- fim #os-checklist-wrap -->
 
       <div class="field">
         <label>Senha / padrão de desbloqueio</label>
@@ -1038,6 +1065,7 @@
           <label>Status</label>
           <select id="os-status">
             <option>Aberto</option>
+            <option>Aguardando aprovação</option>
             <option>Em andamento</option>
             <option>Aguardando peça</option>
             <option>Concluído</option>
@@ -1102,6 +1130,99 @@
 </div>
 
 <!-- ===================== MODAL: ITEM DE ESTOQUE ===================== -->
+<!-- ===================== MODAL: IMPORTAR PEDIDO ===================== -->
+<div class="modal-overlay" id="pedido-modal-overlay">
+  <div class="modal" style="max-width:620px;">
+    <div class="modal-header">
+      <h2 class="modal-title">📦 Importar Pedido de Peças</h2>
+      <button class="modal-close" onclick="closeModal('pedido-modal-overlay')">&times;</button>
+    </div>
+    <div class="modal-body">
+      <p style="font-size:13px;color:var(--text-dim);margin-bottom:18px;">
+        Envie o arquivo do pedido (foto ou PDF). A IA identifica o fornecedor, data, número e todas as peças automaticamente.
+      </p>
+
+      <!-- Dropzone -->
+      <div id="ped-dropzone"
+        style="border:2px dashed var(--border);border-radius:10px;padding:32px;text-align:center;cursor:pointer;transition:border-color .2s;margin-bottom:16px;"
+        onclick="document.getElementById('ped-file').click()"
+        ondragover="event.preventDefault();this.style.borderColor='var(--accent)'"
+        ondragleave="this.style.borderColor='var(--border)'"
+        ondrop="handlePedidoFileDrop(event)">
+        <div style="font-size:36px;margin-bottom:10px;">📄</div>
+        <div style="font-size:14px;font-weight:600;color:var(--text);">Clique ou arraste o arquivo aqui</div>
+        <div style="font-size:12px;color:var(--text-dim);margin-top:6px;">Aceita foto (JPG, PNG) ou PDF</div>
+        <div id="ped-filename" style="font-size:13px;color:var(--accent);margin-top:8px;font-weight:600;"></div>
+      </div>
+      <input type="file" id="ped-file" accept="image/*,.pdf" style="display:none" onchange="onPedidoFileSelect(event)">
+
+      <!-- Preview da imagem -->
+      <div id="ped-img-preview" style="display:none;margin-bottom:12px;text-align:center;">
+        <img id="ped-img-el" style="max-height:200px;border-radius:8px;border:1px solid var(--border);">
+      </div>
+
+      <!-- Botão processar -->
+      <button id="btn-processar-pedido" class="btn btn-primary" style="width:100%;margin-bottom:16px;" onclick="processarPedidoIA()" disabled>
+        🤖 Processar com IA
+      </button>
+
+      <!-- Status -->
+      <div id="ped-status" style="display:none;font-size:13px;color:var(--text-dim);text-align:center;padding:10px;"></div>
+
+      <!-- Card de dados detectados -->
+      <div id="ped-dados-detectados" style="display:none; background:var(--panel-2); border:1px solid var(--border); border-radius:8px; padding:14px 16px; margin-bottom:14px;">
+        <div style="font-size:11px;font-weight:700;color:var(--accent);text-transform:uppercase;letter-spacing:.05em;margin-bottom:10px;">Dados identificados pela IA</div>
+        <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;">
+          <div>
+            <div style="font-size:11px;color:var(--text-dim);margin-bottom:3px;">Fornecedor</div>
+            <div id="ped-det-fornecedor" style="font-size:13px;font-weight:600;"></div>
+          </div>
+          <div>
+            <div style="font-size:11px;color:var(--text-dim);margin-bottom:3px;">Nº Pedido</div>
+            <div id="ped-det-numero" style="font-size:13px;font-weight:600;font-family:monospace;"></div>
+          </div>
+          <div>
+            <div style="font-size:11px;color:var(--text-dim);margin-bottom:3px;">Data do pedido</div>
+            <div id="ped-det-data" style="font-size:13px;font-weight:600;"></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Campos ocultos para uso no JS -->
+      <input type="hidden" id="ped-fornecedor">
+      <input type="hidden" id="ped-data">
+      <input type="hidden" id="ped-numero">
+
+      <!-- Tabela de resultados -->
+      <div id="ped-resultado" style="display:none;">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;">
+          <span style="font-size:13px;font-weight:700;">Peças identificadas — revise e confirme:</span>
+          <span id="ped-count" style="font-size:12px;color:var(--accent);"></span>
+        </div>
+        <div style="max-height:320px;overflow-y:auto;border:1px solid var(--border);border-radius:8px;">
+          <table style="width:100%;border-collapse:collapse;font-size:12px;">
+            <thead>
+              <tr style="background:var(--panel-2);position:sticky;top:0;">
+                <th style="padding:8px 10px;text-align:left;border-bottom:1px solid var(--border);">✓</th>
+                <th style="padding:8px 10px;text-align:left;border-bottom:1px solid var(--border);">Código</th>
+                <th style="padding:8px 10px;text-align:left;border-bottom:1px solid var(--border);">Descrição</th>
+                <th style="padding:8px 10px;text-align:center;border-bottom:1px solid var(--border);">Qtd</th>
+                <th style="padding:8px 10px;text-align:right;border-bottom:1px solid var(--border);">P.Unit (R$)</th>
+              </tr>
+            </thead>
+            <tbody id="ped-itens-body"></tbody>
+          </table>
+        </div>
+        <div style="margin-top:14px;display:flex;gap:10px;">
+          <button class="btn" onclick="closeModal('pedido-modal-overlay')" style="flex:1;">Cancelar</button>
+          <button class="btn btn-primary" onclick="salvarPedidoNoEstoque()" style="flex:2;">💾 Salvar selecionados no estoque</button>
+        </div>
+      </div>
+
+    </div>
+  </div>
+</div>
+
 <div class="modal-overlay" id="stock-modal-overlay">
   <div class="modal">
     <div class="modal-header">
@@ -1158,6 +1279,26 @@
       </div>
     </div>
 
+    <div class="field-row">
+      <div class="field">
+        <label>Fornecedor</label>
+        <select id="stock-fornecedor">
+          <option value="">— Selecione —</option>
+          <option value="CNN">CNN Oriental</option>
+          <option value="SKYTECH">Skytech</option>
+          <option value="Outro">Outro</option>
+        </select>
+      </div>
+      <div class="field">
+        <label>Nº Pedido</label>
+        <input type="text" id="stock-pedido" placeholder="Ex: 26017449">
+      </div>
+      <div class="field">
+        <label>Data do pedido</label>
+        <input type="date" id="stock-data-pedido">
+      </div>
+    </div>
+
     <div class="modal-actions">
       <button class="btn" onclick="closeModal('stock-modal-overlay')">Cancelar</button>
       <button class="btn btn-primary" onclick="saveStockItem()">Salvar item</button>
@@ -1182,7 +1323,17 @@
 
     <div class="field">
       <label>CPF / CNPJ</label>
-      <input type="text" id="client-cpfcnpj" placeholder="000.000.000-00 ou 00.000.000/0001-00">
+      <div style="position:relative;">
+        <input type="text" id="client-cpfcnpj" placeholder="Digite CPF ou CNPJ"
+          maxlength="18" oninput="mascaraCpfCnpj(this)"
+          style="padding-right:130px;">
+        <span id="tipo-pessoa-badge" style="
+          position:absolute; right:10px; top:50%; transform:translateY(-50%);
+          font-size:11px; font-weight:700; letter-spacing:0.05em;
+          padding:2px 8px; border-radius:20px; display:none;
+          pointer-events:none;
+        "></span>
+      </div>
     </div>
 
     <div class="field-row">
@@ -1215,6 +1366,147 @@
 
 <!-- ===================== TOASTS ===================== -->
 <div class="toast-wrap" id="toast-wrap"></div>
+
+<!-- ===================== MODAL RELATÓRIOS/DADOS ===================== -->
+<div class="modal-overlay" id="data-modal-overlay">
+  <div class="modal" style="max-width:560px; width:100%;">
+    <div class="modal-header">
+      <h2 class="modal-title">Relatórios &amp; Dados</h2>
+      <button class="modal-close" onclick="closeModal('data-modal-overlay')">&times;</button>
+    </div>
+    <div class="modal-body" style="padding:0;">
+
+      <!-- Abas -->
+      <div style="display:flex; border-bottom:1px solid var(--border);">
+        <button id="tab-export-btn" onclick="switchDataTab('export')"
+          style="flex:1; padding:13px; background:none; border:none; border-bottom:2px solid var(--accent);
+          color:var(--text); font-size:13px; font-weight:600; cursor:pointer;">
+          ⬇ Exportar / Baixar
+        </button>
+        <button id="tab-import-btn" onclick="switchDataTab('import')"
+          style="flex:1; padding:13px; background:none; border:none; border-bottom:2px solid transparent;
+          color:var(--text-dim); font-size:13px; font-weight:600; cursor:pointer;">
+          ⬆ Importar / Enviar
+        </button>
+      </div>
+
+      <!-- ABA EXPORTAR -->
+      <div id="tab-export" style="padding:24px;">
+        <p style="font-size:13px; color:var(--text-dim); margin-bottom:18px;">
+          Escolha o que deseja exportar. Os arquivos serão baixados em formato <strong>Excel (.xlsx)</strong> ou <strong>CSV</strong>.
+        </p>
+
+        <!-- OS -->
+        <div style="border:1px solid var(--border); border-radius:8px; padding:16px; margin-bottom:12px;">
+          <div style="font-size:13px; font-weight:700; margin-bottom:10px;">📋 Ordens de Serviço</div>
+          <div style="display:flex; gap:10px; flex-wrap:wrap; margin-bottom:12px;">
+            <div style="flex:1; min-width:130px;">
+              <label style="font-size:11px; color:var(--text-dim); display:block; margin-bottom:4px;">Status</label>
+              <select id="exp-os-status" style="width:100%; background:var(--panel-2); border:1px solid var(--border); border-radius:6px; color:var(--text); padding:7px 10px; font-size:13px;">
+                <option value="">Todos</option>
+                <option>Aberto</option>
+                <option>Aguardando aprovação</option>
+                <option>Em andamento</option>
+                <option>Aguardando peça</option>
+                <option>Concluído</option>
+                <option>Entregue</option>
+                <option>Cancelado</option>
+              </select>
+            </div>
+            <div style="flex:1; min-width:130px;">
+              <label style="font-size:11px; color:var(--text-dim); display:block; margin-bottom:4px;">De</label>
+              <input type="date" id="exp-os-de" style="width:100%; background:var(--panel-2); border:1px solid var(--border); border-radius:6px; color:var(--text); padding:7px 10px; font-size:13px;">
+            </div>
+            <div style="flex:1; min-width:130px;">
+              <label style="font-size:11px; color:var(--text-dim); display:block; margin-bottom:4px;">Até</label>
+              <input type="date" id="exp-os-ate" style="width:100%; background:var(--panel-2); border:1px solid var(--border); border-radius:6px; color:var(--text); padding:7px 10px; font-size:13px;">
+            </div>
+          </div>
+          <button onclick="exportCSV('os')" class="btn btn-sm" style="width:100%;">Exportar Ordens de Serviço (.csv)</button>
+        </div>
+
+        <!-- Clientes -->
+        <div style="border:1px solid var(--border); border-radius:8px; padding:16px; margin-bottom:12px;">
+          <div style="font-size:13px; font-weight:700; margin-bottom:10px;">👤 Clientes</div>
+          <button onclick="exportCSV('clientes')" class="btn btn-sm" style="width:100%;">Exportar Clientes (.csv)</button>
+        </div>
+
+        <!-- Estoque -->
+        <div style="border:1px solid var(--border); border-radius:8px; padding:16px;">
+          <div style="font-size:13px; font-weight:700; margin-bottom:10px;">📦 Estoque</div>
+          <div style="display:flex; gap:10px; flex-wrap:wrap; margin-bottom:12px;">
+            <div style="flex:1; min-width:130px;">
+              <label style="font-size:11px; color:var(--text-dim); display:block; margin-bottom:4px;">Fornecedor</label>
+              <select id="exp-stock-fornecedor" style="width:100%; background:var(--panel-2); border:1px solid var(--border); border-radius:6px; color:var(--text); padding:7px 10px; font-size:13px;">
+                <option value="">Todos</option>
+                <option value="CNN">CNN Oriental</option>
+                <option value="SKYTECH">Skytech</option>
+              </select>
+            </div>
+            <div style="flex:1; min-width:120px;">
+              <label style="font-size:11px; color:var(--text-dim); display:block; margin-bottom:4px;">De</label>
+              <input type="date" id="exp-stock-de" style="width:100%; background:var(--panel-2); border:1px solid var(--border); border-radius:6px; color:var(--text); padding:7px 10px; font-size:13px;">
+            </div>
+            <div style="flex:1; min-width:120px;">
+              <label style="font-size:11px; color:var(--text-dim); display:block; margin-bottom:4px;">Até</label>
+              <input type="date" id="exp-stock-ate" style="width:100%; background:var(--panel-2); border:1px solid var(--border); border-radius:6px; color:var(--text); padding:7px 10px; font-size:13px;">
+            </div>
+          </div>
+          <div style="margin-bottom:12px;">
+            <label style="display:flex; align-items:center; gap:8px; font-size:13px; color:var(--text-dim); cursor:pointer;">
+              <input type="checkbox" id="exp-stock-baixo" style="accent-color:var(--accent);">
+              Somente itens abaixo do estoque mínimo
+            </label>
+          </div>
+          <button onclick="exportCSV('estoque')" class="btn btn-sm" style="width:100%;">Exportar Estoque (.csv)</button>
+        </div>
+      </div>
+
+      <!-- ABA IMPORTAR -->
+      <div id="tab-import" style="padding:24px; display:none;">
+        <p style="font-size:13px; color:var(--text-dim); margin-bottom:18px;">
+          Importe dados a partir de um arquivo <strong>CSV</strong>. Baixe o modelo da tabela desejada, preencha e envie.
+        </p>
+
+        <!-- Modelos -->
+        <div style="border:1px solid var(--border); border-radius:8px; padding:16px; margin-bottom:16px;">
+          <div style="font-size:12px; font-weight:700; color:var(--text-dim); text-transform:uppercase; letter-spacing:.05em; margin-bottom:10px;">Baixar modelo para preenchimento</div>
+          <div style="display:flex; gap:8px; flex-wrap:wrap;">
+            <button onclick="downloadTemplate('clientes')" class="btn btn-sm" style="flex:1;">📄 Modelo Clientes</button>
+            <button onclick="downloadTemplate('estoque')"  class="btn btn-sm" style="flex:1;">📄 Modelo Estoque</button>
+          </div>
+        </div>
+
+        <!-- Upload -->
+        <div style="border:1px solid var(--border); border-radius:8px; padding:16px;">
+          <div style="font-size:13px; font-weight:700; margin-bottom:12px;">Enviar arquivo CSV</div>
+          <div style="margin-bottom:12px;">
+            <label style="font-size:11px; color:var(--text-dim); display:block; margin-bottom:4px;">Tipo de dado</label>
+            <select id="imp-tipo" style="width:100%; background:var(--panel-2); border:1px solid var(--border); border-radius:6px; color:var(--text); padding:8px 10px; font-size:13px;">
+              <option value="clientes">Clientes</option>
+              <option value="estoque">Estoque</option>
+            </select>
+          </div>
+          <div id="imp-dropzone"
+            style="border:2px dashed var(--border); border-radius:8px; padding:28px; text-align:center; cursor:pointer; transition:border-color .2s; margin-bottom:12px;"
+            onclick="document.getElementById('imp-file').click()"
+            ondragover="event.preventDefault(); this.style.borderColor='var(--accent)'"
+            ondragleave="this.style.borderColor='var(--border)'"
+            ondrop="handleFileDrop(event)">
+            <div style="font-size:28px; margin-bottom:8px;">📂</div>
+            <div style="font-size:13px; color:var(--text-dim);">Clique ou arraste o arquivo CSV aqui</div>
+            <div id="imp-filename" style="font-size:12px; color:var(--accent); margin-top:6px;"></div>
+          </div>
+          <input type="file" id="imp-file" accept=".csv" style="display:none" onchange="onImportFileSelect(event)">
+          <div id="imp-preview" style="display:none; font-size:12px; color:var(--text-dim); margin-bottom:12px; background:var(--panel-2); border-radius:6px; padding:10px;"></div>
+          <button onclick="importCSV()" class="btn btn-primary" style="width:100%;" id="btn-importar" disabled>Importar dados</button>
+          <div id="imp-error" style="display:none; margin-top:10px; font-size:12px; color:#ff5f6d; text-align:center;"></div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+</div>
 
 
 <script>
@@ -1314,7 +1606,8 @@ async function loadFromSupabase(){
       id: s.id, codigo: s.codigo || '', nome: s.nome,
       categoria: s.categoria || '', compativel: s.compativel || '',
       quantidade: s.quantidade || 0, minimo: s.minimo || 0,
-      local: s.local || '', custo: s.custo || 0, venda: s.venda || 0
+      local: s.local || '', custo: s.custo || 0, venda: s.venda || 0,
+      fornecedor: s.fornecedor || '', pedido: s.pedido || '', dataPedido: s.data_pedido || ''
     }));
 
     state.os = os.map(o => ({
@@ -1322,6 +1615,7 @@ async function loadFromSupabase(){
       clienteId: o.cliente_id, clienteNome: o.cliente_nome || '',
       clienteTelefone: o.cliente_telefone || '',
       chamado: o.chamado || '', aparelho: o.aparelho || '',
+      centroCusto: o.centro_custo || '', chamadoCliente: o.chamado_cliente || '', solicitante: o.solicitante || '',
       imei: o.imei || '', defeito: o.defeito || '',
       senha: o.senha || '', acessorios: o.acessorios || '',
       checklist: o.checklist || {},
@@ -1405,6 +1699,7 @@ function statusBadgeClass(status){
     'Aberto':'badge-aberto',
     'Em andamento':'badge-andamento',
     'Aguardando peça':'badge-aguardando',
+    'Aguardando aprovação':'badge-aguardando',
     'Concluído':'badge-concluido',
     'Entregue':'badge-entregue',
     'Cancelado':'badge-cancelado'
@@ -1429,7 +1724,7 @@ function escapeHtml(str){
    ========================================================= */
 function renderDashboard(){
   const total = state.os.length;
-  const aberto = state.os.filter(o => ['Aberto','Em andamento','Aguardando peça'].includes(o.status)).length;
+  const aberto = state.os.filter(o => ['Aberto','Em andamento','Aguardando peça','Aguardando aprovação'].includes(o.status)).length;
   const concluido = state.os.filter(o => o.status === 'Concluído').length;
   const faturamento = state.os
     .filter(o => ['Concluído','Entregue'].includes(o.status))
@@ -1605,6 +1900,17 @@ function acFilter(tipo){
   acState[tipo].activeIdx = -1;
 
   if(tipo === 'cliente'){
+    // Se o usuário digitou algo diferente do que está selecionado, limpar seleção
+    const currentId = document.getElementById('os-cliente-id').value;
+    if(currentId){
+      const sel = state.clients.find(c => c.id === currentId);
+      const expectedLabel = sel ? sel.nome + ' — ' + sel.telefone : '';
+      if(document.getElementById('ac-cliente-input').value !== expectedLabel){
+        document.getElementById('os-cliente-id').value = '';
+        onOSClientChange();
+      }
+    }
+
     const sorted = [...state.clients].sort((a,b) => a.nome.localeCompare(b.nome));
     const filtered = q ? sorted.filter(c =>
       c.nome.toLowerCase().includes(q) || c.telefone.includes(q)
@@ -1653,6 +1959,29 @@ function acKeyDown(e, tipo){
   else if(e.key === 'Escape'){ list.classList.remove('open'); }
 }
 
+function validarClienteSelecionado(){
+  const id    = document.getElementById('os-cliente-id').value;
+  const input = document.getElementById('ac-cliente-input');
+  const wrap  = document.getElementById('ac-cliente-wrap');
+
+  if(input.value.trim() && !id){
+    // Digitou algo mas não selecionou — mostrar aviso e limpar
+    input.style.borderColor = 'var(--red)';
+    input.style.boxShadow   = '0 0 0 3px rgba(220,53,69,0.15)';
+    input.placeholder = '⚠ Selecione um cliente da lista';
+    setTimeout(() => {
+      input.style.borderColor = '';
+      input.style.boxShadow   = '';
+      input.placeholder = 'Digite o nome ou telefone do cliente...';
+    }, 2500);
+  } else {
+    input.style.borderColor = '';
+    input.style.boxShadow   = '';
+  }
+  // Fechar dropdown ao sair do campo
+  setTimeout(() => document.getElementById('ac-cliente-list').classList.remove('open'), 200);
+}
+
 function acSelectCliente(id, label){
   document.getElementById('ac-cliente-input').value = label;
   document.getElementById('os-cliente-id').value = id;
@@ -1695,6 +2024,12 @@ function openOSModal(osId){
   document.getElementById('os-cliente-email').value = '';
   document.getElementById('os-cliente-info').style.display = 'none';
   document.getElementById('os-chamado').value = '';
+  document.getElementById('os-centro-custo').value = '';
+  document.getElementById('os-chamado-cliente').value = '';
+  document.getElementById('os-solicitante').value = '';
+  document.getElementById('os-pj-fields').style.display = 'none';
+  const clWrap = document.getElementById('os-checklist-wrap');
+  if(clWrap) clWrap.style.display = 'block';
   document.getElementById('ac-aparelho-input').value = '';
   document.getElementById('os-aparelho').value = '';
   document.getElementById('ac-aparelho-list').classList.remove('open');
@@ -1734,6 +2069,9 @@ function openOSModal(osId){
       onOSClientChange();
     }
     document.getElementById('os-chamado').value = o.chamado || '';
+    document.getElementById('os-centro-custo').value   = o.centroCusto || '';
+    document.getElementById('os-chamado-cliente').value = o.chamadoCliente || '';
+    document.getElementById('os-solicitante').value    = o.solicitante || '';
     // Preencher aparelho no autocomplete
     document.getElementById('ac-aparelho-input').value = o.aparelho || '';
     document.getElementById('os-aparelho').value = o.aparelho || '';
@@ -1786,8 +2124,11 @@ function populateClientSelect(){
 function onOSClientChange(){
   const id = document.getElementById('os-cliente-id').value;
   const infoBox = document.getElementById('os-cliente-info');
+  const pjFields = document.getElementById('os-pj-fields');
+
   if(!id){
     infoBox.style.display = 'none';
+    pjFields.style.display = 'none';
     document.getElementById('os-cliente-telefone').value = '';
     document.getElementById('os-cliente-email').value = '';
     return;
@@ -1797,6 +2138,12 @@ function onOSClientChange(){
   document.getElementById('os-cliente-telefone').value = c.telefone;
   document.getElementById('os-cliente-email').value = c.email || '—';
   infoBox.style.display = 'grid';
+
+  // Mostrar campos PJ e ocultar checklist se for pessoa jurídica
+  const isPJ = getTipoPessoa(c.cpfcnpj) === 'PJ';
+  pjFields.style.display = isPJ ? 'block' : 'none';
+  const clWrap = document.getElementById('os-checklist-wrap');
+  if(clWrap) clWrap.style.display = isPJ ? 'none' : 'block';
 }
 
 
@@ -1862,8 +2209,20 @@ async function saveOS(){
   const aparelho = document.getElementById('os-aparelho').value.trim() || document.getElementById('ac-aparelho-input').value.trim();
   const defeito = document.getElementById('os-defeito').value.trim();
 
-  const chamado = document.getElementById('os-chamado').value.trim();
+  const chamado        = document.getElementById('os-chamado').value.trim();
+  const centroCusto    = document.getElementById('os-centro-custo').value.trim();
+  const chamadoCliente = document.getElementById('os-chamado-cliente').value.trim();
+  const solicitante    = document.getElementById('os-solicitante').value.trim();
   const imei    = document.getElementById('os-imei').value.trim();
+
+  // Verificar se cliente foi selecionado da lista (não apenas digitado)
+  const clienteInput = document.getElementById('ac-cliente-input').value.trim();
+  if(!clienteId && clienteInput){
+    document.getElementById('ac-cliente-input').style.borderColor = 'var(--red)';
+    setTimeout(() => document.getElementById('ac-cliente-input').style.borderColor = '', 2000);
+    showToast('Selecione um cliente da lista — não basta digitar o nome.', true);
+    return;
+  }
 
   if(!clienteId || !aparelho || !defeito){
     showToast('Preencha os campos obrigatórios (*)', true);
@@ -1878,21 +2237,25 @@ async function saveOS(){
     return;
   }
 
-  // Validar checklist
-  const clNames = ['cl-liga','cl-carrega','cl-display','cl-touch','cl-vidro','cl-tampa','cl-camtraseira','cl-camfrontal','cl-faceid','cl-biometria','cl-microfone','cl-altofalante','cl-auricular','cl-sinal','cl-wifi','cl-bluetooth','cl-sensor','cl-gaveta','cl-power','cl-volume'];
+  // Validar checklist (pular para clientes PJ)
+  const clWrapEl = document.getElementById('os-checklist-wrap');
+  const isPJSelected = clWrapEl && clWrapEl.style.display === 'none';
   const checklist = {};
   let clIncompleto = false;
-  clNames.forEach(n => {
-    const checked = document.querySelector(`input[name="${n}"]:checked`);
-    if(!checked){ clIncompleto = true; } else { checklist[n] = checked.value; }
-  });
-  if(clIncompleto){
-    document.getElementById('checklist-error').style.display = 'block';
-    document.getElementById('checklist-error').scrollIntoView({ behavior:'smooth', block:'center' });
-    showToast('Preencha todos os itens do checklist.', true);
-    return;
+  if(!isPJSelected){
+    const clNames = ['cl-liga','cl-carrega','cl-display','cl-touch','cl-vidro','cl-tampa','cl-camtraseira','cl-camfrontal','cl-faceid','cl-biometria','cl-microfone','cl-altofalante','cl-auricular','cl-sinal','cl-wifi','cl-bluetooth','cl-sensor','cl-gaveta','cl-power','cl-volume'];
+    clNames.forEach(n => {
+      const checked = document.querySelector(`input[name="${n}"]:checked`);
+      if(!checked){ clIncompleto = true; } else { checklist[n] = checked.value; }
+    });
+    if(clIncompleto){
+      document.getElementById('checklist-error').style.display = 'block';
+      document.getElementById('checklist-error').scrollIntoView({ behavior:'smooth', block:'center' });
+      showToast('Preencha todos os itens do checklist.', true);
+      return;
+    }
+    document.getElementById('checklist-error').style.display = 'none';
   }
-  document.getElementById('checklist-error').style.display = 'none';
 
   const cliente = state.clients.find(c => c.id === clienteId);
   if(!cliente){
@@ -1945,6 +2308,9 @@ async function saveOS(){
     cliente_telefone: telefone,
     aparelho,
     chamado: document.getElementById('os-chamado').value.trim(),
+    centro_custo: centroCusto,
+    chamado_cliente: chamadoCliente,
+    solicitante: solicitante,
     imei: document.getElementById('os-imei').value.trim(),
     defeito,
     senha: document.getElementById('os-senha').value.trim(),
@@ -2017,6 +2383,7 @@ async function saveOS(){
         id: newId, numero,
         clienteId, clienteNome: nome, clienteTelefone: telefone,
         aparelho, chamado: payload.chamado, imei: payload.imei,
+        centroCusto: centroCusto, chamadoCliente: chamadoCliente, solicitante: solicitante,
         defeito, senha: payload.senha, checklist,
         acessorios: payload.acessorios,
         diagnostico: payload.diagnostico,
@@ -2211,6 +2578,216 @@ function atualizarResumoExtra(input){
   card.querySelector('.ae-resumo-defeito').textContent = defeito ? '— ' + (defeito.length > 40 ? defeito.slice(0,40)+'…' : defeito) : '';
 }
 
+
+/* =========================================================
+   IMPORTAÇÃO DE PEDIDO DE PEÇAS — IA (Claude Vision)
+   ========================================================= */
+let _pedidoFile   = null;
+let _pedidoBase64 = null;
+let _pedidoMime   = null;
+let _pedidoItens  = [];
+
+function openPedidoModal(){
+  _pedidoFile = null; _pedidoBase64 = null; _pedidoItens = [];
+  document.getElementById('ped-fornecedor').value = '';
+  document.getElementById('ped-numero').value = '';
+  document.getElementById('ped-data').value = '';
+  document.getElementById('ped-filename').textContent = '';
+  document.getElementById('ped-img-preview').style.display = 'none';
+  document.getElementById('ped-status').style.display = 'none';
+  document.getElementById('ped-resultado').style.display = 'none';
+  document.getElementById('ped-dados-detectados').style.display = 'none';
+  document.getElementById('btn-processar-pedido').disabled = true;
+  document.getElementById('ped-dropzone').style.borderColor = 'var(--border)';
+  openModal('pedido-modal-overlay');
+}
+
+function handlePedidoFileDrop(e){
+  e.preventDefault();
+  document.getElementById('ped-dropzone').style.borderColor = 'var(--border)';
+  const file = e.dataTransfer.files[0];
+  if(file) carregarArquivoPedido(file);
+}
+
+function onPedidoFileSelect(e){
+  const file = e.target.files[0];
+  if(file) carregarArquivoPedido(file);
+  e.target.value = '';
+}
+
+function carregarArquivoPedido(file){
+  _pedidoFile = file;
+  _pedidoMime = file.type || (file.name.endsWith('.pdf') ? 'application/pdf' : 'image/jpeg');
+  document.getElementById('ped-filename').textContent = file.name;
+  document.getElementById('ped-resultado').style.display = 'none';
+  document.getElementById('ped-status').style.display = 'none';
+
+  // Preview imagem
+  const imgWrap = document.getElementById('ped-img-preview');
+  if(_pedidoMime.startsWith('image/')){
+    const url = URL.createObjectURL(file);
+    document.getElementById('ped-img-el').src = url;
+    imgWrap.style.display = 'block';
+  } else {
+    imgWrap.style.display = 'none';
+  }
+
+  const reader = new FileReader();
+  reader.onload = e => {
+    _pedidoBase64 = e.target.result.split(',')[1];
+    document.getElementById('btn-processar-pedido').disabled = false;
+  };
+  reader.readAsDataURL(file);
+}
+
+async function processarPedidoIA(){
+  if(!_pedidoBase64){ showToast('Selecione um arquivo primeiro.', true); return; }
+
+  const btn = document.getElementById('btn-processar-pedido');
+  const status = document.getElementById('ped-status');
+  btn.disabled = true;
+  btn.textContent = '🤖 Processando...';
+  status.style.display = 'block';
+  status.style.color = 'var(--text-dim)';
+  status.textContent = 'Enviando para análise... isso pode levar alguns segundos.';
+  document.getElementById('ped-resultado').style.display = 'none';
+  document.getElementById('ped-dados-detectados').style.display = 'none';
+
+  const prompt = `Você está analisando um documento de pedido de peças para celular.
+Identifique automaticamente:
+
+1. FORNECEDOR: Se o documento mencionar "Tech Envios" ou "TECH ENVIOS" em qualquer lugar, o fornecedor é "SKYTECH". Se mencionar "CNN Oriental" ou "CNN ORIENTAL", o fornecedor é "CNN". Retorne exatamente "SKYTECH" ou "CNN".
+
+2. NÚMERO DO PEDIDO:
+   - Se for SKYTECH: número após "NÚMERO:" no canto superior direito
+   - Se for CNN: número após "Nº:" ou "CONTROLE Nº:" no canto superior direito
+
+3. DATA DO PEDIDO:
+   - Se for SKYTECH: data após "DATA ATUAL:" (formato DD/MM/AAAA)
+   - Se for CNN: data após "Dt. Abertura:" (formato DD/MM/AAAA)
+   Converta para o formato AAAA-MM-DD.
+
+4. ITENS: Extraia TODOS os itens da tabela de produtos/peças:
+   - codigo: código de referência
+   - descricao: descrição completa
+   - qtd: quantidade (inteiro)
+   - preco: preço unitário (decimal)
+   Ignore linhas de frete, totais ou observações.
+
+Retorne SOMENTE JSON válido, sem texto adicional:
+{"fornecedor":"...","numeroPedido":"...","dataPedido":"AAAA-MM-DD","itens":[{"codigo":"...","descricao":"...","qtd":1,"preco":0.00}]}`;
+
+  try {
+    const isImage = _pedidoMime.startsWith('image/');
+
+    // Chama via Edge Function do Supabase (evita bloqueio CORS do browser)
+    const resp = await fetch(`${SB_URL}/functions/v1/processar-pedido`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': 'Bearer ' + SB_KEY
+      },
+      body: JSON.stringify({ base64: _pedidoBase64, mimeType: _pedidoMime })
+    });
+
+    if(!resp.ok){
+      const errText = await resp.text();
+      throw new Error('Erro na Edge Function: ' + errText);
+    }
+
+    const parsed = await resp.json();
+    if(parsed.error) throw new Error(parsed.error);
+
+    _pedidoItens = parsed.itens || [];
+    if(!_pedidoItens.length) throw new Error('Nenhum item encontrado');
+
+    // Preencher campos ocultos com dados detectados pela IA
+    if(parsed.fornecedor) document.getElementById('ped-fornecedor').value = parsed.fornecedor;
+    if(parsed.numeroPedido) document.getElementById('ped-numero').value = parsed.numeroPedido;
+    if(parsed.dataPedido) document.getElementById('ped-data').value = parsed.dataPedido;
+
+    // Exibir card de dados detectados
+    const nomesForn = { CNN: 'CNN Oriental', SKYTECH: 'Skytech' };
+    document.getElementById('ped-det-fornecedor').textContent = nomesForn[parsed.fornecedor] || parsed.fornecedor || '—';
+    document.getElementById('ped-det-numero').textContent = parsed.numeroPedido || '—';
+    document.getElementById('ped-det-data').textContent = parsed.dataPedido ? formatDate(parsed.dataPedido) : '—';
+    document.getElementById('ped-dados-detectados').style.display = 'block';
+
+    renderItensPedido();
+    status.style.display = 'none';
+    btn.textContent = '🤖 Reprocessar';
+    btn.disabled = false;
+
+  } catch(e) {
+    status.textContent = 'Erro ao processar: ' + e.message + '. Tente novamente.';
+    status.style.color = 'var(--red)';
+    btn.textContent = '🤖 Processar com IA';
+    btn.disabled = false;
+  }
+}
+
+function renderItensPedido(){
+  const tbody = document.getElementById('ped-itens-body');
+  tbody.innerHTML = _pedidoItens.map((item, i) => `
+    <tr style="border-bottom:1px solid var(--border);">
+      <td style="padding:8px 10px;">
+        <input type="checkbox" checked data-idx="${i}" style="accent-color:var(--accent);width:15px;height:15px;">
+      </td>
+      <td style="padding:8px 10px; font-family:monospace; font-size:11px; color:var(--text-dim);">${escapeHtml(item.codigo||'—')}</td>
+      <td style="padding:8px 10px;">${escapeHtml(item.descricao)}</td>
+      <td style="padding:8px 10px; text-align:center; font-weight:600;">${item.qtd}</td>
+      <td style="padding:8px 10px; text-align:right; font-family:monospace;">${formatCurrency(item.preco)}</td>
+    </tr>
+  `).join('');
+  document.getElementById('ped-count').textContent = _pedidoItens.length + ' itens';
+  document.getElementById('ped-resultado').style.display = 'block';
+}
+
+async function salvarPedidoNoEstoque(){
+  const fornecedor = document.getElementById('ped-fornecedor').value;
+  const dataPedido = document.getElementById('ped-data').value;
+  const numeroPedido = document.getElementById('ped-numero').value.trim();
+
+  const checks = document.querySelectorAll('#ped-itens-body input[type=checkbox]');
+  const selecionados = _pedidoItens.filter((_, i) => checks[i]?.checked);
+
+  if(!selecionados.length){ showToast('Selecione pelo menos um item.', true); return; }
+
+  let ok = 0;
+  for(const item of selecionados){
+    const id   = 'p' + Date.now() + Math.random().toString(36).slice(2,5);
+    // Tentar extrair categoria e compatível da descrição
+    const desc = item.descricao.toUpperCase();
+    let categoria = 'Peça';
+    if(desc.includes('LCD') || desc.includes('TELA') || desc.includes('DISPLAY')) categoria = 'Tela';
+    else if(desc.includes('BATER') || desc.includes('BATTERY')) categoria = 'Bateria';
+    else if(desc.includes('TAMPA') || desc.includes('CARCAÇA') || desc.includes('CARCACA')) categoria = 'Tampa / Carcaça';
+    else if(desc.includes('CONECTOR')) categoria = 'Conector';
+    else if(desc.includes('LENTE') || desc.includes('CÂMERA') || desc.includes('CAMERA')) categoria = 'Lente / Câmera';
+    else if(desc.includes('GAVETA')) categoria = 'Gaveta';
+    else if(desc.includes('PLACA') || desc.includes('FLEX')) categoria = 'Placa / Flex';
+    else if(desc.includes('BATERIA')) categoria = 'Bateria';
+
+    const row = {
+      id, codigo: item.codigo || '', nome: item.descricao,
+      categoria, compativel: '', quantidade: item.qtd,
+      minimo: 0, local: '', custo: item.preco, venda: 0,
+      fornecedor, pedido: numeroPedido, data_pedido: dataPedido
+    };
+
+    try {
+      await sbPost('estoque', row);
+      state.stock.push({ ...row, dataPedido });
+      ok++;
+    } catch(e) { console.error('Erro ao salvar item:', e); }
+  }
+
+  renderStockTable();
+  renderDashboard();
+  closeModal('pedido-modal-overlay');
+  showToast(ok + ' ' + (ok === 1 ? 'peça adicionada' : 'peças adicionadas') + ' ao estoque!');
+}
+
 function adjustStock(stockId, delta){
   const item = state.stock.find(s => s.id === stockId);
   if(!item) return;
@@ -2348,12 +2925,21 @@ function viewOS(osId){
             ${o.pagamento ? `<div class="kv-row"><span class="kv-label">Forma de pagamento</span><span class="kv-value">${escapeHtml(o.pagamento)}</span></div>` : ''}
             ${o.garantia ? `<div class="kv-row"><span class="kv-label">Garantia</span><span class="kv-value">${escapeHtml(String(o.garantia))} dias</span></div>` : ''}
             ${o.senha ? `<div class="kv-row"><span class="kv-label">Senha aparelho</span><span class="kv-value mono">${escapeHtml(o.senha)}</span></div>` : ''}
+            ${(o.centroCusto||o.chamadoCliente||o.solicitante) ? `
+              <div class="kv-row" style="grid-column:1/-1; margin-top:4px;">
+                <span class="kv-label" style="color:var(--warning,#f59e0b); font-weight:700;">🏢 Dados PJ</span>
+              </div>
+              ${o.centroCusto    ? `<div class="kv-row"><span class="kv-label">Centro de custo</span><span class="kv-value">${escapeHtml(o.centroCusto)}</span></div>` : ''}
+              ${o.chamadoCliente ? `<div class="kv-row"><span class="kv-label">Chamado cliente</span><span class="kv-value mono">${escapeHtml(o.chamadoCliente)}</span></div>` : ''}
+              ${o.solicitante    ? `<div class="kv-row"><span class="kv-label">Solicitante</span><span class="kv-value">${escapeHtml(o.solicitante)}</span></div>` : ''}
+            ` : ''}
           </div>
 
           <div style="margin-top:14px;">
             <label>Atualizar status rapidamente</label>
             <select id="quick-status-select" onchange="quickUpdateStatus('${o.id}', this.value)">
               <option ${o.status==='Aberto'?'selected':''}>Aberto</option>
+              <option ${o.status==='Aguardando aprovação'?'selected':''}>Aguardando aprovação</option>
               <option ${o.status==='Em andamento'?'selected':''}>Em andamento</option>
               <option ${o.status==='Aguardando peça'?'selected':''}>Aguardando peça</option>
               <option ${o.status==='Concluído'?'selected':''}>Concluído</option>
@@ -2566,6 +3152,14 @@ function printOS(){
     <div class="p-field"><span class="p-field-label">Data de Retirada:</span><span class="p-field-value">${formatDate(o.dataPrevista)||''}</span></div>
     <div class="p-field"><span class="p-field-label">Data de Entrada:</span><span class="p-field-value">${formatDate(o.dataEntrada)||''}</span></div>
     <div class="p-field"></div>
+    ${(o.centroCusto||o.chamadoCliente||o.solicitante) ? `
+    <div class="p-field" style="grid-column:1/-1; border-bottom:0.5pt solid #0094d4; padding-bottom:3pt; margin-bottom:3pt;">
+      <span class="p-field-label" style="color:#0094d4;">🏢 Dados corporativos</span>
+    </div>
+    ${o.centroCusto    ? '<div class="p-field"><span class="p-field-label">Centro de custo:</span><span class="p-field-value">'+escapeHtml(o.centroCusto)+'</span></div>' : ''}
+    ${o.chamadoCliente ? '<div class="p-field"><span class="p-field-label">Chamado cliente:</span><span class="p-field-value">'+escapeHtml(o.chamadoCliente)+'</span></div>' : ''}
+    ${o.solicitante    ? '<div class="p-field"><span class="p-field-label">Solicitante:</span><span class="p-field-value">'+escapeHtml(o.solicitante)+'</span></div>' : ''}
+    ` : ''}
   </div>
 
   ${(o.aparelhosExtras && o.aparelhosExtras.length) ? `
@@ -2619,7 +3213,7 @@ function printOS(){
 
   <!-- OBSERVAÇÕES -->
   <div class="p-section-label">Observações sobre o aparelho:</div>
-  <div class="p-text-area">${escapeHtml(o.defeito||'')}${o.diagnostico ? '\n\nDiagnóstico: '+o.diagnostico : ''}</div>
+  <div class="p-text-area">${escapeHtml(o.defeito||'')}${o.diagnostico ? '<br><br>Diagnóstico: '+escapeHtml(o.diagnostico) : ''}</div>
 
   <!-- MANUTENÇÃO REALIZADA -->
   <div class="p-section-label">Manutenção Realizada:</div>
@@ -2728,6 +3322,9 @@ function openStockModal(stockId){
   document.getElementById('stock-local').value = '';
   document.getElementById('stock-custo').value = '';
   document.getElementById('stock-venda').value = '';
+  document.getElementById('stock-fornecedor').value = '';
+  document.getElementById('stock-pedido').value = '';
+  document.getElementById('stock-data-pedido').value = '';
 
   if(stockId){
     const s = state.stock.find(x => x.id === stockId);
@@ -2743,6 +3340,9 @@ function openStockModal(stockId){
     document.getElementById('stock-local').value = s.local || '';
     document.getElementById('stock-custo').value = s.custo;
     document.getElementById('stock-venda').value = s.venda;
+    document.getElementById('stock-fornecedor').value = s.fornecedor || '';
+    document.getElementById('stock-pedido').value = s.pedido || '';
+    document.getElementById('stock-data-pedido').value = s.dataPedido || '';
   } else {
     document.getElementById('stock-modal-title').textContent = 'Novo item de estoque';
   }
@@ -2768,6 +3368,9 @@ async function saveStockItem(){
     local: document.getElementById('stock-local').value.trim(),
     custo: parseFloat(document.getElementById('stock-custo').value) || 0,
     venda: parseFloat(document.getElementById('stock-venda').value) || 0,
+    fornecedor:  document.getElementById('stock-fornecedor').value,
+    pedido:      document.getElementById('stock-pedido').value.trim(),
+    data_pedido: document.getElementById('stock-data-pedido').value,
   };
 
   const id = document.getElementById('stock-id').value;
@@ -2840,6 +3443,7 @@ function renderClientsTable(){
     <tr>
       <td class="cell-strong">${escapeHtml(c.nome)}</td>
       <td class="mono">${escapeHtml(c.cpfcnpj || '—')}</td>
+      <td>${(()=>{ const t=getTipoPessoa(c.cpfcnpj); return t==='PF'?'<span style="font-size:11px;font-weight:700;padding:2px 8px;border-radius:20px;background:rgba(45,160,224,0.15);color:#2da0e0;border:1px solid rgba(45,160,224,0.3);">Pessoa Física</span>':t==='PJ'?'<span style="font-size:11px;font-weight:700;padding:2px 8px;border-radius:20px;background:rgba(251,191,36,0.15);color:#f59e0b;border:1px solid rgba(251,191,36,0.3);">Pessoa Jurídica</span>':'—' })()} </td>
       <td class="mono">${escapeHtml(c.telefone)}</td>
       <td class="mono">${s.ordens}</td>
       <td class="mono">${formatCurrency(s.total)}</td>
@@ -2856,6 +3460,7 @@ function openClientModal(clientId){
   document.getElementById('client-id').value = '';
   document.getElementById('client-nome').value = '';
   document.getElementById('client-cpfcnpj').value = '';
+  atualizarTipoPessoa('');
   document.getElementById('client-telefone').value = '';
   document.getElementById('client-email').value = '';
   document.getElementById('client-endereco').value = '';
@@ -2869,6 +3474,7 @@ function openClientModal(clientId){
     document.getElementById('client-id').value = c.id;
     document.getElementById('client-nome').value = c.nome;
     document.getElementById('client-cpfcnpj').value = c.cpfcnpj || '';
+    atualizarTipoPessoa(apenasDigitos(c.cpfcnpj || ''));
     document.getElementById('client-telefone').value = c.telefone;
     document.getElementById('client-email').value = c.email || '';
     document.getElementById('client-endereco').value = c.endereco || '';
@@ -2878,6 +3484,60 @@ function openClientModal(clientId){
   }
 
   openModal('client-modal-overlay');
+}
+
+/* ---------- CPF / CNPJ — máscara e tipo ---------- */
+function apenasDigitos(v){ return v.replace(/\D/g,''); }
+
+function mascaraCpfCnpj(input){
+  const digits = apenasDigitos(input.value);
+  let masked = '';
+
+  if(digits.length <= 11){
+    // CPF: 000.000.000-00
+    masked = digits
+      .replace(/^(\d{3})(\d)/, '$1.$2')
+      .replace(/^(\d{3})\.(\d{3})(\d)/, '$1.$2.$3')
+      .replace(/\.(\d{3})(\d)/, '.$1-$2');
+  } else {
+    // CNPJ: 00.000.000/0000-00
+    masked = digits
+      .replace(/^(\d{2})(\d)/, '$1.$2')
+      .replace(/^(\d{2})\.(\d{3})(\d)/, '$1.$2.$3')
+      .replace(/\.(\d{3})(\d)/, '.$1/$2')
+      .replace(/(\d{4})(\d)/, '$1-$2')
+      .slice(0, 18);
+  }
+
+  input.value = masked;
+  atualizarTipoPessoa(digits);
+}
+
+function atualizarTipoPessoa(digits){
+  const badge = document.getElementById('tipo-pessoa-badge');
+  if(!badge) return;
+  if(digits.length === 11){
+    badge.style.display  = 'inline-block';
+    badge.textContent    = 'Pessoa Física';
+    badge.style.background = 'rgba(45,160,224,0.15)';
+    badge.style.color    = '#2da0e0';
+    badge.style.border   = '1px solid rgba(45,160,224,0.3)';
+  } else if(digits.length === 14){
+    badge.style.display  = 'inline-block';
+    badge.textContent    = 'Pessoa Jurídica';
+    badge.style.background = 'rgba(251,191,36,0.15)';
+    badge.style.color    = '#f59e0b';
+    badge.style.border   = '1px solid rgba(251,191,36,0.3)';
+  } else {
+    badge.style.display = 'none';
+  }
+}
+
+function getTipoPessoa(cpfcnpj){
+  const d = apenasDigitos(cpfcnpj || '');
+  if(d.length === 11) return 'PF';
+  if(d.length === 14) return 'PJ';
+  return '';
 }
 
 async function saveClient(){
@@ -2952,55 +3612,292 @@ async function deleteClient(clientId){
 /* =========================================================
    EXPORTAR / IMPORTAR DADOS
    ========================================================= */
-function exportData(){
-  const dataStr = JSON.stringify(state, null, 2);
-  const blob = new Blob([dataStr], {type:'application/json'});
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement('a');
-  a.href = url;
-  a.download = `oficinaos-backup-${todayISO()}.json`;
-  document.body.appendChild(a);
-  a.click();
-  document.body.removeChild(a);
-  URL.revokeObjectURL(url);
-  showToast('Backup exportado com sucesso.');
+/* =========================================================
+   MODAL RELATÓRIOS & DADOS
+   ========================================================= */
+function openDataModal(){
+  switchDataTab('export');
+  document.getElementById('data-modal-overlay').classList.add('open');
 }
 
-function importData(event){
-  const file = event.target.files[0];
-  if(!file) return;
+function switchDataTab(tab){
+  document.getElementById('tab-export').style.display     = tab==='export' ? 'block' : 'none';
+  document.getElementById('tab-import').style.display     = tab==='import' ? 'block' : 'none';
+  document.getElementById('tab-export-btn').style.borderBottomColor = tab==='export' ? 'var(--accent)' : 'transparent';
+  document.getElementById('tab-import-btn').style.borderBottomColor = tab==='import' ? 'var(--accent)' : 'transparent';
+  document.getElementById('tab-export-btn').style.color  = tab==='export' ? 'var(--text)' : 'var(--text-dim)';
+  document.getElementById('tab-import-btn').style.color  = tab==='import' ? 'var(--text)' : 'var(--text-dim)';
+}
+
+/* ---- EXPORTAR CSV ---- */
+function toCSV(rows, cols){
+  const NL = '\n';
+  const header = cols.map(c => '"' + c.label + '"').join(',');
+  const body   = rows.map(r =>
+    cols.map(c => {
+      const v = c.fn ? c.fn(r) : (r[c.key] ?? '');
+      return '"' + String(v).replace(/"/g, '""') + '"';
+    }).join(',')
+  ).join(NL);
+  return header + NL + body;
+}
+
+function downloadCSV(csv, filename){
+  const bom  = '﻿'; // BOM para Excel reconhecer UTF-8
+  const blob = new Blob([bom + csv], { type:'text/csv;charset=utf-8;' });
+  const url  = URL.createObjectURL(blob);
+  const a    = document.createElement('a');
+  a.href = url; a.download = filename;
+  document.body.appendChild(a); a.click();
+  document.body.removeChild(a); URL.revokeObjectURL(url);
+}
+
+function exportCSV(tipo){
+  if(tipo === 'os'){
+    const statusFiltro = document.getElementById('exp-os-status').value;
+    const de  = document.getElementById('exp-os-de').value;
+    const ate = document.getElementById('exp-os-ate').value;
+
+    let dados = [...state.os];
+    if(statusFiltro) dados = dados.filter(o => o.status === statusFiltro);
+    if(de)  dados = dados.filter(o => o.dataEntrada >= de);
+    if(ate) dados = dados.filter(o => o.dataEntrada <= ate);
+
+    if(!dados.length){ showToast('Nenhuma OS encontrada com esses filtros.', true); return; }
+
+    const cols = [
+      { label:'Nº OS',          fn: o => String(o.numero).padStart(4,'0') },
+      { label:'Cliente',        key:'clienteNome' },
+      { label:'Telefone',       key:'clienteTelefone' },
+      { label:'Chamado',        key:'chamado' },
+      { label:'Aparelho',       key:'aparelho' },
+      { label:'IMEI',           key:'imei' },
+      { label:'Defeito',        key:'defeito' },
+      { label:'Diagnóstico',    key:'diagnostico' },
+      { label:'Status',         key:'status' },
+      { label:'Forma Pgto',     key:'pagamento' },
+      { label:'Garantia (dias)',key:'garantia' },
+      { label:'Mão de Obra',    fn: o => (o.maoObra||0).toFixed(2) },
+      { label:'Total (R$)',     fn: o => (o.total||0).toFixed(2) },
+      { label:'Data Entrada',   fn: o => formatDate(o.dataEntrada) },
+      { label:'Data Prevista',  fn: o => formatDate(o.dataPrevista) },
+      { label:'Observações',    key:'observacoes' },
+    ];
+    const suffix = statusFiltro ? `-${statusFiltro.replace(/\s/g,'-')}` : '-todos';
+    downloadCSV(toCSV(dados, cols), `mobit-os${suffix}-${todayISO()}.csv`);
+    showToast(`${dados.length} OS exportadas com sucesso.`);
+  }
+
+  if(tipo === 'clientes'){
+    if(!state.clients.length){ showToast('Nenhum cliente cadastrado.', true); return; }
+    const cols = [
+      { label:'Nome',       key:'nome' },
+      { label:'Telefone',   key:'telefone' },
+      { label:'Email',      key:'email' },
+      { label:'CPF/CNPJ',   key:'cpfcnpj' },
+      { label:'Tipo',        fn: c => { const t=getTipoPessoa(c.cpfcnpj); return t==='PF'?'Pessoa Física':t==='PJ'?'Pessoa Jurídica':''; } },
+      { label:'Endereço',   key:'endereco' },
+      { label:'Obs.',       key:'observacoes' },
+    ];
+    downloadCSV(toCSV(state.clients, cols), `mobit-clientes-${todayISO()}.csv`);
+    showToast(`${state.clients.length} clientes exportados.`);
+  }
+
+  if(tipo === 'estoque'){
+    const soBaixo   = document.getElementById('exp-stock-baixo').checked;
+    const fornFiltro = document.getElementById('exp-stock-fornecedor').value;
+    const stockDe   = document.getElementById('exp-stock-de').value;
+    const stockAte  = document.getElementById('exp-stock-ate').value;
+    let dados = [...state.stock];
+    if(soBaixo)    dados = dados.filter(s => s.quantidade <= s.minimo);
+    if(fornFiltro) dados = dados.filter(s => s.fornecedor === fornFiltro);
+    if(stockDe)    dados = dados.filter(s => (s.dataPedido || '') >= stockDe);
+    if(stockAte)   dados = dados.filter(s => (s.dataPedido || '') <= stockAte);
+    if(!dados.length){ showToast('Nenhum item encontrado.', true); return; }
+    const cols = [
+      { label:'Código',      key:'codigo' },
+      { label:'Nome',        key:'nome' },
+      { label:'Categoria',   key:'categoria' },
+      { label:'Compatível',  key:'compativel' },
+      { label:'Qtd Atual',   key:'quantidade' },
+      { label:'Qtd Mínima',  key:'minimo' },
+      { label:'Localização', key:'local' },
+      { label:'Custo (R$)',  fn: s => (s.custo||0).toFixed(2) },
+      { label:'Venda (R$)',  fn: s => (s.venda||0).toFixed(2) },
+      { label:'Fornecedor',  key:'fornecedor' },
+      { label:'Nº Pedido',   key:'pedido' },
+      { label:'Data Pedido', key:'dataPedido' },
+    ];
+    downloadCSV(toCSV(dados, cols), `mobit-estoque-${todayISO()}.csv`);
+    showToast(`${dados.length} itens exportados.`);
+  }
+}
+
+/* ---- TEMPLATES ---- */
+function downloadTemplate(tipo){
+  const NL = '\n';
+  let csv = '';
+  if(tipo === 'clientes'){
+    csv  = ['"Nome"','"Telefone"','"Email"','"CPF/CNPJ"','"Endere\u00e7o"','"Obs."'].join(',') + NL;
+    csv += ['"Maria Exemplo"','"(11) 99999-0000"','"maria@email.com"','"123.456.789-00"','"Rua das Flores, 10"','""'].join(',') + NL;
+  }
+  if(tipo === 'estoque'){
+    csv  = ['"C\u00f3digo"','"Nome"','"Categoria"','"Compat\u00edvel"','"Qtd Atual"','"Qtd M\u00ednima"','"Localiza\u00e7\u00e3o"','"Custo (R$)"','"Venda (R$)"'].join(',') + NL;
+    csv += ['"P001"','"Tela iPhone 13"','"Display"','"iPhone 13"','"5"','"2"','"Gaveta A1"','"150.00"','"280.00"'].join(',') + NL;
+  }
+  const bom  = '\uFEFF';
+  const blob = new Blob([bom + csv], { type:'text/csv;charset=utf-8;' });
+  const url  = URL.createObjectURL(blob);
+  const a    = document.createElement('a');
+  a.href = url; a.download = 'modelo-' + tipo + '.csv';
+  document.body.appendChild(a); a.click();
+  document.body.removeChild(a); URL.revokeObjectURL(url);
+}
+
+/* ---- IMPORTAR CSV ---- */
+let _importRows = [];
+let _importFile = null;
+
+function handleFileDrop(e){
+  e.preventDefault();
+  document.getElementById('imp-dropzone').style.borderColor = 'var(--border)';
+  const file = e.dataTransfer.files[0];
+  if(file && file.name.endsWith('.csv')) processImportFile(file);
+  else showToast('Envie um arquivo .csv', true);
+}
+
+function onImportFileSelect(e){
+  const file = e.target.files[0];
+  if(file) processImportFile(file);
+  e.target.value = '';
+}
+
+function processImportFile(file){
+  _importFile = file;
+  document.getElementById('imp-filename').textContent = file.name;
   const reader = new FileReader();
   reader.onload = e => {
-    try{
-      const data = JSON.parse(e.target.result);
-      if(!data.os || !data.stock){
-        throw new Error('Formato inválido');
-      }
-      if(!data.clients) data.clients = [];
-      state = data;
-      renderDashboard();
-      renderOSTable();
-      renderStockTable();
-      renderClientsTable();
-      showToast('Dados importados com sucesso.');
-    }catch(err){
-      showToast('Erro ao importar arquivo. Verifique o formato.', true);
+    try {
+      const text = e.target.result.replace(/^\uFEFF/,''); // remover BOM
+      const lines = text.split(/\r?\n/).filter(l => l.trim());
+      const header = parseCSVLine(lines[0]);
+      _importRows  = lines.slice(1).map(l => {
+        const vals = parseCSVLine(l);
+        const obj  = {};
+        header.forEach((h,i) => obj[h.trim()] = (vals[i]||'').trim());
+        return obj;
+      }).filter(r => Object.values(r).some(v => v));
+
+      const preview = document.getElementById('imp-preview');
+      preview.style.display = 'block';
+      preview.innerHTML = `<strong>${_importRows.length} linhas encontradas</strong> — Colunas: ${header.join(', ')}`;
+
+      document.getElementById('imp-error').style.display = 'none';
+      document.getElementById('btn-importar').disabled = false;
+    } catch(err) {
+      document.getElementById('imp-error').textContent = 'Erro ao ler arquivo: ' + err.message;
+      document.getElementById('imp-error').style.display = 'block';
     }
   };
-  reader.readAsText(file);
-  event.target.value = '';
+  reader.readAsText(file, 'UTF-8');
+}
+
+function parseCSVLine(line){
+  const result = []; let cur = ''; let inQ = false;
+  for(let i=0; i<line.length; i++){
+    const ch = line[i];
+    if(ch === '"'){ if(inQ && line[i+1]==='"'){ cur+='"'; i++; } else inQ=!inQ; }
+    else if(ch === ',' && !inQ){ result.push(cur); cur=''; }
+    else cur += ch;
+  }
+  result.push(cur);
+  return result;
+}
+
+async function importCSV(){
+  const tipo = document.getElementById('imp-tipo').value;
+  const err  = document.getElementById('imp-error');
+  const btn  = document.getElementById('btn-importar');
+  if(!_importRows.length){ err.textContent='Nenhum dado para importar.'; err.style.display='block'; return; }
+
+  btn.disabled = true; btn.textContent = 'Importando...';
+  let ok = 0; let erros = 0;
+
+  try {
+    if(tipo === 'clientes'){
+      for(const r of _importRows){
+        if(!r['Nome']) continue;
+        const id = 'c' + Date.now() + Math.random().toString(36).slice(2,6);
+        const row = { id, nome:r['Nome']||'', telefone:r['Telefone']||'',
+          email:r['Email']||'', cpfcnpj:r['CPF/CNPJ']||'',
+          endereco:r['Endereço']||r['Endereco']||'', observacoes:r['Obs.']||'' };
+        await sbPost('clientes', row);
+        state.clients.push(row);
+        ok++;
+      }
+      renderClientsTable();
+    }
+
+    if(tipo === 'estoque'){
+      for(const r of _importRows){
+        if(!r['Nome']) continue;
+        const id = 'p' + Date.now() + Math.random().toString(36).slice(2,6);
+        const row = { id, codigo:r['Código']||r['Codigo']||'', nome:r['Nome']||'',
+          categoria:r['Categoria']||'', compativel:r['Compatível']||r['Compativel']||'',
+          quantidade:parseInt(r['Qtd Atual'])||0, minimo:parseInt(r['Qtd Mínima'])||0,
+          local:r['Localização']||r['Localizacao']||'',
+          custo:parseFloat(r['Custo (R$)'])||0, venda:parseFloat(r['Venda (R$)'])||0 };
+        await sbPost('estoque', row);
+        state.stock.push(row);
+        ok++;
+      }
+      renderStockTable();
+    }
+
+    renderDashboard();
+    showToast(`${ok} registros importados com sucesso.`);
+    closeModal('data-modal-overlay');
+    _importRows = []; _importFile = null;
+    document.getElementById('imp-preview').style.display = 'none';
+    document.getElementById('imp-filename').textContent = '';
+  } catch(e) {
+    err.textContent = `Erro ao importar: ${e.message} (${ok} ok, ${erros} falhas)`;
+    err.style.display = 'block';
+  } finally {
+    btn.disabled = false; btn.textContent = 'Importar dados';
+  }
 }
 
 /* =========================================================
-   AUTENTICAÇÃO — verificar sessão
+   AUTENTICAÇÃO — verificar sessão e auto-logout
    ========================================================= */
+const SESSION_TIMEOUT = 3 * 60 * 60 * 1000; // 3 horas em ms
+let _logoutTimer = null;
+
 function getCurrentUser(){
   try { return JSON.parse(sessionStorage.getItem('mobit_user') || 'null'); } catch{ return null; }
 }
 
 function logout(){
+  clearTimeout(_logoutTimer);
   sessionStorage.removeItem('mobit_user');
   window.location.href = 'login.html';
+}
+
+function resetTimer(){
+  clearTimeout(_logoutTimer);
+  _logoutTimer = setTimeout(() => {
+    showToast('Sessão encerrada por inatividade.', true);
+    setTimeout(logout, 2000);
+  }, SESSION_TIMEOUT);
+}
+
+function initAutoLogout(){
+  // Reinicia o timer em qualquer interação do usuário
+  ['mousemove','mousedown','keydown','touchstart','scroll','click'].forEach(evt => {
+    document.addEventListener(evt, resetTimer, { passive: true });
+  });
+  resetTimer(); // inicia o primeiro timer
 }
 
 /* =========================================================
@@ -3017,6 +3914,9 @@ function logout(){
   // Mostrar nome do usuário logado na sidebar
   const userEl = document.getElementById('sidebar-user');
   if(userEl) userEl.textContent = user.nome || user.usuario;
+
+  // Iniciar auto-logout por inatividade (3 horas)
+  initAutoLogout();
 
   document.getElementById('os-data-entrada').value = todayISO();
 
