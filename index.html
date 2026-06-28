@@ -2734,7 +2734,10 @@ function renderItensPedido(){
         <input type="checkbox" checked data-idx="${i}" style="accent-color:var(--accent);width:15px;height:15px;">
       </td>
       <td style="padding:8px 10px; font-family:monospace; font-size:11px; color:var(--text-dim);">${escapeHtml(item.codigo||'—')}</td>
-      <td style="padding:8px 10px;">${escapeHtml(item.descricao)}</td>
+      <td style="padding:8px 10px;">
+        <span style="font-size:10px; font-weight:700; color:var(--accent); background:rgba(45,160,224,0.1); border-radius:4px; padding:1px 6px; margin-right:6px;">${escapeHtml(item.categoria||'Peça')}</span>
+        ${escapeHtml(item.nome || item.descricao || '')}
+      </td>
       <td style="padding:8px 10px; text-align:center; font-weight:600;">${item.qtd}</td>
       <td style="padding:8px 10px; text-align:right; font-family:monospace;">${formatCurrency(item.preco)}</td>
     </tr>
@@ -2756,21 +2759,9 @@ async function salvarPedidoNoEstoque(){
   let ok = 0;
   for(const item of selecionados){
     const id   = 'p' + Date.now() + Math.random().toString(36).slice(2,5);
-    // Tentar extrair categoria e compatível da descrição
-    const desc = item.descricao.toUpperCase();
-    let categoria = 'Peça';
-    if(desc.includes('LCD') || desc.includes('TELA') || desc.includes('DISPLAY')) categoria = 'Tela';
-    else if(desc.includes('BATER') || desc.includes('BATTERY')) categoria = 'Bateria';
-    else if(desc.includes('TAMPA') || desc.includes('CARCAÇA') || desc.includes('CARCACA')) categoria = 'Tampa / Carcaça';
-    else if(desc.includes('CONECTOR')) categoria = 'Conector';
-    else if(desc.includes('LENTE') || desc.includes('CÂMERA') || desc.includes('CAMERA')) categoria = 'Lente / Câmera';
-    else if(desc.includes('GAVETA')) categoria = 'Gaveta';
-    else if(desc.includes('PLACA') || desc.includes('FLEX')) categoria = 'Placa / Flex';
-    else if(desc.includes('BATERIA')) categoria = 'Bateria';
-
     const row = {
-      id, codigo: item.codigo || '', nome: item.descricao,
-      categoria, compativel: '', quantidade: item.qtd,
+      id, codigo: item.codigo || '', nome: item.nome || item.descricao || '',
+      categoria: item.categoria || 'Peça', compativel: '', quantidade: item.qtd,
       minimo: 0, local: '', custo: item.preco, venda: 0,
       fornecedor, pedido: numeroPedido, data_pedido: dataPedido
     };
