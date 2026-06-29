@@ -617,6 +617,9 @@
     <button class="nav-item" data-page="clientes" onclick="goToPage('clientes')">
       <span class="nav-icon">&#128100;</span> Clientes
     </button>
+    <button class="nav-item" data-page="compras" onclick="goToPage('compras')">
+      <span class="nav-icon">&#128181;</span> Compras
+    </button>
 
     <div class="nav-divider"></div>
     <button class="nav-item" onclick="openDataModal()">
@@ -743,7 +746,7 @@
           <input type="text" id="stock-search" placeholder="Buscar por nome ou código..." oninput="renderStockTable()">
         </div>
         <select id="stock-filter-cat" onchange="renderStockTable()">
-          <option value="">Todas categorias</option>
+          <option value="">Todos os itens</option>
         </select>
       </div>
 
@@ -751,7 +754,7 @@
         <table>
           <thead>
             <tr>
-              <th>Código</th><th>Item</th><th>Detalhes</th><th>Categoria</th><th>Compatível com</th>
+              <th>Código</th><th>Modelo</th><th>Detalhes</th><th>Item</th><th>Compatível com</th>
               <th>Qtd.</th><th>Mín.</th><th>Custo</th><th>Venda</th><th></th>
             </tr>
           </thead>
@@ -1047,7 +1050,7 @@
       <div class="parts-list" id="os-parts-list"></div>
       <button type="button" class="btn btn-sm" onclick="addPartRow()">+ Adicionar peça do estoque</button>
 
-      <div class="field" style="margin-top:14px;">
+      <div class="field" id="os-mao-obra-wrap" style="margin-top:14px;">
         <label>Mão de obra (R$)</label>
         <input type="number" id="os-mao-obra" placeholder="0,00" min="0" step="0.01" oninput="updateOSTotal()">
       </div>
@@ -1092,6 +1095,8 @@
             <option>Cartão de crédito</option>
             <option>PIX</option>
             <option>Transferência</option>
+            <option>Boleto Bancário</option>
+            <option>Faturamento</option>
             <option>A combinar</option>
           </select>
         </div>
@@ -1130,6 +1135,141 @@
 </div>
 
 <!-- ===================== MODAL: ITEM DE ESTOQUE ===================== -->
+
+<!-- ===================== MODAL: REGISTRAR COMPRA ===================== -->
+<div class="modal-overlay" id="compra-modal-overlay">
+  <div class="modal" style="max-width:640px;">
+    <div class="modal-header">
+      <h2 class="modal-title" id="compra-modal-title">Registrar Compra</h2>
+      <button class="modal-close" onclick="closeModal('compra-modal-overlay')">&times;</button>
+    </div>
+    <div class="modal-body">
+      <input type="hidden" id="compra-id">
+
+      <div class="field-row">
+        <div class="field">
+          <label>Fornecedor *</label>
+          <select id="compra-fornecedor">
+            <option value="">— Selecione —</option>
+            <option value="CNN">CNN Oriental</option>
+            <option value="SKYTECH">Skytech</option>
+          </select>
+        </div>
+        <div class="field">
+          <label>Data do pedido *</label>
+          <input type="date" id="compra-data-pedido">
+        </div>
+        <div class="field">
+          <label>Nº Pedido</label>
+          <input type="text" id="compra-numero-pedido" placeholder="Ex: 26017449">
+        </div>
+      </div>
+
+      <div class="field-row">
+        <div class="field">
+          <label>Nº NF</label>
+          <input type="text" id="compra-nf" placeholder="Skytech: por pedido / CNN: lançar depois">
+        </div>
+        <div class="field">
+          <label>Data NF</label>
+          <input type="date" id="compra-data-nf">
+        </div>
+        <div class="field">
+          <label>Status</label>
+          <select id="compra-status">
+            <option value="Pendente">Pendente</option>
+            <option value="Pago">Pago</option>
+          </select>
+        </div>
+      </div>
+
+      <div class="field" id="compra-data-pag-wrap" style="display:none;">
+        <label>Data do pagamento</label>
+        <input type="date" id="compra-data-pagamento">
+      </div>
+
+      <!-- Itens da compra -->
+      <div style="margin-top:12px;">
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
+          <label style="margin:0; font-weight:600;">Itens comprados</label>
+          <button type="button" class="btn btn-sm" onclick="addCompraItem()">+ Adicionar item</button>
+        </div>
+        <div id="compra-itens-list" style="display:flex;flex-direction:column;gap:6px;"></div>
+      </div>
+
+      <div class="field" style="margin-top:12px;">
+        <label>Observações</label>
+        <textarea id="compra-obs" placeholder="Observações adicionais..." style="min-height:50px;"></textarea>
+      </div>
+
+      <div style="display:flex; justify-content:space-between; align-items:center; margin-top:10px; padding-top:10px; border-top:1px solid var(--border);">
+        <span style="font-size:13px; color:var(--text-dim);">Total:</span>
+        <span id="compra-total-display" style="font-size:16px; font-weight:700; color:var(--accent);">R$ 0,00</span>
+      </div>
+
+      <div class="modal-actions">
+        <button class="btn" onclick="closeModal('compra-modal-overlay')">Cancelar</button>
+        <button class="btn btn-primary" onclick="saveCompra()">Salvar</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ===================== MODAL: LANÇAR NF CNN ===================== -->
+<div class="modal-overlay" id="nf-modal-overlay">
+  <div class="modal" style="max-width:560px;">
+    <div class="modal-header">
+      <h2 class="modal-title">📄 Lançar NF — CNN Oriental</h2>
+      <button class="modal-close" onclick="closeModal('nf-modal-overlay')">&times;</button>
+    </div>
+    <div class="modal-body">
+      <p style="font-size:13px; color:var(--text-dim); margin-bottom:16px;">
+        Selecione os pedidos CNN do período e associe o número da NF mensal a todos de uma vez.
+      </p>
+      <div class="field-row">
+        <div class="field">
+          <label>Nº da NF *</label>
+          <input type="text" id="nf-numero" placeholder="Número da nota fiscal">
+        </div>
+        <div class="field">
+          <label>Data da NF *</label>
+          <input type="date" id="nf-data">
+        </div>
+      </div>
+      <div class="field-row">
+        <div class="field">
+          <label>Período — De</label>
+          <input type="date" id="nf-de" onchange="renderNFPedidos()">
+        </div>
+        <div class="field">
+          <label>Período — Até</label>
+          <input type="date" id="nf-ate" onchange="renderNFPedidos()">
+        </div>
+      </div>
+
+      <div id="nf-pedidos-list" style="margin-top:12px; max-height:260px; overflow-y:auto;"></div>
+
+      <div class="modal-actions">
+        <button class="btn" onclick="closeModal('nf-modal-overlay')">Cancelar</button>
+        <button class="btn btn-primary" onclick="salvarNFCNN()">Associar NF</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ===================== MODAL: ITENS DA COMPRA (visualizar) ===================== -->
+<div class="modal-overlay" id="compra-itens-modal-overlay">
+  <div class="modal" style="max-width:600px;">
+    <div class="modal-header">
+      <h2 class="modal-title" id="compra-itens-title">Itens do pedido</h2>
+      <button class="modal-close" onclick="closeModal('compra-itens-modal-overlay')">&times;</button>
+    </div>
+    <div class="modal-body">
+      <div id="compra-itens-view"></div>
+    </div>
+  </div>
+</div>
+
 <!-- ===================== MODAL: IMPORTAR PEDIDO ===================== -->
 <div class="modal-overlay" id="pedido-modal-overlay">
   <div class="modal" style="max-width:620px;">
@@ -1238,13 +1378,13 @@
         <input type="text" id="stock-codigo" placeholder="Ex: TEL-S21-001">
       </div>
       <div class="field">
-        <label>Categoria *</label>
+        <label>Item *</label>
         <input type="text" id="stock-categoria" placeholder="Ex: Tela, Bateria, Conector">
       </div>
     </div>
 
     <div class="field">
-      <label>Nome do item *</label>
+      <label>Modelo *</label>
       <input type="text" id="stock-nome" placeholder="Ex: Samsung A12">
     </div>
 
@@ -1276,11 +1416,15 @@
     <div class="field-row">
       <div class="field">
         <label>Preço de custo (R$)</label>
-        <input type="number" id="stock-custo" min="0" step="0.01" placeholder="0,00">
+        <input type="number" id="stock-custo" min="0" step="0.01" placeholder="0,00"
+          oninput="const v=parseFloat(this.value)||0; const venda=document.getElementById('stock-venda'); if(!venda.dataset.manual) venda.value=v?((v*2).toFixed(2)):'';">
       </div>
       <div class="field">
         <label>Preço de venda (R$)</label>
-        <input type="number" id="stock-venda" min="0" step="0.01" placeholder="0,00">
+        <input type="number" id="stock-venda" min="0" step="0.01" placeholder="Preenchido automaticamente (2×custo)"
+          oninput="this.dataset.manual=this.value?'1':'';"
+          onfocus="this.placeholder='0,00';"
+          onblur="this.placeholder=this.value?'':'Preenchido automaticamente (2×custo)';">
       </div>
     </div>
 
@@ -1366,6 +1510,78 @@
       <button class="btn" onclick="closeModal('client-modal-overlay')">Cancelar</button>
       <button class="btn btn-primary" onclick="saveClient()">Salvar cliente</button>
     </div>
+    <!-- ===================== COMPRAS ===================== -->
+    <div class="page" id="page-compras">
+      <div class="page-header">
+        <div>
+          <h1>Compras</h1>
+          <p>Histórico de pedidos e controle de pagamentos por fornecedor</p>
+        </div>
+        <button class="btn btn-primary" onclick="openCompraModal()">+ Registrar compra</button>
+      </div>
+
+      <!-- Filtros -->
+      <div class="toolbar" style="flex-wrap:wrap; gap:8px;">
+        <select id="compra-filter-forn" onchange="renderComprasTable()" style="min-width:140px;">
+          <option value="">Todos fornecedores</option>
+          <option value="CNN">CNN Oriental</option>
+          <option value="SKYTECH">Skytech</option>
+        </select>
+        <select id="compra-filter-status" onchange="renderComprasTable()" style="min-width:130px;">
+          <option value="">Todos os status</option>
+          <option value="Pendente">Pendente</option>
+          <option value="Pago">Pago</option>
+        </select>
+        <input type="date" id="compra-filter-de" onchange="renderComprasTable()" placeholder="De">
+        <input type="date" id="compra-filter-ate" onchange="renderComprasTable()" placeholder="Até">
+        <button class="btn btn-sm" onclick="limparFiltrosCompra()">Limpar filtros</button>
+        <div style="margin-left:auto; display:flex; gap:8px;">
+          <button class="btn btn-sm" onclick="openLancarNFModal()" title="Associar NF da CNN a pedidos do período">
+            📄 Lançar NF CNN
+          </button>
+          <button class="btn btn-sm" onclick="exportComprasCSV()">
+            ⬇ Exportar CSV
+          </button>
+        </div>
+      </div>
+
+      <!-- Resumo do período -->
+      <div id="compras-resumo" style="display:none; margin:12px 0; display:grid; grid-template-columns:repeat(auto-fit,minmax(160px,1fr)); gap:12px;">
+        <div class="stat-card">
+          <div class="stat-label">Total do período</div>
+          <div class="stat-value" id="resumo-total" style="color:var(--accent);">R$ 0,00</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-label">Pendente pagamento</div>
+          <div class="stat-value" id="resumo-pendente" style="color:var(--red);">R$ 0,00</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-label">Já pago</div>
+          <div class="stat-value" id="resumo-pago" style="color:var(--green);">R$ 0,00</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-label">Pedidos</div>
+          <div class="stat-value" id="resumo-qtd">0</div>
+        </div>
+      </div>
+
+      <div class="table-wrap">
+        <table>
+          <thead><tr>
+            <th>Data</th>
+            <th>Fornecedor</th>
+            <th>Nº Pedido</th>
+            <th>Nº NF</th>
+            <th>Itens</th>
+            <th>Valor Total</th>
+            <th>Status</th>
+            <th></th>
+          </tr></thead>
+          <tbody id="compras-table-body"></tbody>
+        </table>
+      </div>
+    </div>
+
   </div>
 </div>
 
@@ -1585,6 +1801,7 @@ let state = {
   os: [],
   stock: [],
   clients: [],
+  compras: [],
   history: {}
 };
 
@@ -1683,6 +1900,7 @@ function goToPage(page){
   if(page === 'ordens') renderOSTable();
   if(page === 'estoque') renderStockTable();
   if(page === 'clientes') renderClientsTable();
+  if(page === 'compras') renderComprasTable();
 }
 
 /* =========================================================
@@ -1909,7 +2127,7 @@ function acFilter(tipo){
     const currentId = document.getElementById('os-cliente-id').value;
     if(currentId){
       const sel = state.clients.find(c => c.id === currentId);
-      const expectedLabel = sel ? sel.nome + ' — ' + sel.telefone : '';
+      const expectedLabel = sel ? sel.nome + ' — ' + (sel.cpfcnpj || sel.telefone) : '';
       if(document.getElementById('ac-cliente-input').value !== expectedLabel){
         document.getElementById('os-cliente-id').value = '';
         onOSClientChange();
@@ -1924,10 +2142,10 @@ function acFilter(tipo){
     if(filtered.length === 0){ list.classList.remove('open'); return; }
     list.innerHTML = filtered.map((c,i) =>
       `<div class="ac-item" data-idx="${i}" data-id="${c.id}"
-        onmousedown="acSelectCliente('${c.id}','${escapeHtml(c.nome)} — ${escapeHtml(c.telefone)}')"
+        onmousedown="acSelectCliente('${c.id}','${escapeHtml(c.nome)} — ${escapeHtml(c.cpfcnpj||c.telefone)}')"
         onmouseover="acSetActive('cliente',${i})">
         <strong>${escapeHtml(c.nome)}</strong>
-        <span style="color:var(--text-faint); margin-left:8px; font-size:12px;">${escapeHtml(c.telefone)}</span>
+        <span style="color:var(--text-faint); margin-left:8px; font-size:12px;">${escapeHtml(c.cpfcnpj || c.telefone)}</span>
       </div>`
     ).join('');
     list.classList.add('open');
@@ -2050,6 +2268,7 @@ function openOSModal(osId){
   document.getElementById('checklist-error').style.display = 'none';
   document.getElementById('os-diagnostico').value = '';
   document.getElementById('os-mao-obra').value = '';
+  document.getElementById('os-mao-obra-wrap').style.display = 'block';
   document.getElementById('os-status').value = 'Aberto';
   document.getElementById('os-data-entrada').value = todayISO();
   document.getElementById('os-data-prevista').value = '';
@@ -2104,6 +2323,9 @@ function openOSModal(osId){
     document.getElementById('os-garantia').value = o.garantia || '';
 
     o.parts.forEach(p => addPartRow(p));
+    // Se há peças, mão de obra já foi ocultada pelo addPartRow
+    // Se não há peças, garantir que mão de obra aparece
+    if(!o.parts.length) document.getElementById('os-mao-obra-wrap').style.display = 'block';
     if((o.aparelhosExtras || []).length > 0){
       (o.aparelhosExtras || []).forEach(a => addAparelhoExtra(a));
       // Atualiza resumo com dados já preenchidos e colapsa
@@ -2160,39 +2382,133 @@ function openClientModalFromOS(){
 }
 
 /* ---------- Linhas de peças no formulário de OS ---------- */
-function addPartRow(existing){
-  const list = document.getElementById('os-parts-list');
-  const row = document.createElement('div');
-  row.className = 'part-row';
+let _partRowCounter = 0;
 
-  const options = state.stock.map(s =>
-    `<option value="${s.id}" data-preco="${s.venda}" data-qtd="${s.quantidade}">${escapeHtml(s.nome)} (${s.quantidade} disp.)</option>`
-  ).join('');
+function addPartRow(existing){
+  // Ocultar mão de obra quando há peças
+  document.getElementById('os-mao-obra-wrap').style.display = 'none';
+  document.getElementById('os-mao-obra').value = '';
+  updateOSTotal();
+
+  const list   = document.getElementById('os-parts-list');
+  const row    = document.createElement('div');
+  const rowId  = 'part-row-' + (++_partRowCounter);
+  row.className = 'part-row';
+  row.id = rowId;
+  row.style.cssText = 'display:flex; gap:8px; align-items:flex-start; margin-bottom:8px; flex-wrap:wrap;';
+
+  // Montar label da peça: Item · Modelo · Detalhes
+  function partLabel(s){
+    const cat  = s.categoria ? s.categoria + ' · ' : '';
+    const det  = s.detalhes  ? ' · ' + s.detalhes  : '';
+    return cat + s.nome + det;
+  }
 
   row.innerHTML = `
-    <select class="part-select" onchange="onPartSelectChange(this)">
-      <option value="">Selecione uma peça...</option>
-      ${options}
-    </select>
-    <input type="number" class="part-qtd" min="1" step="1" value="${existing ? existing.qtd : 1}" oninput="updateOSTotal()">
-    <input type="number" class="part-preco" min="0" step="0.01" value="${existing ? existing.preco : ''}" placeholder="Preço" oninput="updateOSTotal()">
-    <button type="button" class="remove-part" onclick="this.closest('.part-row').remove(); updateOSTotal();">&times;</button>
+    <div style="flex:1; min-width:200px; position:relative;">
+      <input type="text" class="part-ac-input"
+        placeholder="Digite para buscar peça..."
+        autocomplete="off"
+        style="width:100%;"
+        oninput="partAcFilter(this, '${rowId}')"
+        onfocus="partAcFilter(this, '${rowId}')"
+        onblur="setTimeout(()=>partAcClose('${rowId}'),200)">
+      <input type="hidden" class="part-stock-id">
+      <div class="part-ac-list ac-dropdown" id="pac-${rowId}" style="display:none; position:absolute; top:100%; left:0; right:0; z-index:200; background:var(--panel); border:1px solid var(--border); border-radius:var(--radius); max-height:220px; overflow-y:auto; box-shadow:0 4px 16px rgba(0,0,0,.35);"></div>
+    </div>
+    <input type="number" class="part-qtd" min="1" step="1" value="${existing ? existing.qtd : 1}" style="width:64px;" oninput="updateOSTotal()">
+    <input type="number" class="part-preco" min="0" step="0.01" value="${existing ? existing.preco : ''}" placeholder="Preço" style="width:96px;" oninput="updateOSTotal()">
+    <button type="button" class="remove-part" onclick="
+      this.closest('.part-row').remove();
+      updateOSTotal();
+      const rem=document.querySelectorAll('#os-parts-list .part-row').length;
+      document.getElementById('os-mao-obra-wrap').style.display=rem===0?'block':'none';
+    ">&times;</button>
   `;
+
   list.appendChild(row);
 
-  if(existing){
-    row.querySelector('.part-select').value = existing.stockId;
+  // Se carregando existente, preencher input com label e id
+  if(existing && existing.stockId){
+    const s = state.stock.find(x => x.id === existing.stockId);
+    if(s){
+      row.querySelector('.part-ac-input').value = partLabel(s);
+      row.querySelector('.part-stock-id').value = s.id;
+      row.querySelector('.part-preco').value = existing.preco;
+    }
   }
+
   updateOSTotal();
 }
 
-function onPartSelectChange(select){
-  const row = select.closest('.part-row');
-  const opt = select.options[select.selectedIndex];
-  const preco = opt.getAttribute('data-preco');
-  if(preco != null && row.querySelector('.part-preco').value === ''){
-    row.querySelector('.part-preco').value = preco;
+function partAcFilter(input, rowId){
+  const q    = input.value.trim().toLowerCase();
+  const list = document.getElementById('pac-' + rowId);
+  const row  = document.getElementById(rowId);
+
+  // Se usuário editou o texto, limpar seleção
+  const hiddenId = row.querySelector('.part-stock-id').value;
+  if(hiddenId){
+    const sel = state.stock.find(s => s.id === hiddenId);
+    const expectedLabel = sel ? (sel.categoria ? sel.categoria + ' · ' : '') + sel.nome + (sel.detalhes ? ' · ' + sel.detalhes : '') : '';
+    if(input.value !== expectedLabel){
+      row.querySelector('.part-stock-id').value = '';
+      row.querySelector('.part-preco').value = '';
+      updateOSTotal();
+    }
   }
+
+  const sorted = [...state.stock].sort((a,b) => {
+    const ca = a.categoria || '', cb = b.categoria || '';
+    return ca.localeCompare(cb) || a.nome.localeCompare(b.nome);
+  });
+
+  const filtered = q
+    ? sorted.filter(s =>
+        (s.categoria||'').toLowerCase().includes(q) ||
+        s.nome.toLowerCase().includes(q) ||
+        (s.detalhes||'').toLowerCase().includes(q) ||
+        (s.codigo||'').toLowerCase().includes(q)
+      )
+    : sorted;
+
+  if(!filtered.length){ list.style.display='none'; return; }
+
+  list.innerHTML = filtered.map(s => {
+    const cat = s.categoria
+      ? `<span style="font-size:10px;font-weight:700;color:var(--accent);background:rgba(45,160,224,0.12);border-radius:3px;padding:1px 5px;margin-right:5px;">${escapeHtml(s.categoria)}</span>`
+      : '';
+    const det = s.detalhes
+      ? `<span style="font-size:11px;color:var(--text-dim);margin-left:5px;">${escapeHtml(s.detalhes)}</span>`
+      : '';
+    const qtd = `<span style="font-size:11px;color:${s.quantidade<=s.minimo?'var(--red)':'var(--text-faint)'};margin-left:auto;white-space:nowrap;">${s.quantidade} disp.</span>`;
+    const label = (s.categoria ? s.categoria + ' · ' : '') + s.nome + (s.detalhes ? ' · ' + s.detalhes : '');
+    return `<div class="ac-item" style="display:flex;align-items:center;gap:4px;"
+      onmousedown="partAcSelect('${rowId}','${s.id}','${label.replace(/'/g,"\'")}','${s.venda}')">
+      ${cat}<strong>${escapeHtml(s.nome)}</strong>${det}${qtd}
+    </div>`;
+  }).join('');
+
+  list.style.display = 'block';
+}
+
+function partAcSelect(rowId, stockId, label, preco){
+  const row = document.getElementById(rowId);
+  row.querySelector('.part-ac-input').value  = label;
+  row.querySelector('.part-stock-id').value  = stockId;
+  const precoInput = row.querySelector('.part-preco');
+  if(!precoInput.value) precoInput.value = preco;
+  document.getElementById('pac-' + rowId).style.display = 'none';
+  updateOSTotal();
+}
+
+function partAcClose(rowId){
+  const list = document.getElementById('pac-' + rowId);
+  if(list) list.style.display = 'none';
+}
+
+function onPartSelectChange(select){
+  // mantido por compatibilidade
   updateOSTotal();
 }
 
@@ -2288,8 +2604,7 @@ async function saveOS(){
   // Collect parts
   const parts = [];
   document.querySelectorAll('#os-parts-list .part-row').forEach(row => {
-    const select = row.querySelector('.part-select');
-    const stockId = select.value;
+    const stockId = row.querySelector('.part-stock-id')?.value || '';
     if(!stockId) return;
     const qtd = parseFloat(row.querySelector('.part-qtd').value) || 0;
     const preco = parseFloat(row.querySelector('.part-preco').value) || 0;
@@ -2782,6 +3097,48 @@ async function salvarPedidoNoEstoque(){
 
   renderStockTable();
   renderDashboard();
+
+  // Registrar automaticamente na tabela de compras
+  try {
+    const compraId = 'comp' + Date.now();
+    const compraPayload = {
+      id: compraId,
+      fornecedor: document.getElementById('ped-fornecedor').value,
+      numero_pedido: document.getElementById('ped-numero').value,
+      data_pedido: document.getElementById('ped-data').value || null,
+      status: 'Pendente',
+      valor_total: selecionados.reduce((s,i) => s + i.qtd * i.preco, 0)
+    };
+    await sbPost('compras', compraPayload);
+    for(const item of selecionados){
+      await sbPost('compras_itens', {
+        id: 'ci' + Date.now() + Math.random().toString(36).slice(2,5),
+        compra_id: compraId,
+        codigo: item.codigo || '',
+        nome: item.nome || item.descricao || '',
+        categoria: item.categoria || '',
+        detalhes: item.detalhes || '',
+        qtd: item.qtd,
+        preco_unit: item.preco,
+        total: item.qtd * item.preco
+      });
+    }
+    // Atualizar cache local
+    state.compras.unshift({
+      id: compraId,
+      fornecedor: compraPayload.fornecedor,
+      numeroPedido: compraPayload.numero_pedido || '',
+      numeroNF: '', dataPedido: compraPayload.data_pedido || '',
+      dataNF: '', valorTotal: compraPayload.valor_total,
+      status: 'Pendente', dataPagamento: '', observacoes: '',
+      itens: selecionados.map(i => ({
+        codigo: i.codigo||'', nome: i.nome||i.descricao||'',
+        categoria: i.categoria||'', detalhes: i.detalhes||'',
+        qtd: i.qtd, precoUnit: i.preco, total: i.qtd*i.preco
+      }))
+    });
+  } catch(e){ console.error('Erro ao registrar compra:', e); }
+
   closeModal('pedido-modal-overlay');
   showToast(ok + ' ' + (ok === 1 ? 'peça adicionada' : 'peças adicionadas') + ' ao estoque!');
 }
@@ -3322,6 +3679,7 @@ function openStockModal(stockId){
   document.getElementById('stock-local').value = '';
   document.getElementById('stock-custo').value = '';
   document.getElementById('stock-venda').value = '';
+  document.getElementById('stock-venda').dataset.manual = '';
   document.getElementById('stock-fornecedor').value = '';
   document.getElementById('stock-pedido').value = '';
   document.getElementById('stock-data-pedido').value = '';
@@ -3720,7 +4078,7 @@ function exportCSV(tipo){
     const cols = [
       { label:'Código',      key:'codigo' },
       { label:'Nome',        key:'nome' },
-      { label:'Categoria',   key:'categoria' },
+      { label:'Item',        key:'categoria' },
       { label:'Compatível',  key:'compativel' },
       { label:'Qtd Atual',   key:'quantidade' },
       { label:'Qtd Mínima',  key:'minimo' },
@@ -3871,6 +4229,441 @@ async function importCSV(){
   }
 }
 
+
+/* =========================================================
+   MÓDULO DE COMPRAS
+   ========================================================= */
+async function loadCompras(){
+  try {
+    const rows = await sbGet('compras', 'order=data_pedido.desc');
+    const itensAll = await sbGet('compras_itens', 'order=compra_id.asc');
+    state.compras = rows.map(c => ({
+      id: c.id, fornecedor: c.fornecedor, numeroPedido: c.numero_pedido || '',
+      numeroNF: c.numero_nf || '', dataPedido: c.data_pedido || '',
+      dataNF: c.data_nf || '', valorTotal: c.valor_total || 0,
+      status: c.status || 'Pendente', dataPagamento: c.data_pagamento || '',
+      observacoes: c.observacoes || '',
+      itens: itensAll.filter(i => i.compra_id === c.id).map(i => ({
+        id: i.id, codigo: i.codigo || '', nome: i.nome || '',
+        categoria: i.categoria || '', detalhes: i.detalhes || '',
+        qtd: i.qtd || 1, precoUnit: i.preco_unit || 0, total: i.total || 0
+      }))
+    }));
+  } catch(e) { console.error('Erro ao carregar compras:', e); }
+}
+
+/* ---- Renderizar tabela ---- */
+async function renderComprasTable(){
+  if(!state.compras.length){
+    await loadCompras();
+  }
+  const forn   = document.getElementById('compra-filter-forn')?.value || '';
+  const status = document.getElementById('compra-filter-status')?.value || '';
+  const de     = document.getElementById('compra-filter-de')?.value || '';
+  const ate    = document.getElementById('compra-filter-ate')?.value || '';
+
+  let list = [...state.compras];
+  if(forn)   list = list.filter(c => c.fornecedor === forn);
+  if(status) list = list.filter(c => c.status === status);
+  if(de)     list = list.filter(c => c.dataPedido >= de);
+  if(ate)    list = list.filter(c => c.dataPedido <= ate);
+
+  // Resumo
+  const total    = list.reduce((s,c) => s + c.valorTotal, 0);
+  const pendente = list.filter(c => c.status === 'Pendente').reduce((s,c) => s + c.valorTotal, 0);
+  const pago     = list.filter(c => c.status === 'Pago').reduce((s,c) => s + c.valorTotal, 0);
+  document.getElementById('resumo-total').textContent    = formatCurrency(total);
+  document.getElementById('resumo-pendente').textContent = formatCurrency(pendente);
+  document.getElementById('resumo-pago').textContent     = formatCurrency(pago);
+  document.getElementById('resumo-qtd').textContent      = list.length;
+  document.getElementById('compras-resumo').style.display = 'grid';
+
+  const body = document.getElementById('compras-table-body');
+  if(!body) return;
+
+  if(!list.length){
+    body.innerHTML = '<tr><td colspan="8" style="text-align:center;color:var(--text-faint);padding:32px;">Nenhuma compra encontrada.</td></tr>';
+    return;
+  }
+
+  const fornNomes = { CNN: 'CNN Oriental', SKYTECH: 'Skytech' };
+  body.innerHTML = list.map(c => {
+    const statusBadge = c.status === 'Pago'
+      ? `<span style="font-size:11px;font-weight:700;padding:2px 8px;border-radius:20px;background:rgba(40,167,69,0.15);color:#28a745;border:1px solid rgba(40,167,69,0.3);">✓ Pago</span>`
+      : `<span style="font-size:11px;font-weight:700;padding:2px 8px;border-radius:20px;background:rgba(220,53,69,0.15);color:#dc3545;border:1px solid rgba(220,53,69,0.3);">⏳ Pendente</span>`;
+    const fornBadge = c.fornecedor === 'SKYTECH'
+      ? `<span style="font-size:11px;font-weight:700;color:#f59e0b;">Skytech</span>`
+      : `<span style="font-size:11px;font-weight:700;color:var(--accent);">CNN Oriental</span>`;
+    return `<tr>
+      <td class="mono">${formatDate(c.dataPedido)||'—'}</td>
+      <td>${fornBadge}</td>
+      <td class="mono">${escapeHtml(c.numeroPedido||'—')}</td>
+      <td class="mono">${c.numeroNF
+        ? escapeHtml(c.numeroNF)
+        : (c.fornecedor==='CNN'
+          ? `<span style="color:var(--text-faint);font-size:11px;">Pendente</span>`
+          : '—')}</td>
+      <td style="text-align:center;">
+        <button class="btn btn-ghost btn-sm" onclick="verItensCompra('${c.id}')" title="Ver itens">
+          ${c.itens.length} ${c.itens.length===1?'item':'itens'}
+        </button>
+      </td>
+      <td class="mono" style="font-weight:600;">${formatCurrency(c.valorTotal)}</td>
+      <td>${statusBadge}</td>
+      <td style="display:flex;gap:6px;flex-wrap:wrap;">
+        ${c.status==='Pendente'
+          ? `<button class="btn btn-ghost btn-sm" style="color:var(--green);" onclick="marcarPago('${c.id}')">✓ Pagar</button>`
+          : `<button class="btn btn-ghost btn-sm" style="color:var(--text-dim);" onclick="marcarPendente('${c.id}')">↩ Desfazer</button>`}
+        <button class="btn btn-ghost btn-sm" onclick="openCompraModal('${c.id}')">Editar</button>
+        <button class="btn btn-ghost btn-sm" onclick="deleteCompra('${c.id}')">&times;</button>
+      </td>
+    </tr>`;
+  }).join('');
+}
+
+function limparFiltrosCompra(){
+  document.getElementById('compra-filter-forn').value = '';
+  document.getElementById('compra-filter-status').value = '';
+  document.getElementById('compra-filter-de').value = '';
+  document.getElementById('compra-filter-ate').value = '';
+  renderComprasTable();
+}
+
+/* ---- Modal Compra ---- */
+function openCompraModal(id){
+  document.getElementById('compra-id').value = '';
+  document.getElementById('compra-fornecedor').value = '';
+  document.getElementById('compra-data-pedido').value = todayISO();
+  document.getElementById('compra-numero-pedido').value = '';
+  document.getElementById('compra-nf').value = '';
+  document.getElementById('compra-data-nf').value = '';
+  document.getElementById('compra-status').value = 'Pendente';
+  document.getElementById('compra-data-pagamento').value = '';
+  document.getElementById('compra-data-pag-wrap').style.display = 'none';
+  document.getElementById('compra-obs').value = '';
+  document.getElementById('compra-itens-list').innerHTML = '';
+  document.getElementById('compra-modal-title').textContent = id ? 'Editar Compra' : 'Registrar Compra';
+  updateCompraTotal();
+
+  if(id){
+    const c = state.compras.find(x => x.id === id);
+    if(!c) return;
+    document.getElementById('compra-id').value = c.id;
+    document.getElementById('compra-fornecedor').value = c.fornecedor;
+    document.getElementById('compra-data-pedido').value = c.dataPedido;
+    document.getElementById('compra-numero-pedido').value = c.numeroPedido;
+    document.getElementById('compra-nf').value = c.numeroNF;
+    document.getElementById('compra-data-nf').value = c.dataNF;
+    document.getElementById('compra-status').value = c.status;
+    document.getElementById('compra-data-pagamento').value = c.dataPagamento;
+    document.getElementById('compra-data-pag-wrap').style.display = c.status==='Pago'?'block':'none';
+    document.getElementById('compra-obs').value = c.observacoes;
+    c.itens.forEach(i => addCompraItem(i));
+  } else {
+    addCompraItem();
+  }
+
+  openModal('compra-modal-overlay');
+}
+
+// Mostrar/ocultar data pagamento conforme status
+document.addEventListener('change', e => {
+  if(e.target.id === 'compra-status'){
+    document.getElementById('compra-data-pag-wrap').style.display = e.target.value==='Pago'?'block':'none';
+    if(e.target.value==='Pago' && !document.getElementById('compra-data-pagamento').value)
+      document.getElementById('compra-data-pagamento').value = todayISO();
+  }
+});
+
+function addCompraItem(existing){
+  const list = document.getElementById('compra-itens-list');
+  const row  = document.createElement('div');
+  row.style.cssText = 'display:flex;gap:6px;align-items:center;';
+  row.innerHTML = `
+    <input type="text" placeholder="Código" style="width:80px;" class="ci-codigo" value="${existing?escapeHtml(existing.codigo||''):''}">
+    <input type="text" placeholder="Descrição *" style="flex:1;" class="ci-nome" value="${existing?escapeHtml(existing.nome||''):''}">
+    <input type="number" placeholder="Qtd" style="width:60px;" class="ci-qtd" min="1" value="${existing?existing.qtd:1}" oninput="updateCompraTotal()">
+    <input type="number" placeholder="P.Unit" style="width:90px;" class="ci-preco" min="0" step="0.01" value="${existing?existing.precoUnit:''}" oninput="updateCompraTotal()">
+    <button type="button" onclick="this.parentElement.remove();updateCompraTotal();" style="background:none;border:none;color:var(--text-faint);font-size:18px;cursor:pointer;">&times;</button>
+  `;
+  list.appendChild(row);
+  updateCompraTotal();
+}
+
+function updateCompraTotal(){
+  let total = 0;
+  document.querySelectorAll('#compra-itens-list > div').forEach(row => {
+    const qtd   = parseFloat(row.querySelector('.ci-qtd')?.value) || 0;
+    const preco = parseFloat(row.querySelector('.ci-preco')?.value) || 0;
+    total += qtd * preco;
+  });
+  const el = document.getElementById('compra-total-display');
+  if(el) el.textContent = formatCurrency(total);
+}
+
+async function saveCompra(){
+  const fornecedor = document.getElementById('compra-fornecedor').value;
+  const dataPedido = document.getElementById('compra-data-pedido').value;
+  if(!fornecedor || !dataPedido){
+    showToast('Preencha fornecedor e data.', true); return;
+  }
+
+  const itens = [];
+  let valorTotal = 0;
+  document.querySelectorAll('#compra-itens-list > div').forEach(row => {
+    const nome  = row.querySelector('.ci-nome').value.trim();
+    const qtd   = parseInt(row.querySelector('.ci-qtd').value) || 0;
+    const preco = parseFloat(row.querySelector('.ci-preco').value) || 0;
+    if(nome && qtd){
+      const total = qtd * preco;
+      valorTotal += total;
+      itens.push({
+        id: 'ci' + Date.now() + Math.random().toString(36).slice(2,5),
+        codigo: row.querySelector('.ci-codigo').value.trim(),
+        nome, categoria: '', detalhes: '', qtd,
+        preco_unit: preco, total
+      });
+    }
+  });
+
+  const payload = {
+    fornecedor, data_pedido: dataPedido,
+    numero_pedido: document.getElementById('compra-numero-pedido').value.trim(),
+    numero_nf:     document.getElementById('compra-nf').value.trim(),
+    data_nf:       document.getElementById('compra-data-nf').value || null,
+    status:        document.getElementById('compra-status').value,
+    data_pagamento:document.getElementById('compra-data-pagamento').value || null,
+    observacoes:   document.getElementById('compra-obs').value.trim(),
+    valor_total:   valorTotal
+  };
+
+  const editId = document.getElementById('compra-id').value;
+  try {
+    if(editId){
+      await sbPatch('compras', 'id', editId, payload);
+      // Deletar itens antigos e reinserir
+      await fetch(`${SB_URL}/rest/v1/compras_itens?compra_id=eq.${editId}`,
+        { method:'DELETE', headers: sbHeaders({'Prefer':''}) });
+      for(const it of itens){
+        await sbPost('compras_itens', { ...it, compra_id: editId });
+      }
+      const c = state.compras.find(x => x.id === editId);
+      Object.assign(c, { fornecedor, dataPedido, numeroPedido: payload.numero_pedido,
+        numeroNF: payload.numero_nf, dataNF: payload.data_nf||'',
+        valorTotal, status: payload.status, dataPagamento: payload.data_pagamento||'',
+        observacoes: payload.observacoes,
+        itens: itens.map(i => ({ ...i, precoUnit: i.preco_unit })) });
+      showToast('Compra atualizada.');
+    } else {
+      const newId = 'comp' + Date.now();
+      await sbPost('compras', { id: newId, ...payload });
+      for(const it of itens){
+        await sbPost('compras_itens', { ...it, compra_id: newId });
+      }
+      state.compras.unshift({ id: newId, fornecedor, dataPedido,
+        numeroPedido: payload.numero_pedido, numeroNF: payload.numero_nf,
+        dataNF: payload.data_nf||'', valorTotal, status: payload.status,
+        dataPagamento: payload.data_pagamento||'', observacoes: payload.observacoes,
+        itens: itens.map(i => ({ ...i, precoUnit: i.preco_unit })) });
+      showToast('Compra registrada.');
+    }
+    closeModal('compra-modal-overlay');
+    renderComprasTable();
+  } catch(e){ showToast('Erro ao salvar: ' + e.message, true); }
+}
+
+/* ---- Marcar pago / pendente ---- */
+async function marcarPago(id){
+  const dataPag = todayISO();
+  try {
+    await sbPatch('compras', 'id', id, { status:'Pago', data_pagamento: dataPag });
+    const c = state.compras.find(x => x.id === id);
+    if(c){ c.status = 'Pago'; c.dataPagamento = dataPag; }
+    renderComprasTable();
+    showToast('Pedido marcado como pago.');
+  } catch(e){ showToast('Erro: ' + e.message, true); }
+}
+
+async function marcarPendente(id){
+  try {
+    await sbPatch('compras', 'id', id, { status:'Pendente', data_pagamento: null });
+    const c = state.compras.find(x => x.id === id);
+    if(c){ c.status = 'Pendente'; c.dataPagamento = ''; }
+    renderComprasTable();
+    showToast('Status revertido para pendente.');
+  } catch(e){ showToast('Erro: ' + e.message, true); }
+}
+
+/* ---- Excluir compra ---- */
+async function deleteCompra(id){
+  if(!confirm('Remover esta compra?')) return;
+  try {
+    await sbDelete('compras', 'id', id);
+    state.compras = state.compras.filter(c => c.id !== id);
+    renderComprasTable();
+    showToast('Compra removida.');
+  } catch(e){ showToast('Erro: ' + e.message, true); }
+}
+
+/* ---- Ver itens ---- */
+function verItensCompra(id){
+  const c = state.compras.find(x => x.id === id);
+  if(!c) return;
+  const fornNomes = { CNN:'CNN Oriental', SKYTECH:'Skytech' };
+  document.getElementById('compra-itens-title').textContent =
+    `${fornNomes[c.fornecedor]||c.fornecedor} — Pedido ${c.numeroPedido||'s/nº'} (${formatDate(c.dataPedido)})`;
+
+  const rows = c.itens.map(i => `
+    <tr>
+      <td class="mono" style="font-size:11px;">${escapeHtml(i.codigo||'—')}</td>
+      <td>${escapeHtml(i.nome)}</td>
+      <td style="text-align:center;">${i.qtd}</td>
+      <td class="mono">${formatCurrency(i.precoUnit)}</td>
+      <td class="mono" style="font-weight:600;">${formatCurrency(i.total)}</td>
+    </tr>`).join('');
+
+  document.getElementById('compra-itens-view').innerHTML = `
+    <table style="width:100%;border-collapse:collapse;font-size:13px;">
+      <thead><tr style="background:var(--panel-2);">
+        <th style="padding:8px 10px;text-align:left;">Código</th>
+        <th style="padding:8px 10px;text-align:left;">Item</th>
+        <th style="padding:8px 10px;text-align:center;">Qtd</th>
+        <th style="padding:8px 10px;text-align:left;">P.Unit</th>
+        <th style="padding:8px 10px;text-align:left;">Total</th>
+      </tr></thead>
+      <tbody>${rows}</tbody>
+      <tfoot><tr style="border-top:1px solid var(--border);">
+        <td colspan="4" style="padding:8px 10px;text-align:right;font-weight:700;">Total</td>
+        <td class="mono" style="padding:8px 10px;font-weight:700;color:var(--accent);">${formatCurrency(c.valorTotal)}</td>
+      </tr></tfoot>
+    </table>`;
+  openModal('compra-itens-modal-overlay');
+}
+
+/* ---- Lançar NF CNN ---- */
+function openLancarNFModal(){
+  document.getElementById('nf-numero').value = '';
+  document.getElementById('nf-data').value = todayISO();
+  // Default: mês atual
+  const now = new Date();
+  document.getElementById('nf-de').value  = `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}-01`;
+  document.getElementById('nf-ate').value = todayISO();
+  renderNFPedidos();
+  openModal('nf-modal-overlay');
+}
+
+function renderNFPedidos(){
+  const de  = document.getElementById('nf-de').value;
+  const ate = document.getElementById('nf-ate').value;
+  const lista = state.compras.filter(c =>
+    c.fornecedor === 'CNN' &&
+    (!de  || c.dataPedido >= de) &&
+    (!ate || c.dataPedido <= ate)
+  );
+  const el = document.getElementById('nf-pedidos-list');
+  if(!lista.length){
+    el.innerHTML = '<p style="color:var(--text-faint);font-size:13px;text-align:center;padding:16px;">Nenhum pedido CNN no período.</p>';
+    return;
+  }
+  el.innerHTML = `
+    <div style="font-size:12px;font-weight:700;color:var(--text-dim);margin-bottom:8px;">
+      Pedidos CNN encontrados (${lista.length}):
+    </div>
+    ${lista.map(c => `
+      <label style="display:flex;align-items:center;gap:10px;padding:8px 10px;border:1px solid var(--border);border-radius:6px;margin-bottom:6px;cursor:pointer;font-size:13px;">
+        <input type="checkbox" checked value="${c.id}" style="accent-color:var(--accent);width:15px;height:15px;">
+        <span class="mono" style="color:var(--text-dim);">${formatDate(c.dataPedido)}</span>
+        <span>Pedido ${c.numeroPedido||'s/nº'}</span>
+        <span style="margin-left:auto;font-weight:600;">${formatCurrency(c.valorTotal)}</span>
+        ${c.numeroNF?`<span style="font-size:11px;color:var(--accent);">NF ${c.numeroNF}</span>`:''}
+      </label>
+    `).join('')}
+    <div style="text-align:right;font-weight:700;padding-top:8px;border-top:1px solid var(--border);">
+      Total selecionado: <span style="color:var(--accent);">${formatCurrency(lista.reduce((s,c)=>s+c.valorTotal,0))}</span>
+    </div>`;
+}
+
+async function salvarNFCNN(){
+  const nf   = document.getElementById('nf-numero').value.trim();
+  const data = document.getElementById('nf-data').value;
+  if(!nf){ showToast('Informe o número da NF.', true); return; }
+  const checks = document.querySelectorAll('#nf-pedidos-list input[type=checkbox]:checked');
+  if(!checks.length){ showToast('Selecione ao menos um pedido.', true); return; }
+  let ok = 0;
+  for(const chk of checks){
+    const id = chk.value;
+    try {
+      await sbPatch('compras', 'id', id, { numero_nf: nf, data_nf: data||null });
+      const c = state.compras.find(x => x.id === id);
+      if(c){ c.numeroNF = nf; c.dataNF = data; }
+      ok++;
+    } catch(e){ console.error(e); }
+  }
+  closeModal('nf-modal-overlay');
+  renderComprasTable();
+  showToast(`NF ${nf} associada a ${ok} pedido(s).`);
+}
+
+/* ---- Exportar CSV de compras ---- */
+function exportComprasCSV(){
+  const forn   = document.getElementById('compra-filter-forn')?.value || '';
+  const status = document.getElementById('compra-filter-status')?.value || '';
+  const de     = document.getElementById('compra-filter-de')?.value || '';
+  const ate    = document.getElementById('compra-filter-ate')?.value || '';
+
+  let list = [...state.compras];
+  if(forn)   list = list.filter(c => c.fornecedor === forn);
+  if(status) list = list.filter(c => c.status === status);
+  if(de)     list = list.filter(c => c.dataPedido >= de);
+  if(ate)    list = list.filter(c => c.dataPedido <= ate);
+
+  if(!list.length){ showToast('Nenhuma compra para exportar.', true); return; }
+
+  const NL = '\n';
+  const fornNomes = { CNN:'CNN Oriental', SKYTECH:'Skytech' };
+  let csv = ['"Fornecedor"','"Data Pedido"','"Nº Pedido"','"Nº NF"','"Data NF"',
+    '"Código"','"Item"','"Qtd"','"P.Unit (R$)"','"Total Item (R$)"',
+    '"Total Pedido (R$)"','"Status"','"Data Pagamento"'].join(',') + NL;
+
+  list.forEach(c => {
+    if(c.itens.length){
+      c.itens.forEach((it, idx) => {
+        csv += [
+          `"${fornNomes[c.fornecedor]||c.fornecedor}"`,
+          `"${formatDate(c.dataPedido)||''}"`,
+          `"${c.numeroPedido||''}"`,
+          `"${c.numeroNF||''}"`,
+          `"${formatDate(c.dataNF)||''}"`,
+          `"${it.codigo||''}"`,
+          `"${it.nome||''}"`,
+          `"${it.qtd}"`,
+          `"${(it.precoUnit||0).toFixed(2)}"`,
+          `"${(it.total||0).toFixed(2)}"`,
+          idx===0 ? `"${c.valorTotal.toFixed(2)}"` : '""',
+          idx===0 ? `"${c.status}"` : '""',
+          idx===0 ? `"${formatDate(c.dataPagamento)||''}"` : '""'
+        ].join(',') + NL;
+      });
+    } else {
+      csv += [`"${fornNomes[c.fornecedor]||c.fornecedor}"`,
+        `"${formatDate(c.dataPedido)||''}"`,`"${c.numeroPedido||''}"`,
+        `"${c.numeroNF||''}"`,`"${formatDate(c.dataNF)||''}"`,
+        '""','""','""','""','""',
+        `"${c.valorTotal.toFixed(2)}"`,`"${c.status}"`,
+        `"${formatDate(c.dataPagamento)||''}"`].join(',') + NL;
+    }
+  });
+
+  const bom  = '\uFEFF';
+  const blob = new Blob([bom + csv], { type:'text/csv;charset=utf-8;' });
+  const url  = URL.createObjectURL(blob);
+  const a    = document.createElement('a');
+  a.href = url; a.download = 'mobit-compras-' + todayISO() + '.csv';
+  document.body.appendChild(a); a.click();
+  document.body.removeChild(a); URL.revokeObjectURL(url);
+  showToast(list.length + ' compra(s) exportada(s).');
+}
+
 /* =========================================================
    AUTENTICAÇÃO — verificar sessão e auto-logout
    ========================================================= */
@@ -3925,6 +4718,7 @@ function initAutoLogout(){
 
   // Carregar dados do Supabase
   await loadFromSupabase();
+  await loadCompras();
 
   renderDashboard();
   renderOSTable();
