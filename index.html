@@ -3084,7 +3084,7 @@ async function salvarPedidoNoEstoque(){
       id, codigo: item.codigo || '', nome: item.nome || item.descricao || '',
       detalhes: item.detalhes || '',
       categoria: item.categoria || 'Peça', compativel: '', quantidade: item.qtd,
-      minimo: 0, local: '', custo: item.preco, venda: 0,
+      minimo: 0, local: '', custo: item.preco, venda: parseFloat((item.preco * 2).toFixed(2)),
       fornecedor, pedido: numeroPedido, data_pedido: dataPedido
     };
 
@@ -3095,6 +3095,12 @@ async function salvarPedidoNoEstoque(){
     } catch(e) { console.error('Erro ao salvar item:', e); }
   }
 
+  // Capturar dados do pedido ANTES de fechar o modal
+  const _compraForn   = document.getElementById('ped-fornecedor').value || '';
+  const _compraNPed   = document.getElementById('ped-numero').value || '';
+  const _compraData   = document.getElementById('ped-data').value || null;
+  const _compraDetForn = { CNN:'CNN Oriental', SKYTECH:'Skytech' };
+
   renderStockTable();
   renderDashboard();
 
@@ -3103,9 +3109,9 @@ async function salvarPedidoNoEstoque(){
     const compraId = 'comp' + Date.now();
     const compraPayload = {
       id: compraId,
-      fornecedor: document.getElementById('ped-fornecedor').value,
-      numero_pedido: document.getElementById('ped-numero').value,
-      data_pedido: document.getElementById('ped-data').value || null,
+      fornecedor: _compraForn,
+      numero_pedido: _compraNPed,
+      data_pedido: _compraData,
       status: 'Pendente',
       valor_total: selecionados.reduce((s,i) => s + i.qtd * i.preco, 0)
     };
@@ -3126,8 +3132,8 @@ async function salvarPedidoNoEstoque(){
     // Atualizar cache local
     state.compras.unshift({
       id: compraId,
-      fornecedor: compraPayload.fornecedor,
-      numeroPedido: compraPayload.numero_pedido || '',
+      fornecedor: _compraForn,
+      numeroPedido: _compraNPed,
       numeroNF: '', dataPedido: compraPayload.data_pedido || '',
       dataNF: '', valorTotal: compraPayload.valor_total,
       status: 'Pendente', dataPagamento: '', observacoes: '',
@@ -3137,7 +3143,7 @@ async function salvarPedidoNoEstoque(){
         qtd: i.qtd, precoUnit: i.preco, total: i.qtd*i.preco
       }))
     });
-  } catch(e){ console.error('Erro ao registrar compra:', e); }
+  } catch(e){ console.error('Erro ao registrar compra:', e); showToast('Peças salvas, mas erro ao registrar em Compras: ' + e.message, true); }
 
   closeModal('pedido-modal-overlay');
   showToast(ok + ' ' + (ok === 1 ? 'peça adicionada' : 'peças adicionadas') + ' ao estoque!');
