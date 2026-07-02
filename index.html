@@ -590,6 +590,47 @@
 
   .text-faint{ color:var(--text-faint); }
   .mb-0{ margin-bottom:0 !important; }
+  /* ── KANBAN ── */
+  .kanban-tabs { display:flex; gap:4px; margin-bottom:20px; border-bottom:1px solid var(--border); }
+  .kanban-tab  { padding:10px 20px; background:none; border:none; border-bottom:2px solid transparent;
+    color:var(--text-dim); font-size:13px; font-weight:600; cursor:pointer; transition:all .2s; }
+  .kanban-tab.active { color:var(--accent); border-bottom-color:var(--accent); }
+
+  .kanban-board { display:grid; grid-template-columns:repeat(3,1fr); gap:16px; align-items:start; }
+  @media(max-width:900px){ .kanban-board{ grid-template-columns:1fr; } }
+
+  .kanban-col { background:var(--panel-2); border-radius:var(--radius); padding:14px; min-height:300px; }
+  .kanban-col-header { display:flex; justify-content:space-between; align-items:center; margin-bottom:14px; }
+  .kanban-col-title  { font-size:13px; font-weight:700; text-transform:uppercase; letter-spacing:.06em; }
+  .kanban-col-count  { font-size:11px; font-weight:700; background:rgba(255,255,255,0.08);
+    border-radius:20px; padding:2px 8px; color:var(--text-dim); }
+
+  .kanban-card { background:var(--panel); border:1px solid var(--border); border-radius:8px;
+    padding:12px 14px; margin-bottom:10px; cursor:pointer; transition:box-shadow .15s, transform .15s;
+    border-left:3px solid var(--accent); position:relative; }
+  .kanban-card:hover { box-shadow:0 4px 16px rgba(0,0,0,.3); transform:translateY(-1px); }
+  .kanban-card-title { font-size:13px; font-weight:600; margin-bottom:6px; line-height:1.4; }
+  .kanban-card-meta  { display:flex; flex-wrap:wrap; gap:6px; margin-top:8px; align-items:center; }
+  .kanban-badge { font-size:10px; font-weight:700; padding:2px 7px; border-radius:20px; }
+  .kanban-card-desc  { font-size:12px; color:var(--text-dim); margin-bottom:4px; line-height:1.5;
+    display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden; }
+  .kanban-add-btn { width:100%; padding:8px; background:none; border:1px dashed var(--border);
+    border-radius:6px; color:var(--text-faint); font-size:12px; cursor:pointer; transition:all .2s; }
+  .kanban-add-btn:hover { border-color:var(--accent); color:var(--accent); background:var(--cyan-dim,rgba(0,148,212,.06)); }
+
+  /* Cores de prioridade */
+  .pri-baixa   { background:rgba(108,117,125,.15); color:#6c757d; }
+  .pri-normal  { background:rgba(0,148,212,.15);   color:#0094d4; }
+  .pri-alta    { background:rgba(255,193,7,.15);   color:#ffc107; }
+  .pri-urgente { background:rgba(220,53,69,.15);   color:#dc3545; }
+
+  /* Modal tarefa */
+  .comentario-item { padding:10px 0; border-bottom:1px solid var(--border); }
+  .comentario-item:last-child { border-bottom:none; }
+  .comentario-autor { font-size:11px; font-weight:700; color:var(--accent); }
+  .comentario-data  { font-size:10px; color:var(--text-faint); margin-left:6px; }
+  .comentario-texto { font-size:13px; margin-top:4px; color:var(--text); }
+
 </style>
 </head>
 <body>
@@ -619,6 +660,9 @@
     </button>
     <button class="nav-item" data-page="compras" onclick="goToPage('compras')">
       <span class="nav-icon">&#128181;</span> Compras
+    </button>
+    <button class="nav-item" data-page="kanban" onclick="goToPage('kanban')">
+      <span class="nav-icon">&#128203;</span> Tarefas
     </button>
 
     <div class="nav-divider"></div>
@@ -786,6 +830,73 @@
             <tr><th>Cliente</th><th>CPF / CNPJ</th><th>Tipo</th><th>Telefone</th><th>Ordens</th><th>Total gasto</th><th>Última visita</th><th></th></tr>
           </thead>
           <tbody id="clients-table-body"></tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- ===================== KANBAN ===================== -->
+    <div class="page" id="page-kanban">
+      <div class="page-header">
+        <div>
+          <h1>Tarefas</h1>
+          <p>Quadro de tarefas e lembretes do time</p>
+        </div>
+        <button class="btn btn-primary" onclick="openTarefaModal()">+ Nova tarefa</button>
+      </div>
+
+      <!-- Abas -->
+      <div class="kanban-tabs">
+        <button class="kanban-tab active" id="ktab-geral" onclick="switchKanbanTab('geral')">🗂 Tarefas gerais</button>
+        <button class="kanban-tab" id="ktab-minhas" onclick="switchKanbanTab('minhas')">👤 Minhas tarefas</button>
+      </div>
+
+      <!-- Board -->
+      <div class="kanban-board" id="kanban-board">
+        <!-- Renderizado via JS -->
+      </div>
+    </div>
+
+    <!-- ===================== COMPRAS ===================== -->
+    <div class="page" id="page-compras">
+      <div class="page-header">
+        <div>
+          <h1>Compras</h1>
+          <p>Histórico de pedidos e controle de pagamentos por fornecedor</p>
+        </div>
+        <button class="btn btn-primary" onclick="openCompraModal()">+ Registrar compra</button>
+      </div>
+      <div class="toolbar" style="flex-wrap:wrap; gap:8px;">
+        <select id="compra-filter-forn" onchange="renderComprasTable()" style="min-width:140px;">
+          <option value="">Todos fornecedores</option>
+          <option value="CNN">CNN Oriental</option>
+          <option value="SKYTECH">Skytech</option>
+        </select>
+        <select id="compra-filter-status" onchange="renderComprasTable()" style="min-width:130px;">
+          <option value="">Todos os status</option>
+          <option value="Pendente">Pendente</option>
+          <option value="Pago">Pago</option>
+        </select>
+        <input type="date" id="compra-filter-de" onchange="renderComprasTable()" placeholder="De">
+        <input type="date" id="compra-filter-ate" onchange="renderComprasTable()" placeholder="Até">
+        <button class="btn btn-sm" onclick="limparFiltrosCompra()">Limpar filtros</button>
+        <div style="margin-left:auto; display:flex; gap:8px;">
+          <button class="btn btn-sm" onclick="openLancarNFModal()">📄 Lançar NF CNN</button>
+          <button class="btn btn-sm" onclick="exportComprasCSV()">⬇ Exportar CSV</button>
+        </div>
+      </div>
+      <div id="compras-resumo" style="margin:12px 0; display:grid; grid-template-columns:repeat(auto-fit,minmax(160px,1fr)); gap:12px;">
+        <div class="stat-card"><div class="stat-label">Total do período</div><div class="stat-value" id="resumo-total" style="color:var(--accent);">R$ 0,00</div></div>
+        <div class="stat-card"><div class="stat-label">Pendente pagamento</div><div class="stat-value" id="resumo-pendente" style="color:var(--red);">R$ 0,00</div></div>
+        <div class="stat-card"><div class="stat-label">Já pago</div><div class="stat-value" id="resumo-pago" style="color:var(--green);">R$ 0,00</div></div>
+        <div class="stat-card"><div class="stat-label">Pedidos</div><div class="stat-value" id="resumo-qtd">0</div></div>
+      </div>
+      <div class="table-wrap">
+        <table>
+          <thead><tr>
+            <th>Data</th><th>Fornecedor</th><th>Nº Pedido</th>
+            <th>Nº NF</th><th>Itens</th><th>Valor Total</th><th>Status</th><th></th>
+          </tr></thead>
+          <tbody id="compras-table-body"></tbody>
         </table>
       </div>
     </div>
@@ -1270,6 +1381,97 @@
   </div>
 </div>
 
+
+<!-- ===================== MODAL: TAREFA ===================== -->
+<div class="modal-overlay" id="tarefa-modal-overlay">
+  <div class="modal" style="max-width:580px;">
+    <div class="modal-header">
+      <h2 class="modal-title" id="tarefa-modal-title">Nova tarefa</h2>
+      <button class="modal-close" onclick="closeModal('tarefa-modal-overlay')">&times;</button>
+    </div>
+    <div class="modal-body">
+      <input type="hidden" id="tarefa-id">
+
+      <div class="field">
+        <label>Título *</label>
+        <input type="text" id="tarefa-titulo" placeholder="Descreva a tarefa...">
+      </div>
+
+      <div class="field">
+        <label>Descrição / Anotações</label>
+        <textarea id="tarefa-desc" placeholder="Detalhes, links, referências..." style="min-height:80px;"></textarea>
+      </div>
+
+      <div class="field-row">
+        <div class="field">
+          <label>Coluna</label>
+          <select id="tarefa-coluna">
+            <option>A Fazer</option>
+            <option>Em andamento</option>
+            <option>Concluído</option>
+          </select>
+        </div>
+        <div class="field">
+          <label>Prioridade</label>
+          <select id="tarefa-prioridade">
+            <option value="Baixa">Baixa</option>
+            <option value="Normal" selected>Normal</option>
+            <option value="Alta">Alta</option>
+            <option value="Urgente">Urgente</option>
+          </select>
+        </div>
+        <div class="field">
+          <label>Prazo</label>
+          <input type="date" id="tarefa-prazo">
+        </div>
+      </div>
+
+      <div class="field-row">
+        <div class="field">
+          <label>Atribuir para</label>
+          <select id="tarefa-atribuido">
+            <option value="">— Tarefa geral —</option>
+          </select>
+        </div>
+        <div class="field">
+          <label>Cor do card</label>
+          <div style="display:flex; gap:8px; margin-top:8px; flex-wrap:wrap;">
+            ${['#0094d4','#28a745','#ffc107','#dc3545','#6f42c1','#fd7e14','#20c997','#6c757d'].map(c =>
+              `<div onclick="selecionarCorCard('${c}')" id="cor-opt-${c.slice(1)}"
+                style="width:24px;height:24px;border-radius:50%;background:${c};cursor:pointer;
+                border:2px solid transparent;transition:border .15s;"
+                title="${c}"></div>`
+            ).join('')}
+          </div>
+          <input type="hidden" id="tarefa-cor" value="#0094d4">
+        </div>
+      </div>
+
+      <!-- Comentários (só ao editar) -->
+      <div id="tarefa-comentarios-wrap" style="display:none; margin-top:16px;">
+        <div style="font-size:13px;font-weight:700;margin-bottom:10px;padding-top:12px;border-top:1px solid var(--border);">
+          💬 Comentários
+        </div>
+        <div id="tarefa-comentarios-list" style="max-height:180px;overflow-y:auto;margin-bottom:10px;"></div>
+        <div style="display:flex;gap:8px;">
+          <input type="text" id="tarefa-novo-comentario" placeholder="Adicionar comentário..." style="flex:1;"
+            onkeydown="if(event.key==='Enter') adicionarComentario()">
+          <button class="btn btn-sm btn-primary" onclick="adicionarComentario()">Enviar</button>
+        </div>
+      </div>
+
+      <div class="modal-actions">
+        <div style="display:flex;gap:8px;">
+          <button class="btn" onclick="closeModal('tarefa-modal-overlay')">Cancelar</button>
+          <button id="btn-excluir-tarefa" class="btn" style="display:none;color:var(--red);border-color:var(--red);"
+            onclick="deleteTarefa()">Excluir</button>
+        </div>
+        <button class="btn btn-primary" onclick="saveTarefa()">Salvar</button>
+      </div>
+    </div>
+  </div>
+</div>
+
 <!-- ===================== MODAL: IMPORTAR PEDIDO ===================== -->
 <div class="modal-overlay" id="pedido-modal-overlay">
   <div class="modal" style="max-width:620px;">
@@ -1514,81 +1716,6 @@
   </div><!-- fim modal clientes -->
 </div><!-- fim modal client-modal-overlay -->
 
-    <!-- ===================== COMPRAS ===================== -->
-    <div class="page" id="page-compras">
-      <div class="page-header">
-        <div>
-          <h1>Compras</h1>
-          <p>Histórico de pedidos e controle de pagamentos por fornecedor</p>
-        </div>
-        <button class="btn btn-primary" onclick="openCompraModal()">+ Registrar compra</button>
-      </div>
-
-      <!-- Filtros -->
-      <div class="toolbar" style="flex-wrap:wrap; gap:8px;">
-        <select id="compra-filter-forn" onchange="renderComprasTable()" style="min-width:140px;">
-          <option value="">Todos fornecedores</option>
-          <option value="CNN">CNN Oriental</option>
-          <option value="SKYTECH">Skytech</option>
-        </select>
-        <select id="compra-filter-status" onchange="renderComprasTable()" style="min-width:130px;">
-          <option value="">Todos os status</option>
-          <option value="Pendente">Pendente</option>
-          <option value="Pago">Pago</option>
-        </select>
-        <input type="date" id="compra-filter-de" onchange="renderComprasTable()" placeholder="De">
-        <input type="date" id="compra-filter-ate" onchange="renderComprasTable()" placeholder="Até">
-        <button class="btn btn-sm" onclick="limparFiltrosCompra()">Limpar filtros</button>
-        <div style="margin-left:auto; display:flex; gap:8px;">
-          <button class="btn btn-sm" onclick="openLancarNFModal()" title="Associar NF da CNN a pedidos do período">
-            📄 Lançar NF CNN
-          </button>
-          <button class="btn btn-sm" onclick="exportComprasCSV()">
-            ⬇ Exportar CSV
-          </button>
-        </div>
-      </div>
-
-      <!-- Resumo do período -->
-      <div id="compras-resumo" style="display:none; margin:12px 0; display:grid; grid-template-columns:repeat(auto-fit,minmax(160px,1fr)); gap:12px;">
-        <div class="stat-card">
-          <div class="stat-label">Total do período</div>
-          <div class="stat-value" id="resumo-total" style="color:var(--accent);">R$ 0,00</div>
-        </div>
-        <div class="stat-card">
-          <div class="stat-label">Pendente pagamento</div>
-          <div class="stat-value" id="resumo-pendente" style="color:var(--red);">R$ 0,00</div>
-        </div>
-        <div class="stat-card">
-          <div class="stat-label">Já pago</div>
-          <div class="stat-value" id="resumo-pago" style="color:var(--green);">R$ 0,00</div>
-        </div>
-        <div class="stat-card">
-          <div class="stat-label">Pedidos</div>
-          <div class="stat-value" id="resumo-qtd">0</div>
-        </div>
-      </div>
-
-      <div class="table-wrap">
-        <table>
-          <thead><tr>
-            <th>Data</th>
-            <th>Fornecedor</th>
-            <th>Nº Pedido</th>
-            <th>Nº NF</th>
-            <th>Itens</th>
-            <th>Valor Total</th>
-            <th>Status</th>
-            <th></th>
-          </tr></thead>
-          <tbody id="compras-table-body"></tbody>
-        </table>
-      </div>
-    </div>
-
-  </div>
-</div>
-
 <!-- ===================== TOASTS ===================== -->
 <div class="toast-wrap" id="toast-wrap"></div>
 
@@ -1806,6 +1933,7 @@ let state = {
   stock: [],
   clients: [],
   compras: [],
+  tarefas: [],
   history: {}
 };
 
@@ -1905,6 +2033,7 @@ function goToPage(page){
   if(page === 'estoque') renderStockTable();
   if(page === 'clientes') renderClientsTable();
   if(page === 'compras') renderComprasTable();
+  if(page === 'kanban') renderKanban();
 }
 
 /* =========================================================
@@ -4239,6 +4368,278 @@ async function importCSV(){
   }
 }
 
+
+
+/* =========================================================
+   MÓDULO KANBAN — Tarefas
+   ========================================================= */
+let _kanbanTab = 'geral'; // 'geral' | 'minhas'
+
+const COLUNAS = ['A Fazer', 'Em andamento', 'Concluído'];
+const COR_COL = { 'A Fazer':'#0094d4', 'Em andamento':'#ffc107', 'Concluído':'#28a745' };
+const COR_PRI = { 'Baixa':'pri-baixa', 'Normal':'pri-normal', 'Alta':'pri-alta', 'Urgente':'pri-urgente' };
+
+async function loadTarefas(){
+  try {
+    const rows = await sbGet('tarefas', 'order=ordem.asc,criado_em.asc');
+    state.tarefas = rows.map(t => ({
+      id: t.id, titulo: t.titulo, descricao: t.descricao||'',
+      coluna: t.coluna||'A Fazer', prioridade: t.prioridade||'Normal',
+      atribuidoId: t.atribuido_id||'', atribuidoNome: t.atribuido_nome||'',
+      criadoPorId: t.criado_por_id||'', criadoPorNome: t.criado_por_nome||'',
+      prazo: t.prazo||'', cor: t.cor||'#0094d4', ordem: t.ordem||0,
+      criadoEm: t.criado_em||''
+    }));
+  } catch(e){ console.error('Erro tarefas:', e); }
+}
+
+function switchKanbanTab(tab){
+  _kanbanTab = tab;
+  document.getElementById('ktab-geral').classList.toggle('active', tab==='geral');
+  document.getElementById('ktab-minhas').classList.toggle('active', tab==='minhas');
+  renderKanban();
+}
+
+async function renderKanban(){
+  if(!state.tarefas) state.tarefas = [];
+  if(!state.tarefas.length) await loadTarefas();
+
+  const user = getCurrentUser();
+  let lista = [...state.tarefas];
+
+  if(_kanbanTab === 'minhas'){
+    lista = lista.filter(t => t.atribuidoId === user?.id);
+  } else {
+    lista = lista.filter(t => !t.atribuidoId);
+  }
+
+  const board = document.getElementById('kanban-board');
+  if(!board) return;
+
+  board.innerHTML = COLUNAS.map(col => {
+    const cards = lista.filter(t => t.coluna === col);
+    const cardsHTML = cards.map(t => {
+      const prazoStr = t.prazo ? formatDate(t.prazo) : '';
+      const hoje = todayISO();
+      const vencido = t.prazo && t.prazo < hoje && t.coluna !== 'Concluído';
+      const prazoHTML = prazoStr
+        ? `<span style="font-size:10px;padding:2px 6px;border-radius:20px;font-weight:600;
+            background:${vencido?'rgba(220,53,69,.2)':'rgba(255,255,255,.07)'};
+            color:${vencido?'#dc3545':'var(--text-faint)'};">
+            📅 ${prazoStr}${vencido?' ⚠':''}
+           </span>`
+        : '';
+      const atribHTML = t.atribuidoNome
+        ? `<span style="font-size:10px;color:var(--accent);">👤 ${escapeHtml(t.atribuidoNome)}</span>`
+        : '';
+      return `
+        <div class="kanban-card" onclick="openTarefaModal('${t.id}')"
+          style="border-left-color:${t.cor||'#0094d4'};">
+          <div class="kanban-card-title">${escapeHtml(t.titulo)}</div>
+          ${t.descricao ? `<div class="kanban-card-desc">${escapeHtml(t.descricao)}</div>` : ''}
+          <div class="kanban-card-meta">
+            <span class="kanban-badge ${COR_PRI[t.prioridade]||'pri-normal'}">${t.prioridade}</span>
+            ${prazoHTML}
+            ${atribHTML}
+          </div>
+        </div>`;
+    }).join('');
+
+    return `
+      <div class="kanban-col"
+        ondragover="event.preventDefault()"
+        ondrop="onCardDrop(event,'${col}')">
+        <div class="kanban-col-header">
+          <span class="kanban-col-title" style="color:${COR_COL[col]};">${col}</span>
+          <span class="kanban-col-count">${cards.length}</span>
+        </div>
+        ${cardsHTML}
+        <button class="kanban-add-btn" onclick="openTarefaModal(null,'${col}')">+ Adicionar</button>
+      </div>`;
+  }).join('');
+}
+
+/* ── Modal tarefa ── */
+async function openTarefaModal(id, colunaInicial){
+  // Preencher select de usuários
+  const sel = document.getElementById('tarefa-atribuido');
+  sel.innerHTML = '<option value="">— Tarefa geral —</option>';
+  try {
+    const users = await sbGet('usuarios', 'ativo=eq.true&select=id,nome,usuario&order=nome.asc');
+    users.forEach(u => {
+      const opt = document.createElement('option');
+      opt.value = u.id; opt.textContent = u.nome || u.usuario;
+      sel.appendChild(opt);
+    });
+  } catch(e){ console.error(e); }
+
+  // Reset
+  document.getElementById('tarefa-id').value = '';
+  document.getElementById('tarefa-titulo').value = '';
+  document.getElementById('tarefa-desc').value = '';
+  document.getElementById('tarefa-coluna').value = colunaInicial || 'A Fazer';
+  document.getElementById('tarefa-prioridade').value = 'Normal';
+  document.getElementById('tarefa-prazo').value = '';
+  document.getElementById('tarefa-atribuido').value = '';
+  document.getElementById('tarefa-cor').value = '#0094d4';
+  document.getElementById('tarefa-modal-title').textContent = 'Nova tarefa';
+  document.getElementById('btn-excluir-tarefa').style.display = 'none';
+  document.getElementById('tarefa-comentarios-wrap').style.display = 'none';
+  selecionarCorCard('#0094d4');
+
+  if(id){
+    const t = state.tarefas.find(x => x.id === id);
+    if(!t) return;
+    document.getElementById('tarefa-id').value = t.id;
+    document.getElementById('tarefa-titulo').value = t.titulo;
+    document.getElementById('tarefa-desc').value = t.descricao;
+    document.getElementById('tarefa-coluna').value = t.coluna;
+    document.getElementById('tarefa-prioridade').value = t.prioridade;
+    document.getElementById('tarefa-prazo').value = t.prazo;
+    document.getElementById('tarefa-atribuido').value = t.atribuidoId;
+    document.getElementById('tarefa-cor').value = t.cor;
+    document.getElementById('tarefa-modal-title').textContent = 'Editar tarefa';
+    document.getElementById('btn-excluir-tarefa').style.display = 'inline-flex';
+    selecionarCorCard(t.cor);
+    await carregarComentarios(id);
+  }
+
+  openModal('tarefa-modal-overlay');
+}
+
+function selecionarCorCard(cor){
+  document.querySelectorAll('[id^="cor-opt-"]').forEach(el => {
+    el.style.border = '2px solid transparent';
+    el.style.transform = 'scale(1)';
+  });
+  const hex = cor.replace('#','');
+  const el = document.getElementById('cor-opt-' + hex);
+  if(el){ el.style.border = '2px solid #fff'; el.style.transform = 'scale(1.25)'; }
+  document.getElementById('tarefa-cor').value = cor;
+}
+
+async function saveTarefa(){
+  const titulo = document.getElementById('tarefa-titulo').value.trim();
+  if(!titulo){ showToast('Preencha o título.', true); return; }
+
+  const user = getCurrentUser();
+  const atribSel = document.getElementById('tarefa-atribuido');
+  const atribId  = atribSel.value;
+  const atribNome = atribId ? atribSel.options[atribSel.selectedIndex].text : '';
+
+  const payload = {
+    titulo,
+    descricao:     document.getElementById('tarefa-desc').value.trim(),
+    coluna:        document.getElementById('tarefa-coluna').value,
+    prioridade:    document.getElementById('tarefa-prioridade').value,
+    prazo:         document.getElementById('tarefa-prazo').value || null,
+    atribuido_id:  atribId || null,
+    atribuido_nome: atribNome || null,
+    criado_por_id:  user?.id || '',
+    criado_por_nome: user?.nome || user?.usuario || '',
+    cor:           document.getElementById('tarefa-cor').value,
+  };
+
+  const id = document.getElementById('tarefa-id').value;
+  try {
+    if(id){
+      await sbPatch('tarefas', 'id', id, payload);
+      const t = state.tarefas.find(x => x.id === id);
+      Object.assign(t, { titulo, descricao: payload.descricao,
+        coluna: payload.coluna, prioridade: payload.prioridade,
+        prazo: payload.prazo||'', atribuidoId: atribId,
+        atribuidoNome: atribNome, cor: payload.cor });
+      showToast('Tarefa atualizada.');
+    } else {
+      const newId = 'task' + Date.now();
+      await sbPost('tarefas', { id: newId, ...payload, ordem: state.tarefas.length });
+      state.tarefas.push({ id: newId, titulo, descricao: payload.descricao,
+        coluna: payload.coluna, prioridade: payload.prioridade,
+        prazo: payload.prazo||'', atribuidoId: atribId, atribuidoNome: atribNome,
+        criadoPorId: user?.id||'', criadoPorNome: user?.nome||'',
+        cor: payload.cor, ordem: state.tarefas.length });
+      showToast('Tarefa criada.');
+    }
+    closeModal('tarefa-modal-overlay');
+    renderKanban();
+  } catch(e){ showToast('Erro: ' + e.message, true); }
+}
+
+async function deleteTarefa(){
+  const id = document.getElementById('tarefa-id').value;
+  if(!id || !confirm('Excluir esta tarefa?')) return;
+  try {
+    await sbDelete('tarefas', 'id', id);
+    state.tarefas = state.tarefas.filter(t => t.id !== id);
+    closeModal('tarefa-modal-overlay');
+    renderKanban();
+    showToast('Tarefa excluída.');
+  } catch(e){ showToast('Erro: ' + e.message, true); }
+}
+
+/* ── Comentários ── */
+async function carregarComentarios(tarefaId){
+  const wrap = document.getElementById('tarefa-comentarios-wrap');
+  const list = document.getElementById('tarefa-comentarios-list');
+  wrap.style.display = 'block';
+  try {
+    const rows = await sbGet('tarefas_comentarios',
+      `tarefa_id=eq.${tarefaId}&order=criado_em.asc`);
+    if(!rows.length){
+      list.innerHTML = '<p style="font-size:12px;color:var(--text-faint);">Nenhum comentário ainda.</p>';
+      return;
+    }
+    list.innerHTML = rows.map(c => `
+      <div class="comentario-item">
+        <span class="comentario-autor">${escapeHtml(c.autor_nome||'—')}</span>
+        <span class="comentario-data">${new Date(c.criado_em).toLocaleString('pt-BR')}</span>
+        <div class="comentario-texto">${escapeHtml(c.texto)}</div>
+      </div>`).join('');
+    list.scrollTop = list.scrollHeight;
+  } catch(e){ console.error(e); }
+}
+
+async function adicionarComentario(){
+  const tarefaId = document.getElementById('tarefa-id').value;
+  const texto    = document.getElementById('tarefa-novo-comentario').value.trim();
+  if(!texto || !tarefaId) return;
+  const user = getCurrentUser();
+  try {
+    await sbPost('tarefas_comentarios', {
+      id: 'tc' + Date.now(),
+      tarefa_id: tarefaId,
+      autor_nome: user?.nome || user?.usuario || 'Usuário',
+      texto
+    });
+    document.getElementById('tarefa-novo-comentario').value = '';
+    await carregarComentarios(tarefaId);
+  } catch(e){ showToast('Erro ao comentar: ' + e.message, true); }
+}
+
+/* ── Drag & Drop entre colunas ── */
+function onCardDrop(event, novaColuna){
+  const id = event.dataTransfer?.getData('text/plain');
+  if(!id) return;
+  const t = state.tarefas.find(x => x.id === id);
+  if(!t || t.coluna === novaColuna) return;
+  t.coluna = novaColuna;
+  sbPatch('tarefas', 'id', id, { coluna: novaColuna }).catch(console.error);
+  renderKanban();
+}
+// Adicionar draggable nos cards via delegação
+document.addEventListener('dragstart', e => {
+  const card = e.target.closest?.('.kanban-card');
+  if(card){
+    const id = card.getAttribute('onclick')?.match(/'([^']+)'/)?.[1];
+    if(id) e.dataTransfer.setData('text/plain', id);
+  }
+});
+document.addEventListener('DOMContentLoaded', () => {
+  document.addEventListener('mouseover', e => {
+    const card = e.target.closest?.('.kanban-card');
+    if(card) card.draggable = true;
+  });
+});
 
 /* =========================================================
    MÓDULO DE COMPRAS
