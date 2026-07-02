@@ -2552,7 +2552,7 @@ async function exportDashboardPDF(){
   // Capturar logo em base64 via canvas (sem fetch, sem CORS)
   let logoB64 = '';
   try {
-    const logoImg = document.querySelector('.brand-logo');
+    const logoImg = document.querySelector('logo.png');
     if(logoImg && logoImg.complete && logoImg.naturalWidth > 0){
       const tmpCanvas = document.createElement('canvas');
       tmpCanvas.width  = logoImg.naturalWidth;
