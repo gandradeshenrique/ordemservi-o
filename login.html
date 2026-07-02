@@ -378,11 +378,31 @@
   }
 
   /* Responsivo */
+  @media (max-width: 900px) {
+    .left { padding: 30px 20px; }
+    .orb-wrap { width: 260px; height: 260px; }
+    .right { padding: 30px 24px; }
+    .login-card { padding: 28px 22px; }
+  }
+
   @media (max-width: 768px) {
     .page { grid-template-columns: 1fr; }
     .left { display: none; }
-    .right { padding: 40px 24px; }
+    .right {
+      padding: 40px 20px;
+      justify-content: center;
+    }
     .divider { display: none; }
+    .login-header h2 { font-size: 24px; }
+    .login-card { padding: 24px 18px; max-width: 100%; }
+    .btn-login { padding: 13px; font-size: 14px; }
+  }
+
+  @media (max-width: 420px) {
+    .right { padding: 24px 14px; }
+    .login-card { padding: 20px 14px; }
+    .login-header h2 { font-size: 20px; }
+    .login-opts { flex-direction: column; gap: 8px; align-items: flex-start; }
   }
 </style>
 </head>

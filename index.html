@@ -546,21 +546,124 @@
     margin: 0 0 12px;
   }
 
-  @media (max-width: 900px){
+  /* ── Hamburguer botão (mobile) ── */
+  .sidebar-toggle{
+    display:none;
+    position:fixed; top:12px; left:12px; z-index:300;
+    background:var(--panel); border:1px solid var(--border);
+    border-radius:8px; padding:8px 10px; cursor:pointer;
+    color:var(--text); font-size:18px; line-height:1;
+  }
+  .sidebar-overlay{
+    display:none;
+    position:fixed; inset:0; background:rgba(0,0,0,.6);
+    z-index:199;
+  }
+
+  /* ── TABLET (768px – 1024px) ── */
+  @media (max-width: 1024px){
+    .stats-grid{ grid-template-columns: repeat(2, 1fr); }
+    .modal{ padding:18px 16px; }
+    #dash-row1, .dash-row2{ grid-template-columns:1fr !important; }
+    #dash-kpis{ grid-template-columns: repeat(2,1fr) !important; }
+    .kanban-board{ grid-template-columns: repeat(2,1fr); }
+    .tables-grid{ grid-template-columns:1fr !important; }
+    .charts-grid{ grid-template-columns:1fr !important; }
+  }
+
+  /* ── MOBILE (≤ 768px) ── */
+  @media (max-width: 768px){
+    /* Layout principal */
     .app{ grid-template-columns: 1fr; }
+
+    /* Sidebar como drawer lateral */
     .sidebar{
-      flex-direction:row; overflow-x:auto;
-      border-right:none; border-bottom:1px solid var(--border);
-      padding: 12px;
+      position:fixed; top:0; left:-260px; height:100vh; width:240px;
+      z-index:200; transition:left .25s ease;
+      border-right:1px solid var(--border);
+      overflow-y:auto; flex-direction:column;
+      padding:20px 14px;
     }
-    .brand{ display:none; }
-    .nav-divider{ display:none; }
-    .sidebar-footer{ display:none; }
-    .nav-item{ flex-shrink:0; }
-    .main{ padding:20px 16px 40px; }
-    .field-row, .field-row-3{ grid-template-columns: 1fr; }
+    .sidebar.open{ left:0; }
+    .sidebar-overlay.open{ display:block; }
+    .sidebar-toggle{ display:flex; align-items:center; }
+
+    /* Main */
+    .main{
+      padding:60px 14px 32px;
+      min-width:0;
+    }
+
+    /* Header das páginas */
+    .page-header{
+      flex-direction:column; align-items:flex-start; gap:10px;
+    }
+    .page-header > div + * { align-self:stretch; }
+    .page-header button{ width:100%; justify-content:center; }
+
+    /* Toolbar */
+    .toolbar{ flex-wrap:wrap; gap:8px; }
+    .toolbar select, .toolbar input{ width:100%; }
+
+    /* Grids de campos */
+    .field-row, .field-row-3{ grid-template-columns:1fr; }
     .os-detail-grid{ grid-template-columns:1fr; }
-    .part-row{ grid-template-columns: 1fr 60px 90px 32px; }
+
+    /* Peças */
+    .part-row{ grid-template-columns:1fr 56px 80px 32px; gap:6px; }
+
+    /* Tabelas — scroll horizontal */
+    .table-wrap{ overflow-x:auto; -webkit-overflow-scrolling:touch; }
+    table{ min-width:560px; }
+
+    /* Stats */
+    .stats-grid{ grid-template-columns:repeat(2,1fr) !important; }
+    #dash-kpis{ grid-template-columns:repeat(2,1fr) !important; }
+
+    /* Gráficos em coluna única */
+    #dash-row1,
+    [style*="grid-template-columns:1fr 1fr"]{
+      grid-template-columns:1fr !important;
+    }
+
+    /* Kanban */
+    .kanban-board{ grid-template-columns:1fr !important; }
+
+    /* Modais */
+    .modal-overlay{ padding:0; align-items:flex-end; }
+    .modal{
+      border-radius:16px 16px 0 0;
+      max-height:90vh; overflow-y:auto;
+      width:100%; max-width:100%;
+      padding:20px 16px;
+    }
+    .modal-wide{ max-width:100% !important; }
+
+    /* Aparelhos extras — campo compacto */
+    .aparelho-extra-card .ae-campos .field-row{ grid-template-columns:1fr; }
+
+    /* Botões de ação em tabelas */
+    .btn-ghost.btn-sm{ padding:5px 8px; font-size:11px; }
+
+    /* Dashboard comparativo */
+    #dash-filtros .field-row-like{ flex-direction:column; }
+    #dash-periodo-b-wrap{ flex-direction:column !important; }
+
+    /* Exportar dropdown */
+    #export-dropdown-wrap{ position:static; }
+    #export-menu{ right:0; left:0; }
+
+    /* Toast mais largo */
+    .toast-wrap{ left:12px; right:12px; bottom:12px; }
+    .toast{ width:100%; }
+  }
+
+  /* ── MOBILE PEQUENO (≤ 420px) ── */
+  @media (max-width: 420px){
+    .stats-grid{ grid-template-columns:1fr !important; }
+    #dash-kpis{ grid-template-columns:1fr !important; }
+    .page-header h1{ font-size:18px; }
+    .modal{ padding:16px 12px; }
   }
 
   .toast-wrap{
@@ -636,6 +739,8 @@
 </head>
 <body>
 
+<button class="sidebar-toggle" onclick="toggleSidebar()" aria-label="Menu">☰</button>
+<div class="sidebar-overlay" id="sidebar-overlay" onclick="closeSidebar()"></div>
 <div class="app">
   <!-- ===== SIDEBAR ===== -->
   <div class="sidebar">
@@ -728,7 +833,7 @@
       <div class="card" style="margin-bottom:18px;" id="dash-filtros">
         <div style="display:flex; gap:24px; flex-wrap:wrap; align-items:flex-end;">
           <div>
-            <div style="font-size:11px;font-weight:700;color:var(--accent);text-transform:uppercase;letter-spacing:.05em;margin-bottom:6px;">Período A</div>
+            <div style="font-size:11px;font-weight:700;color:var(--accent);text-transform:uppercase;letter-spacing:.05em;margin-bottom:6px;">Período</div>
             <div style="display:flex;gap:8px;align-items:center;">
               <input type="date" id="dash-a-de" style="width:140px;">
               <span style="color:var(--text-dim);font-size:12px;">até</span>
@@ -738,7 +843,7 @@
           <div id="dash-periodo-b-wrap" style="display:none; align-items:center; gap:16px; flex-wrap:wrap;">
             <div style="width:1px;background:var(--border);align-self:stretch;min-height:40px;"></div>
             <div>
-              <div style="font-size:11px;font-weight:700;color:#f59e0b;text-transform:uppercase;letter-spacing:.05em;margin-bottom:6px;">Período B (comparativo)</div>
+              <div style="font-size:11px;font-weight:700;color:#f59e0b;text-transform:uppercase;letter-spacing:.05em;margin-bottom:6px;">Período (Comparativo)</div>
               <div style="display:flex;gap:8px;align-items:center;">
                 <input type="date" id="dash-b-de" style="width:140px;">
                 <span style="color:var(--text-dim);font-size:12px;">até</span>
@@ -762,7 +867,7 @@
       <!-- Gráficos linha 1 -->
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:16px;min-width:0;" id="dash-row1">
         <div class="card">
-          <div class="section-title" style="margin-bottom:14px;">OS por status — Período A</div>
+          <div class="section-title" style="margin-bottom:14px;">OS por status — Período</div>
           <div style="position:relative;height:200px;"><canvas id="chart-status-a"></canvas></div>
         </div>
         <div class="card">
@@ -786,11 +891,11 @@
       <!-- Gráficos linha 3 -->
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:16px;min-width:0;">
         <div class="card">
-          <div class="section-title" style="margin-bottom:14px;">💰 Lucro estimado (Período A)</div>
+          <div class="section-title" style="margin-bottom:14px;">💰 Lucro estimado</div>
           <div style="position:relative;height:200px;"><canvas id="chart-lucro"></canvas></div>
         </div>
         <div class="card">
-          <div class="section-title" style="margin-bottom:14px;">🔧 Peças mais utilizadas (Período A)</div>
+          <div class="section-title" style="margin-bottom:14px;">🔧 Peças mais utilizadas</div>
           <div style="position:relative;height:200px;"><canvas id="chart-pecas"></canvas></div>
         </div>
       </div>
@@ -798,7 +903,7 @@
       <!-- Tabelas -->
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:16px;">
         <div class="card">
-          <div class="section-title" style="margin-bottom:10px;">🏆 Top 5 clientes (Período A)</div>
+          <div class="section-title" style="margin-bottom:10px;">🏆 Top 5 clientes</div>
           <table style="width:100%;border-collapse:collapse;font-size:13px;">
             <thead><tr style="background:var(--panel-2);">
               <th style="padding:7px 10px;text-align:left;">Cliente</th>
@@ -2026,6 +2131,24 @@
    ========================================================= */
 
 /* =========================================================
+   SIDEBAR MOBILE
+   ========================================================= */
+function toggleSidebar(){
+  document.querySelector('.sidebar').classList.toggle('open');
+  document.getElementById('sidebar-overlay').classList.toggle('open');
+}
+function closeSidebar(){
+  document.querySelector('.sidebar').classList.remove('open');
+  document.getElementById('sidebar-overlay').classList.remove('open');
+}
+// Fechar sidebar ao navegar (mobile)
+document.addEventListener('click', e => {
+  if(e.target.closest('.nav-item') && window.innerWidth <= 768){
+    setTimeout(closeSidebar, 100);
+  }
+});
+
+/* =========================================================
    SUPABASE — Configuração e camada de dados
    ========================================================= */
 const SB_URL = 'https://zrghmwdzxslpuyglsvnq.supabase.co';
@@ -2267,7 +2390,7 @@ function renderDashboard(){
   const tmA = osA.length;
   const tmB = osB.length;
 
-  // Gastos de compras no período A
+  // Gastos de compras no período
   const compA = state.compras.filter(c => c.dataPedido >= aDe && c.dataPedido <= aAte);
   const gastosA = compA.reduce((s,c) => s + (c.valorTotal||0), 0);
   const lucroA  = fatA - gastosA;
@@ -2286,13 +2409,13 @@ function renderDashboard(){
 
   // KPIs
   const kpis = [
-    { label:'Faturamento (A)',   val: formatCurrency(fatA),         sub: 'vs Período B' + delta(fatA, fatB),      cor:'var(--accent)' },
-    { label:'OS abertas (A)',    val: tmA,                          sub: 'vs ' + tmB + ' no período B' + delta(tmA, tmB), cor:'var(--text)' },
-    { label:'Concluídas (A)',    val: concA,                        sub: 'vs ' + concB + ' no período B' + delta(concA, concB), cor:'#28a745' },
-    { label:'Ticket médio (A)', val: formatCurrency(ticketA),      sub: 'vs ' + formatCurrency(ticketB) + delta(ticketA, ticketB), cor:'var(--accent)' },
-    { label:'Gastos peças (A)', val: formatCurrency(gastosA),      sub: compA.length + ' pedido(s) no período',  cor:'#f59e0b' },
-    { label:'Lucro estimado (A)',val: formatCurrency(lucroA),       sub: 'Faturamento − Compras',                 cor: lucroA >= 0 ? '#28a745' : '#dc3545' },
-    { label:'Clientes atendidos',val: new Set(osA.map(o=>o.clienteId)).size, sub: 'no Período A', cor:'var(--text)' },
+    { label:'Faturamento',   val: formatCurrency(fatA),         sub: 'vs Período (Comparativo)' + delta(fatA, fatB),      cor:'var(--accent)' },
+    { label:'OS abertas',    val: tmA,                          sub: 'vs ' + tmB + ' no Período (Comparativo)' + delta(tmA, tmB), cor:'var(--text)' },
+    { label:'Concluídas',    val: concA,                        sub: 'vs ' + concB + ' no Período (Comparativo)' + delta(concA, concB), cor:'#28a745' },
+    { label:'Ticket médio', val: formatCurrency(ticketA),      sub: 'vs ' + formatCurrency(ticketB) + delta(ticketA, ticketB), cor:'var(--accent)' },
+    { label:'Gastos peças', val: formatCurrency(gastosA),      sub: compA.length + ' pedido(s) no período',  cor:'#f59e0b' },
+    { label:'Lucro estimado',val: formatCurrency(lucroA),       sub: 'Faturamento − Compras',                 cor: lucroA >= 0 ? '#28a745' : '#dc3545' },
+    { label:'Clientes atendidos',val: new Set(osA.map(o=>o.clienteId)).size, sub: 'no período selecionado', cor:'var(--text)' },
     { label:'Estoque crítico',  val: state.stock.filter(s=>s.quantidade<=s.minimo).length, sub:'itens abaixo do mínimo', cor:'#dc3545' },
   ];
 
@@ -2323,8 +2446,8 @@ function renderDashboard(){
   renderChart('chart-fat-diario', 'line',
     diasA.map(d => d.slice(5)), // só MM-DD
     [
-      { label:'Período A', data: fatDiarioA, borderColor:'#0094d4', backgroundColor:'rgba(0,148,212,.1)', tension:.4, fill:true },
-      ...(periodoBAtivoFat ? [{ label:'Período B', data: fatDiarioB, borderColor:'#f59e0b', backgroundColor:'rgba(245,158,11,.1)', tension:.4, fill:true, borderDash:[4,4] }] : [])
+      { label:'Período', data: fatDiarioA, borderColor:'#0094d4', backgroundColor:'rgba(0,148,212,.1)', tension:.4, fill:true },
+      ...(periodoBAtivoFat ? [{ label:'Período (Comparativo)', data: fatDiarioB, borderColor:'#f59e0b', backgroundColor:'rgba(245,158,11,.1)', tension:.4, fill:true, borderDash:[4,4] }] : [])
     ],
     { plugins:{ legend:{ labels:{ color:'#9aa5b1' } } }, scales:{ y:{ ticks:{ color:'#9aa5b1', callback: v=>'R$'+v }, grid:{ color:'rgba(255,255,255,.05)' } }, x:{ ticks:{ color:'#9aa5b1', maxTicksLimit:10 }, grid:{ display:false } } } }
   );
@@ -2337,8 +2460,8 @@ function renderDashboard(){
 
   const periodoBAtivoTipo = isPeriodoBAtivo();
   renderChart('chart-pf-pj', 'bar', ['Pessoa Física','Pessoa Jurídica'], [
-    { label:'Período A', data:[pfA,pjA], backgroundColor:['rgba(0,148,212,.7)','rgba(0,148,212,.7)'] },
-    ...(periodoBAtivoTipo ? [{ label:'Período B', data:[pfB,pjB], backgroundColor:['rgba(245,158,11,.5)','rgba(245,158,11,.5)'] }] : [])
+    { label:'Período', data:[pfA,pjA], backgroundColor:['rgba(0,148,212,.7)','rgba(0,148,212,.7)'] },
+    ...(periodoBAtivoTipo ? [{ label:'Período (Comparativo)', data:[pfB,pjB], backgroundColor:['rgba(245,158,11,.5)','rgba(245,158,11,.5)'] }] : [])
   ], { plugins:{ legend:{ labels:{ color:'#9aa5b1' } } }, scales:{ y:{ ticks:{ color:'#9aa5b1' }, grid:{ color:'rgba(255,255,255,.05)' } }, x:{ ticks:{ color:'#9aa5b1' }, grid:{ display:false } } } });
 
   // ── Gráfico 4: Gastos por fornecedor (barra horizontal) ──
@@ -2349,8 +2472,8 @@ function renderDashboard(){
 
   const periodoBAtivoForn = isPeriodoBAtivo();
   renderChart('chart-fornecedor', 'bar', ['CNN Oriental','Skytech'], [
-    { label:'Período A', data: gastosFornA, backgroundColor:'rgba(0,148,212,.7)' },
-    ...(periodoBAtivoForn ? [{ label:'Período B', data: gastosFornB, backgroundColor:'rgba(245,158,11,.5)' }] : [])
+    { label:'Período', data: gastosFornA, backgroundColor:'rgba(0,148,212,.7)' },
+    ...(periodoBAtivoForn ? [{ label:'Período (Comparativo)', data: gastosFornB, backgroundColor:'rgba(245,158,11,.5)' }] : [])
   ], {
     indexAxis:'y',
     plugins:{ legend:{ labels:{ color:'#9aa5b1' } } },
@@ -2366,7 +2489,7 @@ function renderDashboard(){
   ];
   renderChart('chart-lucro', 'bar',
     ['Faturamento','Gastos c/ Peças','Lucro Estimado'],
-    [{ label:'Período A', data: lucroData, backgroundColor: lucroCores }],
+    [{ label:'Período', data: lucroData, backgroundColor: lucroCores }],
     {
       plugins:{ legend:{ display:false } },
       scales:{
@@ -2646,8 +2769,8 @@ async function exportDashboardPDF(){
     <div class="header-logo">${logoB64 ? `<img src="${logoB64}" style="height:52pt;max-width:160pt;object-fit:contain;">` : 'MOB<span>IT</span> <span style="font-size:13pt;font-weight:400;color:#555;">Soluções</span>'}</div>
     <div class="header-right">
       <strong>Relatório Gerencial</strong><br>
-      Período A: ${fmtPer(aDe,aAte)}<br>
-      ${periodoB ? `Período B: ${fmtPer(bDe,bAte)}<br>` : ''}
+      Período: ${fmtPer(aDe,aAte)}<br>
+      ${periodoB ? `Período (Comparativo): ${fmtPer(bDe,bAte)}<br>` : ''}
       Emitido em: ${new Date().toLocaleString('pt-BR')}
     </div>
   </div>
@@ -2655,18 +2778,18 @@ async function exportDashboardPDF(){
   <!-- KPIs -->
   <div class="kpi-grid">
     <div class="kpi"><div class="kpi-label">Faturamento (A)</div><div class="kpi-val">${formatCurrency(fatA)}</div><div class="kpi-sub">${periodoB?'vs '+formatCurrency(fatB)+deltaHTML(fatA,fatB):'Período selecionado'}</div></div>
-    <div class="kpi"><div class="kpi-label">Total de OS (A)</div><div class="kpi-val">${osA.length}</div><div class="kpi-sub">${periodoB?'vs '+osB.length+' no Período B':osA.length+' ordens'}</div></div>
-    <div class="kpi"><div class="kpi-label">Concluídas (A)</div><div class="kpi-val">${concA}</div><div class="kpi-sub">${periodoB?'vs '+concB+' no Período B':'OS concluídas/entregues'}</div></div>
+    <div class="kpi"><div class="kpi-label">Total de OS (A)</div><div class="kpi-val">${osA.length}</div><div class="kpi-sub">${periodoB?'vs '+osB.length+' no Período (Comparativo)':osA.length+' ordens'}</div></div>
+    <div class="kpi"><div class="kpi-label">Concluídas (A)</div><div class="kpi-val">${concA}</div><div class="kpi-sub">${periodoB?'vs '+concB+' no Período (Comparativo)':'OS concluídas/entregues'}</div></div>
     <div class="kpi"><div class="kpi-label">Ticket Médio (A)</div><div class="kpi-val">${formatCurrency(ticketA)}</div><div class="kpi-sub">por OS concluída</div></div>
     <div class="kpi" style="border-left-color:#f59e0b;"><div class="kpi-label">Gastos Peças (A)</div><div class="kpi-val" style="color:#f59e0b;">${formatCurrency(gastosA)}</div><div class="kpi-sub">${compA.length} pedido(s)</div></div>
     <div class="kpi" style="border-left-color:${lucroA>=0?'#28a745':'#dc3545'};"><div class="kpi-label">Lucro Estimado (A)</div><div class="kpi-val" style="color:${lucroA>=0?'#28a745':'#dc3545'};">${formatCurrency(lucroA)}</div><div class="kpi-sub">Faturamento − Compras</div></div>
-    <div class="kpi"><div class="kpi-label">Clientes Atendidos</div><div class="kpi-val">${new Set(osA.map(o=>o.clienteId)).size}</div><div class="kpi-sub">no Período A</div></div>
+    <div class="kpi"><div class="kpi-label">Clientes Atendidos</div><div class="kpi-val">${new Set(osA.map(o=>o.clienteId)).size}</div><div class="kpi-sub">no Período</div></div>
     <div class="kpi" style="border-left-color:#dc3545;"><div class="kpi-label">Estoque Crítico</div><div class="kpi-val" style="color:#dc3545;">${state.stock.filter(s=>s.quantidade<=s.minimo).length}</div><div class="kpi-sub">itens abaixo do mínimo</div></div>
   </div>
 
   <!-- GRÁFICOS -->
   <div class="charts-grid">
-    ${imgs['chart-status-a'] ? `<div class="chart-box"><div class="chart-title">OS por Status — Período A</div><img src="${imgs['chart-status-a']}"></div>` : ''}
+    ${imgs['chart-status-a'] ? `<div class="chart-box"><div class="chart-title">OS por Status — Período</div><img src="${imgs['chart-status-a']}"></div>` : ''}
     ${imgs['chart-fat-diario'] ? `<div class="chart-box"><div class="chart-title">Faturamento Diário</div><img src="${imgs['chart-fat-diario']}"></div>` : ''}
     ${imgs['chart-pf-pj'] ? `<div class="chart-box"><div class="chart-title">Clientes PF vs PJ</div><img src="${imgs['chart-pf-pj']}"></div>` : ''}
     ${imgs['chart-fornecedor'] ? `<div class="chart-box"><div class="chart-title">Gastos por Fornecedor</div><img src="${imgs['chart-fornecedor']}"></div>` : ''}
@@ -2745,7 +2868,7 @@ function exportDashboardCSV(){
   const gastosA = compA.reduce((s,c) => s + (c.valorTotal||0), 0);
   const NL = '\n';
   let csv = '"Relatório Gerencial MobitOS"' + NL;
-  csv += `"Período A: ${formatDate(aDe)} a ${formatDate(aAte)}"` + NL + NL;
+  csv += `"Período: ${formatDate(aDe)} a ${formatDate(aAte)}"` + NL + NL;
   csv += '"INDICADORES"' + NL;
   csv += `"Faturamento","${formatCurrency(fatA)}"` + NL;
   csv += `"Total de OS","${osA.length}"` + NL;
