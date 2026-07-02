@@ -632,6 +632,7 @@
   .comentario-texto { font-size:13px; margin-top:4px; color:var(--text); }
 
 </style>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
 </head>
 <body>
 
@@ -696,38 +697,147 @@
     <div class="page active" id="page-dashboard">
       <div class="page-header">
         <div>
-          <h1>Painel geral</h1>
-          <p>Visão geral das ordens de serviço e estoque</p>
+          <h1>Painel gerencial</h1>
+          <p>Relatório de desempenho e resultado da assistência técnica</p>
+        </div>
+        <div style="position:relative;display:inline-block;" id="export-dropdown-wrap">
+          <button class="btn btn-primary" onclick="toggleExportMenu()" style="display:flex;align-items:center;gap:6px;">
+            ⬇ Exportar relatório <span style="font-size:10px;">▼</span>
+          </button>
+          <div id="export-menu" style="display:none;position:absolute;top:calc(100% + 4px);right:0;
+            background:var(--panel);border:1px solid var(--border);border-radius:8px;
+            min-width:180px;z-index:50;box-shadow:0 4px 16px rgba(0,0,0,.4);overflow:hidden;">
+            <button onclick="exportDashboardPDF();toggleExportMenu();"
+              style="width:100%;padding:11px 16px;background:none;border:none;color:var(--text);
+              font-size:13px;text-align:left;cursor:pointer;display:flex;align-items:center;gap:8px;"
+              onmouseover="this.style.background='var(--panel-2)'" onmouseout="this.style.background='none'">
+              📄 Exportar PDF
+            </button>
+            <button onclick="exportDashboardCSV();toggleExportMenu();"
+              style="width:100%;padding:11px 16px;background:none;border:none;color:var(--text);
+              font-size:13px;text-align:left;cursor:pointer;display:flex;align-items:center;gap:8px;
+              border-top:1px solid var(--border);"
+              onmouseover="this.style.background='var(--panel-2)'" onmouseout="this.style.background='none'">
+              📊 Exportar CSV
+            </button>
+          </div>
         </div>
       </div>
 
-      <div id="low-stock-alert"></div>
+      <!-- Seletor de períodos -->
+      <div class="card" style="margin-bottom:18px;" id="dash-filtros">
+        <div style="display:flex; gap:24px; flex-wrap:wrap; align-items:flex-end;">
+          <div>
+            <div style="font-size:11px;font-weight:700;color:var(--accent);text-transform:uppercase;letter-spacing:.05em;margin-bottom:6px;">Período A</div>
+            <div style="display:flex;gap:8px;align-items:center;">
+              <input type="date" id="dash-a-de" style="width:140px;">
+              <span style="color:var(--text-dim);font-size:12px;">até</span>
+              <input type="date" id="dash-a-ate" style="width:140px;">
+            </div>
+          </div>
+          <div id="dash-periodo-b-wrap" style="display:none; align-items:center; gap:16px; flex-wrap:wrap;">
+            <div style="width:1px;background:var(--border);align-self:stretch;min-height:40px;"></div>
+            <div>
+              <div style="font-size:11px;font-weight:700;color:#f59e0b;text-transform:uppercase;letter-spacing:.05em;margin-bottom:6px;">Período B (comparativo)</div>
+              <div style="display:flex;gap:8px;align-items:center;">
+                <input type="date" id="dash-b-de" style="width:140px;">
+                <span style="color:var(--text-dim);font-size:12px;">até</span>
+                <input type="date" id="dash-b-ate" style="width:140px;">
+              </div>
+            </div>
+          </div>
+          <div style="display:flex;gap:8px;align-items:flex-end;flex-wrap:wrap;">
+            <button class="btn btn-primary" onclick="document.getElementById('dash-a-de').dataset.userSet='1';renderDashboard()" style="margin-bottom:1px;">Atualizar</button>
+            <button class="btn" onclick="dashSetMesAtual()" style="margin-bottom:1px;">Mês atual</button>
+            <button id="btn-toggle-periodo-b" class="btn" onclick="togglePeriodoB()" style="margin-bottom:1px;border-color:var(--border);color:var(--text-dim);">
+              + Comparativo
+            </button>
+          </div>
+        </div>
+      </div>
 
-      <div class="stats-grid" id="dashboard-stats"></div>
+      <!-- KPIs -->
+      <div id="dash-kpis" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:14px;margin-bottom:18px;"></div>
 
-      <div class="card" style="margin-bottom:18px;">
-        <div class="section-title">Ordens recentes</div>
+      <!-- Gráficos linha 1 -->
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:16px;min-width:0;" id="dash-row1">
+        <div class="card">
+          <div class="section-title" style="margin-bottom:14px;">OS por status — Período A</div>
+          <div style="position:relative;height:200px;"><canvas id="chart-status-a"></canvas></div>
+        </div>
+        <div class="card">
+          <div class="section-title" style="margin-bottom:14px;">Faturamento diário</div>
+          <div style="position:relative;height:200px;"><canvas id="chart-fat-diario"></canvas></div>
+        </div>
+      </div>
+
+      <!-- Gráficos linha 2 -->
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:16px;min-width:0;">
+        <div class="card">
+          <div class="section-title" style="margin-bottom:14px;">Clientes PF vs PJ</div>
+          <div style="position:relative;height:200px;"><canvas id="chart-pf-pj"></canvas></div>
+        </div>
+        <div class="card">
+          <div class="section-title" style="margin-bottom:14px;">Gastos por fornecedor</div>
+          <div style="position:relative;height:200px;"><canvas id="chart-fornecedor"></canvas></div>
+        </div>
+      </div>
+
+      <!-- Gráficos linha 3 -->
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:16px;min-width:0;">
+        <div class="card">
+          <div class="section-title" style="margin-bottom:14px;">💰 Lucro estimado (Período A)</div>
+          <div style="position:relative;height:200px;"><canvas id="chart-lucro"></canvas></div>
+        </div>
+        <div class="card">
+          <div class="section-title" style="margin-bottom:14px;">🔧 Peças mais utilizadas (Período A)</div>
+          <div style="position:relative;height:200px;"><canvas id="chart-pecas"></canvas></div>
+        </div>
+      </div>
+
+      <!-- Tabelas -->
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:16px;">
+        <div class="card">
+          <div class="section-title" style="margin-bottom:10px;">🏆 Top 5 clientes (Período A)</div>
+          <table style="width:100%;border-collapse:collapse;font-size:13px;">
+            <thead><tr style="background:var(--panel-2);">
+              <th style="padding:7px 10px;text-align:left;">Cliente</th>
+              <th style="padding:7px 10px;text-align:center;">OS</th>
+              <th style="padding:7px 10px;text-align:right;">Total</th>
+            </tr></thead>
+            <tbody id="dash-top-clientes"></tbody>
+          </table>
+        </div>
+        <div class="card">
+          <div class="section-title" style="margin-bottom:10px;">⚠ Estoque crítico</div>
+          <table style="width:100%;border-collapse:collapse;font-size:13px;">
+            <thead><tr style="background:var(--panel-2);">
+              <th style="padding:7px 10px;text-align:left;">Item</th>
+              <th style="padding:7px 10px;text-align:center;">Atual</th>
+              <th style="padding:7px 10px;text-align:center;">Mín.</th>
+            </tr></thead>
+            <tbody id="dash-estoque-critico"></tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- OS Recentes -->
+      <div class="card">
+        <div class="section-title" style="margin-bottom:10px;">📋 OS recentes</div>
         <div class="table-wrap" style="border:none;">
           <table>
-            <thead>
-              <tr><th>Nº OS</th><th>Cliente</th><th>Aparelho</th><th>Status</th><th>Valor</th><th>Entrada</th></tr>
-            </thead>
+            <thead><tr>
+              <th>Nº OS</th><th>Cliente</th><th>Aparelho</th><th>Status</th><th>Valor</th><th>Entrada</th>
+            </tr></thead>
             <tbody id="dashboard-recent-os"></tbody>
           </table>
         </div>
       </div>
 
-      <div class="card">
-        <div class="section-title">Itens com estoque baixo</div>
-        <div class="table-wrap" style="border:none;">
-          <table>
-            <thead>
-              <tr><th>Item</th><th>Categoria</th><th>Qtd. atual</th><th>Qtd. mínima</th><th>Status</th></tr>
-            </thead>
-            <tbody id="dashboard-low-stock"></tbody>
-          </table>
-        </div>
-      </div>
+      <!-- elementos ocultos mantidos para compatibilidade -->
+      <div id="low-stock-alert" style="display:none;"></div>
+      <div id="dashboard-stats" style="display:none;"></div>
+      <div id="dashboard-low-stock" style="display:none;"></div>
     </div>
 
     <!-- ===================== ORDENS ===================== -->
@@ -749,8 +859,8 @@
           <option value="">Todos os status</option>
           <option value="Aberto">Aberto</option>
           <option value="Aguardando aprovação">Aguardando aprovação</option>
-          <option value="Em andamento">Em andamento</option>
           <option value="Aguardando peça">Aguardando peça</option>
+          <option value="Em andamento">Em andamento</option>
           <option value="Concluído">Concluído</option>
           <option value="Entregue">Entregue</option>
           <option value="Cancelado">Cancelado</option>
@@ -841,7 +951,10 @@
           <h1>Tarefas</h1>
           <p>Quadro de tarefas e lembretes do time</p>
         </div>
-        <button class="btn btn-primary" onclick="openTarefaModal()">+ Nova tarefa</button>
+        <div style="display:flex;gap:8px;">
+          <button class="btn btn-primary" onclick="openNovaColuna()">+ Nova coluna</button>
+          <button class="btn btn-primary" onclick="openTarefaModal()">+ Nova tarefa</button>
+        </div>
       </div>
 
       <!-- Abas -->
@@ -1180,8 +1293,8 @@
           <select id="os-status">
             <option>Aberto</option>
             <option>Aguardando aprovação</option>
-            <option>Em andamento</option>
             <option>Aguardando peça</option>
+            <option>Em andamento</option>
             <option>Concluído</option>
             <option>Entregue</option>
             <option>Cancelado</option>
@@ -1405,7 +1518,7 @@
       <div class="field-row">
         <div class="field">
           <label>Coluna</label>
-          <select id="tarefa-coluna">
+          <select id="tarefa-coluna" id="tarefa-coluna-sel">
             <option>A Fazer</option>
             <option>Em andamento</option>
             <option>Concluído</option>
@@ -1435,14 +1548,7 @@
         </div>
         <div class="field">
           <label>Cor do card</label>
-          <div style="display:flex; gap:8px; margin-top:8px; flex-wrap:wrap;">
-            ${['#0094d4','#28a745','#ffc107','#dc3545','#6f42c1','#fd7e14','#20c997','#6c757d'].map(c =>
-              `<div onclick="selecionarCorCard('${c}')" id="cor-opt-${c.slice(1)}"
-                style="width:24px;height:24px;border-radius:50%;background:${c};cursor:pointer;
-                border:2px solid transparent;transition:border .15s;"
-                title="${c}"></div>`
-            ).join('')}
-          </div>
+          <div id="tarefa-cores-wrap" style="display:flex; gap:8px; margin-top:8px; flex-wrap:wrap;"></div>
           <input type="hidden" id="tarefa-cor" value="#0094d4">
         </div>
       </div>
@@ -1467,6 +1573,57 @@
             onclick="deleteTarefa()">Excluir</button>
         </div>
         <button class="btn btn-primary" onclick="saveTarefa()">Salvar</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+
+<!-- ===================== MODAL: NOVA COLUNA KANBAN ===================== -->
+<div class="modal-overlay" id="coluna-modal-overlay">
+  <div class="modal" style="max-width:420px;">
+    <div class="modal-header">
+      <h2 class="modal-title">Nova coluna</h2>
+      <button class="modal-close" onclick="closeModal('coluna-modal-overlay')">&times;</button>
+    </div>
+    <div class="modal-body">
+      <div class="field">
+        <label>Nome da coluna *</label>
+        <input type="text" id="coluna-nome" placeholder="Ex: Em revisão, Bloqueado..."
+          onkeydown="if(event.key==='Enter') salvarNovaColuna()">
+      </div>
+      <div class="field">
+        <label>Cor do título</label>
+        <div id="coluna-cores-wrap" style="display:flex; gap:8px; margin-top:8px; flex-wrap:wrap;"></div>
+        <input type="hidden" id="coluna-cor" value="#6c757d">
+      </div>
+      <div class="modal-actions">
+        <button class="btn" onclick="closeModal('coluna-modal-overlay')">Cancelar</button>
+        <button class="btn btn-primary" onclick="salvarNovaColuna()">Criar coluna</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+
+<!-- ===================== MODAL: COMENTÁRIO DE STATUS ===================== -->
+<div class="modal-overlay" id="status-comentario-overlay">
+  <div class="modal" style="max-width:460px;">
+    <div class="modal-header">
+      <h2 class="modal-title">Alteração de status</h2>
+      <button class="modal-close" onclick="_statusComentarioReject && _statusComentarioReject()">&times;</button>
+    </div>
+    <div class="modal-body">
+      <div id="status-comentario-info" style="font-size:13px; color:var(--text-dim); margin-bottom:14px; padding:10px 14px; background:var(--panel-2); border-radius:8px; border-left:3px solid var(--accent);"></div>
+      <div class="field mb-0">
+        <label>Comentário sobre a alteração <span style="color:var(--text-faint); font-weight:400;">(opcional)</span></label>
+        <textarea id="status-comentario-texto" placeholder="Ex: Cliente aprovado orçamento, aguardando peça..." style="min-height:80px;"
+          onkeydown="if(event.key==='Enter' && event.ctrlKey) _statusComentarioResolve(this.value)"></textarea>
+        <div style="font-size:11px; color:var(--text-faint); margin-top:4px;">Ctrl+Enter para confirmar</div>
+      </div>
+      <div class="modal-actions">
+        <button class="btn" onclick="_statusComentarioReject && _statusComentarioReject()">Cancelar alteração</button>
+        <button class="btn btn-primary" onclick="_statusComentarioResolve(document.getElementById('status-comentario-texto').value)">Confirmar</button>
       </div>
     </div>
   </div>
@@ -1758,8 +1915,8 @@
                 <option value="">Todos</option>
                 <option>Aberto</option>
                 <option>Aguardando aprovação</option>
-                <option>Em andamento</option>
                 <option>Aguardando peça</option>
+                <option>Em andamento</option>
                 <option>Concluído</option>
                 <option>Entregue</option>
                 <option>Cancelado</option>
@@ -2079,80 +2236,543 @@ function escapeHtml(str){
    DASHBOARD
    ========================================================= */
 function renderDashboard(){
-  const total = state.os.length;
-  const aberto = state.os.filter(o => ['Aberto','Em andamento','Aguardando peça','Aguardando aprovação'].includes(o.status)).length;
-  const concluido = state.os.filter(o => o.status === 'Concluído').length;
-  const faturamento = state.os
-    .filter(o => ['Concluído','Entregue'].includes(o.status))
-    .reduce((sum,o) => sum + (o.total||0), 0);
+  // Sempre inicializar com mês atual vs mês anterior
+  const hoje = new Date();
+  const primDia = new Date(hoje.getFullYear(), hoje.getMonth(), 1);
+  const ultDia  = new Date(hoje.getFullYear(), hoje.getMonth() + 1, 0);
+  const mesAnt  = new Date(hoje.getFullYear(), hoje.getMonth() - 1, 1);
+  const ultMesAnt = new Date(hoje.getFullYear(), hoje.getMonth(), 0);
+  const toISO = d => d.toISOString().slice(0,10);
 
-  const lowStock = state.stock.filter(s => s.quantidade <= s.minimo);
-
-  const statsHtml = `
-    <div class="stat-card">
-      <div class="stat-label">Ordens em aberto</div>
-      <div class="stat-value stat-accent">${aberto}</div>
-      <div class="stat-sub">de ${total} ordens totais</div>
-    </div>
-    <div class="stat-card">
-      <div class="stat-label">Concluídas (aguard. retirada)</div>
-      <div class="stat-value stat-blue">${concluido}</div>
-      <div class="stat-sub">prontas para entrega</div>
-    </div>
-    <div class="stat-card">
-      <div class="stat-label">Faturamento (concl. + entreg.)</div>
-      <div class="stat-value stat-green">${formatCurrency(faturamento)}</div>
-      <div class="stat-sub">total acumulado</div>
-    </div>
-    <div class="stat-card">
-      <div class="stat-label">Itens em estoque baixo</div>
-      <div class="stat-value ${lowStock.length ? 'stat-red' : ''}">${lowStock.length}</div>
-      <div class="stat-sub">de ${state.stock.length} itens cadastrados</div>
-    </div>
-  `;
-  document.getElementById('dashboard-stats').innerHTML = statsHtml;
-
-  // Alert banner
-  const alertDiv = document.getElementById('low-stock-alert');
-  if(lowStock.length > 0){
-    alertDiv.innerHTML = `<div class="alert-banner">&#9888; ${lowStock.length} item(ns) com estoque igual ou abaixo do mínimo. Verifique a aba Estoque.</div>`;
-  } else {
-    alertDiv.innerHTML = '';
+  // Só preenche se não tiver sido alterado pelo usuário
+  if(!document.getElementById('dash-a-de').dataset.userSet){
+    document.getElementById('dash-a-de').value  = toISO(primDia);
+    document.getElementById('dash-a-ate').value = toISO(hoje); // até hoje
+    document.getElementById('dash-b-de').value  = toISO(mesAnt);
+    document.getElementById('dash-b-ate').value = toISO(ultMesAnt);
   }
 
-  // Recent OS (last 5, sorted by entry date desc)
-  const recent = [...state.os].sort((a,b) => b.dataEntrada.localeCompare(a.dataEntrada)).slice(0,5);
-  const recentBody = document.getElementById('dashboard-recent-os');
-  if(recent.length === 0){
-    recentBody.innerHTML = `<tr class="empty-row"><td colspan="6">Nenhuma OS cadastrada ainda.</td></tr>`;
-  } else {
-    recentBody.innerHTML = recent.map(o => `
-      <tr style="cursor:pointer" onclick="viewOS('${o.id}')">
-        <td class="mono">#${o.numero}</td>
-        <td class="cell-strong">${escapeHtml(o.clienteNome)}</td>
-        <td>${escapeHtml(o.aparelho)}</td>
-        <td><span class="badge ${statusBadgeClass(o.status)}">${o.status}</span></td>
-        <td class="mono">${formatCurrency(o.total)}</td>
-        <td class="mono">${formatDate(o.dataEntrada)}</td>
-      </tr>
-    `).join('');
+  const aDe  = document.getElementById('dash-a-de').value;
+  const aAte = document.getElementById('dash-a-ate').value;
+  const bDe  = document.getElementById('dash-b-de').value;
+  const bAte = document.getElementById('dash-b-ate').value;
+
+  const osA = state.os.filter(o => o.dataEntrada >= aDe && o.dataEntrada <= aAte);
+  const osB = state.os.filter(o => o.dataEntrada >= bDe && o.dataEntrada <= bAte);
+
+  const fatA = osA.reduce((s,o) => s + (o.total||0), 0);
+  const fatB = osB.reduce((s,o) => s + (o.total||0), 0);
+  const concA = osA.filter(o => ['Concluído','Entregue'].includes(o.status)).length;
+  const concB = osB.filter(o => ['Concluído','Entregue'].includes(o.status)).length;
+  const tmA = osA.length;
+  const tmB = osB.length;
+
+  // Gastos de compras no período A
+  const compA = state.compras.filter(c => c.dataPedido >= aDe && c.dataPedido <= aAte);
+  const gastosA = compA.reduce((s,c) => s + (c.valorTotal||0), 0);
+  const lucroA  = fatA - gastosA;
+
+  // Ticket médio
+  const ticketA = concA ? fatA / concA : 0;
+  const ticketB = concB ? fatB / concB : 0;
+
+  function delta(a, b){
+    if(!b) return '';
+    const pct = ((a - b) / b * 100).toFixed(1);
+    const cor = a >= b ? '#28a745' : '#dc3545';
+    const seta = a >= b ? '▲' : '▼';
+    return `<span style="font-size:11px;color:${cor};margin-left:6px;">${seta} ${Math.abs(pct)}%</span>`;
   }
 
-  // Low stock table
-  const lowBody = document.getElementById('dashboard-low-stock');
-  if(lowStock.length === 0){
-    lowBody.innerHTML = `<tr class="empty-row"><td colspan="5">Nenhum item com estoque baixo. Tudo certo!</td></tr>`;
+  // KPIs
+  const kpis = [
+    { label:'Faturamento (A)',   val: formatCurrency(fatA),         sub: 'vs Período B' + delta(fatA, fatB),      cor:'var(--accent)' },
+    { label:'OS abertas (A)',    val: tmA,                          sub: 'vs ' + tmB + ' no período B' + delta(tmA, tmB), cor:'var(--text)' },
+    { label:'Concluídas (A)',    val: concA,                        sub: 'vs ' + concB + ' no período B' + delta(concA, concB), cor:'#28a745' },
+    { label:'Ticket médio (A)', val: formatCurrency(ticketA),      sub: 'vs ' + formatCurrency(ticketB) + delta(ticketA, ticketB), cor:'var(--accent)' },
+    { label:'Gastos peças (A)', val: formatCurrency(gastosA),      sub: compA.length + ' pedido(s) no período',  cor:'#f59e0b' },
+    { label:'Lucro estimado (A)',val: formatCurrency(lucroA),       sub: 'Faturamento − Compras',                 cor: lucroA >= 0 ? '#28a745' : '#dc3545' },
+    { label:'Clientes atendidos',val: new Set(osA.map(o=>o.clienteId)).size, sub: 'no Período A', cor:'var(--text)' },
+    { label:'Estoque crítico',  val: state.stock.filter(s=>s.quantidade<=s.minimo).length, sub:'itens abaixo do mínimo', cor:'#dc3545' },
+  ];
+
+  document.getElementById('dash-kpis').innerHTML = kpis.map(k => `
+    <div class="stat-card" style="border-left:3px solid ${k.cor};">
+      <div class="stat-label">${k.label}</div>
+      <div class="stat-value" style="color:${k.cor};font-size:22px;">${k.val}</div>
+      <div style="font-size:11px;color:var(--text-dim);margin-top:4px;">${k.sub}</div>
+    </div>`).join('');
+
+  // ── Gráfico 1: OS por status (donut) ──
+  const STATUS_ALL = ['Aberto','Aguardando aprovação','Aguardando peça','Em andamento','Concluído','Entregue','Cancelado'];
+  const STATUS_COLORS = ['#0094d4','#f59e0b','#fd7e14','#6f42c1','#28a745','#20c997','#dc3545'];
+  const statusCountA = STATUS_ALL.map(s => osA.filter(o => o.status === s).length);
+
+  renderChart('chart-status-a', 'doughnut', STATUS_ALL, [{
+    data: statusCountA, backgroundColor: STATUS_COLORS,
+    borderColor: 'var(--panel)', borderWidth: 2
+  }], { plugins:{ legend:{ position:'right', labels:{ color:'#9aa5b1', font:{size:11} } } } });
+
+  // ── Gráfico 2: Faturamento diário (linha) ──
+  const diasA = getDiasRange(aDe, aAte);
+  const diasB = getDiasRange(bDe, bAte).slice(0, diasA.length);
+  const fatDiarioA = diasA.map(d => osA.filter(o=>o.dataEntrada===d).reduce((s,o)=>s+(o.total||0),0));
+  const fatDiarioB = diasB.map(d => osB.filter(o=>o.dataEntrada===d).reduce((s,o)=>s+(o.total||0),0));
+  const periodoBAtivoFat = isPeriodoBAtivo();
+
+  renderChart('chart-fat-diario', 'line',
+    diasA.map(d => d.slice(5)), // só MM-DD
+    [
+      { label:'Período A', data: fatDiarioA, borderColor:'#0094d4', backgroundColor:'rgba(0,148,212,.1)', tension:.4, fill:true },
+      ...(periodoBAtivoFat ? [{ label:'Período B', data: fatDiarioB, borderColor:'#f59e0b', backgroundColor:'rgba(245,158,11,.1)', tension:.4, fill:true, borderDash:[4,4] }] : [])
+    ],
+    { plugins:{ legend:{ labels:{ color:'#9aa5b1' } } }, scales:{ y:{ ticks:{ color:'#9aa5b1', callback: v=>'R$'+v }, grid:{ color:'rgba(255,255,255,.05)' } }, x:{ ticks:{ color:'#9aa5b1', maxTicksLimit:10 }, grid:{ display:false } } } }
+  );
+
+  // ── Gráfico 3: PF vs PJ (barra agrupada) ──
+  const pfA = osA.filter(o => { const c=state.clients.find(x=>x.id===o.clienteId); return c && getTipoPessoa(c.cpfcnpj)==='PF'; }).length;
+  const pjA = osA.filter(o => { const c=state.clients.find(x=>x.id===o.clienteId); return c && getTipoPessoa(c.cpfcnpj)==='PJ'; }).length;
+  const pfB = osB.filter(o => { const c=state.clients.find(x=>x.id===o.clienteId); return c && getTipoPessoa(c.cpfcnpj)==='PF'; }).length;
+  const pjB = osB.filter(o => { const c=state.clients.find(x=>x.id===o.clienteId); return c && getTipoPessoa(c.cpfcnpj)==='PJ'; }).length;
+
+  const periodoBAtivoTipo = isPeriodoBAtivo();
+  renderChart('chart-pf-pj', 'bar', ['Pessoa Física','Pessoa Jurídica'], [
+    { label:'Período A', data:[pfA,pjA], backgroundColor:['rgba(0,148,212,.7)','rgba(0,148,212,.7)'] },
+    ...(periodoBAtivoTipo ? [{ label:'Período B', data:[pfB,pjB], backgroundColor:['rgba(245,158,11,.5)','rgba(245,158,11,.5)'] }] : [])
+  ], { plugins:{ legend:{ labels:{ color:'#9aa5b1' } } }, scales:{ y:{ ticks:{ color:'#9aa5b1' }, grid:{ color:'rgba(255,255,255,.05)' } }, x:{ ticks:{ color:'#9aa5b1' }, grid:{ display:false } } } });
+
+  // ── Gráfico 4: Gastos por fornecedor (barra horizontal) ──
+  const fornecedores = ['CNN','SKYTECH'];
+  const gastosFornA = fornecedores.map(f => compA.filter(c=>c.fornecedor===f).reduce((s,c)=>s+(c.valorTotal||0),0));
+  const compB = state.compras.filter(c => c.dataPedido >= bDe && c.dataPedido <= bAte);
+  const gastosFornB = fornecedores.map(f => compB.filter(c=>c.fornecedor===f).reduce((s,c)=>s+(c.valorTotal||0),0));
+
+  const periodoBAtivoForn = isPeriodoBAtivo();
+  renderChart('chart-fornecedor', 'bar', ['CNN Oriental','Skytech'], [
+    { label:'Período A', data: gastosFornA, backgroundColor:'rgba(0,148,212,.7)' },
+    ...(periodoBAtivoForn ? [{ label:'Período B', data: gastosFornB, backgroundColor:'rgba(245,158,11,.5)' }] : [])
+  ], {
+    indexAxis:'y',
+    plugins:{ legend:{ labels:{ color:'#9aa5b1' } } },
+    scales:{ x:{ ticks:{ color:'#9aa5b1', callback:v=>'R$'+v.toLocaleString('pt-BR') }, grid:{ color:'rgba(255,255,255,.05)' } }, y:{ ticks:{ color:'#9aa5b1' }, grid:{ display:false } } }
+  });
+
+  // ── Gráfico Lucro estimado (barras: Faturamento, Gastos, Lucro) ──
+  const lucroData = [fatA, gastosA, lucroA];
+  const lucroCores = [
+    'rgba(0,148,212,.8)',
+    'rgba(245,158,11,.8)',
+    lucroA >= 0 ? 'rgba(40,167,69,.8)' : 'rgba(220,53,69,.8)'
+  ];
+  renderChart('chart-lucro', 'bar',
+    ['Faturamento','Gastos c/ Peças','Lucro Estimado'],
+    [{ label:'Período A', data: lucroData, backgroundColor: lucroCores }],
+    {
+      plugins:{ legend:{ display:false } },
+      scales:{
+        y:{ ticks:{ color:'#9aa5b1', callback: v => 'R$' + v.toLocaleString('pt-BR') }, grid:{ color:'rgba(255,255,255,.05)' } },
+        x:{ ticks:{ color:'#9aa5b1' }, grid:{ display:false } }
+      }
+    }
+  );
+
+  // ── Gráfico Peças utilizadas (pizza) ──
+  const pecasMap = {};
+  osA.forEach(o => {
+    (o.parts || []).forEach(p => {
+      const nome = p.nome || 'Sem nome';
+      pecasMap[nome] = (pecasMap[nome] || 0) + (p.qtd || 1);
+    });
+  });
+  const pecasOrdenadas = Object.entries(pecasMap).sort((a,b) => b[1]-a[1]).slice(0,8);
+  const coresPecas = ['#0094d4','#28a745','#ffc107','#dc3545','#6f42c1','#fd7e14','#20c997','#6c757d'];
+
+  if(pecasOrdenadas.length){
+    renderChart('chart-pecas', 'pie',
+      pecasOrdenadas.map(([nome]) => nome.length > 20 ? nome.slice(0,20)+'…' : nome),
+      [{ data: pecasOrdenadas.map(([,qtd]) => qtd), backgroundColor: coresPecas, borderColor:'var(--panel)', borderWidth:2 }],
+      { plugins:{ legend:{ position:'right', labels:{ color:'#9aa5b1', font:{size:10}, boxWidth:12 } } } }
+    );
   } else {
-    lowBody.innerHTML = lowStock.map(s => `
-      <tr>
-        <td class="cell-strong">${escapeHtml(s.nome)}</td>
-        <td>${escapeHtml(s.categoria)}</td>
-        <td class="mono">${s.quantidade}</td>
-        <td class="mono">${s.minimo}</td>
-        <td>${stockPill(s)}</td>
-      </tr>
-    `).join('');
+    if(_dashCharts['chart-pecas']){ _dashCharts['chart-pecas'].destroy(); delete _dashCharts['chart-pecas']; }
+    const wrap = document.getElementById('chart-pecas')?.parentElement;
+    if(wrap){
+      // Manter o canvas mas limpar (não substituir por div)
+      const ctx = document.getElementById('chart-pecas');
+      if(ctx && ctx.tagName === 'CANVAS'){
+        const c = ctx.getContext('2d');
+        c.clearRect(0,0,ctx.width,ctx.height);
+        c.fillStyle = 'rgba(154,165,177,0.3)';
+        c.font = '13px Arial';
+        c.textAlign = 'center';
+        c.fillText('Nenhuma peça utilizada no período', ctx.width/2, ctx.height/2);
+      } else {
+        // Recriar o canvas caso tenha sido substituído
+        wrap.innerHTML = '<canvas id="chart-pecas"></canvas>';
+      }
+    }
   }
+
+  // ── Top 5 clientes ──
+  const clienteMap = {};
+  osA.forEach(o => {
+    if(!o.clienteId) return;
+    if(!clienteMap[o.clienteId]) clienteMap[o.clienteId] = { nome: o.clienteNome, qtd:0, total:0 };
+    clienteMap[o.clienteId].qtd++;
+    clienteMap[o.clienteId].total += o.total||0;
+  });
+  const top5 = Object.values(clienteMap).sort((a,b)=>b.total-a.total).slice(0,5);
+  document.getElementById('dash-top-clientes').innerHTML = top5.length
+    ? top5.map((c,i) => `<tr>
+        <td style="padding:7px 10px;"><span style="color:var(--accent);font-weight:700;margin-right:6px;">${i+1}.</span>${escapeHtml(c.nome)}</td>
+        <td style="padding:7px 10px;text-align:center;">${c.qtd}</td>
+        <td style="padding:7px 10px;text-align:right;font-weight:600;">${formatCurrency(c.total)}</td>
+      </tr>`).join('')
+    : '<tr><td colspan="3" style="padding:16px;text-align:center;color:var(--text-faint);">Nenhuma OS no período</td></tr>';
+
+  // ── Estoque crítico ──
+  const critico = state.stock.filter(s=>s.quantidade<=s.minimo).slice(0,8);
+  document.getElementById('dash-estoque-critico').innerHTML = critico.length
+    ? critico.map(s => `<tr>
+        <td style="padding:7px 10px;">${escapeHtml(s.nome)}${s.detalhes?'<span style="font-size:11px;color:var(--text-faint);margin-left:4px;">'+escapeHtml(s.detalhes)+'</span>':''}</td>
+        <td style="padding:7px 10px;text-align:center;color:${s.quantidade===0?'#dc3545':'#f59e0b'};font-weight:700;">${s.quantidade}</td>
+        <td style="padding:7px 10px;text-align:center;color:var(--text-dim);">${s.minimo}</td>
+      </tr>`).join('')
+    : '<tr><td colspan="3" style="padding:16px;text-align:center;color:#28a745;">✓ Estoque saudável</td></tr>';
+
+  // ── OS Recentes ──
+  const recentes = [...state.os].sort((a,b)=>b.numero-a.numero).slice(0,8);
+  document.getElementById('dashboard-recent-os').innerHTML = recentes.map(o => `
+    <tr>
+      <td class="mono">#${String(o.numero).padStart(4,'0')}</td>
+      <td>${escapeHtml(o.clienteNome||'—')}</td>
+      <td>${escapeHtml(o.aparelho||'—')}</td>
+      <td><span class="badge ${statusBadgeClass(o.status)}">${o.status}</span></td>
+      <td class="mono">${formatCurrency(o.total)}</td>
+      <td class="mono">${formatDate(o.dataEntrada)}</td>
+    </tr>`).join('');
+}
+
+function getDiasRange(de, ate){
+  const dias = []; let cur = new Date(de + 'T00:00:00');
+  const fim = new Date(ate + 'T00:00:00');
+  while(cur <= fim){ dias.push(cur.toISOString().slice(0,10)); cur.setDate(cur.getDate()+1); }
+  return dias;
+}
+
+function togglePeriodoB(){
+  const wrap = document.getElementById('dash-periodo-b-wrap');
+  const btn  = document.getElementById('btn-toggle-periodo-b');
+  const ativo = wrap.style.display !== 'none' && wrap.style.display !== '';
+  if(ativo){
+    wrap.style.display = 'none';
+    btn.textContent = '+ Comparativo';
+    btn.style.color = 'var(--text-dim)';
+    btn.style.borderColor = 'var(--border)';
+  } else {
+    wrap.style.display = 'flex';
+    btn.textContent = '✕ Comparativo';
+    btn.style.color = 'var(--accent)';
+    btn.style.borderColor = 'var(--accent)';
+  }
+  renderDashboard();
+}
+
+function isPeriodoBAtivo(){
+  const wrap = document.getElementById('dash-periodo-b-wrap');
+  return wrap && wrap.style.display !== 'none' && wrap.style.display !== '';
+}
+
+function dashSetMesAtual(){
+  const hoje = new Date();
+  const primDia = new Date(hoje.getFullYear(), hoje.getMonth(), 1);
+  const mesAnt  = new Date(hoje.getFullYear(), hoje.getMonth()-1, 1);
+  const ultMesAnt = new Date(hoje.getFullYear(), hoje.getMonth(), 0);
+  const toISO = d => d.toISOString().slice(0,10);
+  document.getElementById('dash-a-de').value  = toISO(primDia);
+  document.getElementById('dash-a-ate').value = toISO(hoje);
+  document.getElementById('dash-b-de').value  = toISO(mesAnt);
+  document.getElementById('dash-b-ate').value = toISO(ultMesAnt);
+  delete document.getElementById('dash-a-de').dataset.userSet;
+  renderDashboard();
+}
+
+const _dashCharts = {};
+function renderChart(id, type, labels, datasets, options){
+  if(_dashCharts[id]){ _dashCharts[id].destroy(); delete _dashCharts[id]; }
+  const canvas = document.getElementById(id);
+  if(!canvas) return;
+  _dashCharts[id] = new Chart(canvas, {
+    type,
+    data: { labels, datasets },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      animation: { duration: 400 },
+      ...options
+    }
+  });
+}
+
+function statusBadgeClass(status){
+  const map = { 'Aberto':'badge-aberto','Em andamento':'badge-andamento','Aguardando peça':'badge-aguardando','Aguardando aprovação':'badge-aguardando','Concluído':'badge-concluido','Entregue':'badge-entregue','Cancelado':'badge-cancelado' };
+  return map[status]||'';
+}
+
+function toggleExportMenu(){
+  const menu = document.getElementById('export-menu');
+  menu.style.display = menu.style.display === 'none' ? 'block' : 'none';
+}
+// Fechar menu ao clicar fora
+document.addEventListener('click', e => {
+  if(!document.getElementById('export-dropdown-wrap')?.contains(e.target)){
+    const m = document.getElementById('export-menu');
+    if(m) m.style.display = 'none';
+  }
+});
+
+async function exportDashboardPDF(){
+  const aDe  = document.getElementById('dash-a-de').value;
+  const aAte = document.getElementById('dash-a-ate').value;
+  const bDe  = document.getElementById('dash-b-de').value;
+  const bAte = document.getElementById('dash-b-ate').value;
+  const periodoB = isPeriodoBAtivo();
+
+  const osA = state.os.filter(o => o.dataEntrada >= aDe && o.dataEntrada <= aAte);
+  const osB = periodoB ? state.os.filter(o => o.dataEntrada >= bDe && o.dataEntrada <= bAte) : [];
+  const fatA = osA.reduce((s,o) => s+(o.total||0), 0);
+  const fatB = osB.reduce((s,o) => s+(o.total||0), 0);
+  const concA = osA.filter(o => ['Concluído','Entregue'].includes(o.status)).length;
+  const concB = osB.filter(o => ['Concluído','Entregue'].includes(o.status)).length;
+  const compA = state.compras.filter(c => c.dataPedido >= aDe && c.dataPedido <= aAte);
+  const gastosA = compA.reduce((s,c) => s+(c.valorTotal||0), 0);
+  const lucroA  = fatA - gastosA;
+  const ticketA = concA ? fatA/concA : 0;
+
+  // Capturar logo em base64 via canvas (sem fetch, sem CORS)
+  let logoB64 = '';
+  try {
+    const logoImg = document.querySelector('.brand-logo');
+    if(logoImg && logoImg.complete && logoImg.naturalWidth > 0){
+      const tmpCanvas = document.createElement('canvas');
+      tmpCanvas.width  = logoImg.naturalWidth;
+      tmpCanvas.height = logoImg.naturalHeight;
+      tmpCanvas.getContext('2d').drawImage(logoImg, 0, 0);
+      logoB64 = tmpCanvas.toDataURL('image/png');
+    }
+  } catch(e){ console.warn('Logo não carregado:', e); }
+
+  // Capturar gráficos como imagem — usar instâncias Chart.js diretamente
+  const graficos = ['chart-status-a','chart-fat-diario','chart-pf-pj','chart-fornecedor','chart-lucro','chart-pecas'];
+  const imgs = {};
+  graficos.forEach(id => {
+    // Tentar via instância Chart.js (mais confiável)
+    if(_dashCharts[id] && _dashCharts[id].canvas){
+      try { imgs[id] = _dashCharts[id].canvas.toDataURL('image/png'); } catch(e){}
+    }
+    // Fallback: via getElementById
+    if(!imgs[id]){
+      const c = document.getElementById(id);
+      if(c && c.tagName === 'CANVAS') try { imgs[id] = c.toDataURL('image/png'); } catch(e){}
+    }
+  });
+
+  // Top clientes
+  const clienteMap = {};
+  osA.forEach(o => {
+    if(!o.clienteId) return;
+    if(!clienteMap[o.clienteId]) clienteMap[o.clienteId] = { nome:o.clienteNome, qtd:0, total:0 };
+    clienteMap[o.clienteId].qtd++; clienteMap[o.clienteId].total += o.total||0;
+  });
+  const top5 = Object.values(clienteMap).sort((a,b)=>b.total-a.total).slice(0,5);
+
+  const STATUS_ALL = ['Aberto','Aguardando aprovação','Aguardando peça','Em andamento','Concluído','Entregue','Cancelado'];
+
+  function fmtPer(de, ate){ return formatDate(de) + ' a ' + formatDate(ate); }
+  function deltaHTML(a,b){
+    if(!b||!periodoB) return '';
+    const pct = ((a-b)/b*100).toFixed(1);
+    const cor = a>=b?'#28a745':'#dc3545';
+    return `<span style="color:${cor};font-size:11px;"> ${a>=b?'▲':'▼'} ${Math.abs(pct)}%</span>`;
+  }
+
+  const _sc = 'script';
+  const html = `<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<title>Relatório Gerencial — Mobit Soluções</title>
+<style>
+  *{ box-sizing:border-box; margin:0; padding:0; }
+  body{ font-family:Arial,sans-serif; font-size:11pt; color:#111; background:#fff; }
+  .wrap{ max-width:210mm; margin:0 auto; padding:12mm 14mm; }
+
+  /* Cabeçalho */
+  .header{ display:flex; justify-content:space-between; align-items:center; border-bottom:2px solid #0094d4; padding-bottom:10pt; margin-bottom:14pt; }
+  .header-logo{ font-size:22pt; font-weight:700; color:#0094d4; }
+  .header-logo span{ color:#111; }
+  .header-right{ text-align:right; font-size:9pt; color:#555; }
+  .header-right strong{ font-size:11pt; color:#111; }
+
+  /* KPIs */
+  .kpi-grid{ display:grid; grid-template-columns:repeat(4,1fr); gap:8pt; margin-bottom:16pt; }
+  .kpi{ background:#f8f9fa; border:1pt solid #e0e0e0; border-radius:6pt; padding:10pt; border-left:3pt solid #0094d4; }
+  .kpi-label{ font-size:8pt; color:#666; text-transform:uppercase; letter-spacing:.04em; }
+  .kpi-val{ font-size:15pt; font-weight:700; color:#0094d4; margin:3pt 0 2pt; }
+  .kpi-sub{ font-size:8pt; color:#888; }
+
+  /* Gráficos */
+  .charts-grid{ display:grid; grid-template-columns:1fr 1fr; gap:12pt; margin-bottom:16pt; }
+  .chart-box{ border:1pt solid #e0e0e0; border-radius:6pt; padding:10pt; }
+  .chart-title{ font-size:9pt; font-weight:700; color:#333; margin-bottom:8pt; text-transform:uppercase; letter-spacing:.04em; }
+  .chart-box img{ width:100%; height:auto; max-height:160pt; object-fit:contain; }
+
+  /* Tabelas */
+  .tables-grid{ display:grid; grid-template-columns:1fr 1fr; gap:12pt; margin-bottom:16pt; }
+  table{ width:100%; border-collapse:collapse; font-size:9pt; }
+  th{ background:#0094d4; color:#fff; padding:5pt 8pt; text-align:left; font-weight:600; }
+  td{ padding:5pt 8pt; border-bottom:1pt solid #f0f0f0; }
+  tr:nth-child(even) td{ background:#f9f9f9; }
+  .section-title{ font-size:10pt; font-weight:700; color:#0094d4; margin-bottom:8pt; text-transform:uppercase; letter-spacing:.04em; border-bottom:1pt solid #e0e0e0; padding-bottom:4pt; }
+
+  /* OS recentes */
+  .os-table{ margin-bottom:16pt; }
+
+  /* Rodapé */
+  .footer{ border-top:1pt solid #e0e0e0; padding-top:8pt; margin-top:8pt; display:flex; justify-content:space-between; font-size:8pt; color:#888; }
+
+  @media print{
+    body{ -webkit-print-color-adjust:exact; print-color-adjust:exact; }
+    .wrap{ padding:8mm 10mm; }
+    @page{ margin:0; size:A4; }
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <!-- CABEÇALHO -->
+  <div class="header">
+    <div class="header-logo">${logoB64 ? `<img src="${logoB64}" style="height:52pt;max-width:160pt;object-fit:contain;">` : 'MOB<span>IT</span> <span style="font-size:13pt;font-weight:400;color:#555;">Soluções</span>'}</div>
+    <div class="header-right">
+      <strong>Relatório Gerencial</strong><br>
+      Período A: ${fmtPer(aDe,aAte)}<br>
+      ${periodoB ? `Período B: ${fmtPer(bDe,bAte)}<br>` : ''}
+      Emitido em: ${new Date().toLocaleString('pt-BR')}
+    </div>
+  </div>
+
+  <!-- KPIs -->
+  <div class="kpi-grid">
+    <div class="kpi"><div class="kpi-label">Faturamento (A)</div><div class="kpi-val">${formatCurrency(fatA)}</div><div class="kpi-sub">${periodoB?'vs '+formatCurrency(fatB)+deltaHTML(fatA,fatB):'Período selecionado'}</div></div>
+    <div class="kpi"><div class="kpi-label">Total de OS (A)</div><div class="kpi-val">${osA.length}</div><div class="kpi-sub">${periodoB?'vs '+osB.length+' no Período B':osA.length+' ordens'}</div></div>
+    <div class="kpi"><div class="kpi-label">Concluídas (A)</div><div class="kpi-val">${concA}</div><div class="kpi-sub">${periodoB?'vs '+concB+' no Período B':'OS concluídas/entregues'}</div></div>
+    <div class="kpi"><div class="kpi-label">Ticket Médio (A)</div><div class="kpi-val">${formatCurrency(ticketA)}</div><div class="kpi-sub">por OS concluída</div></div>
+    <div class="kpi" style="border-left-color:#f59e0b;"><div class="kpi-label">Gastos Peças (A)</div><div class="kpi-val" style="color:#f59e0b;">${formatCurrency(gastosA)}</div><div class="kpi-sub">${compA.length} pedido(s)</div></div>
+    <div class="kpi" style="border-left-color:${lucroA>=0?'#28a745':'#dc3545'};"><div class="kpi-label">Lucro Estimado (A)</div><div class="kpi-val" style="color:${lucroA>=0?'#28a745':'#dc3545'};">${formatCurrency(lucroA)}</div><div class="kpi-sub">Faturamento − Compras</div></div>
+    <div class="kpi"><div class="kpi-label">Clientes Atendidos</div><div class="kpi-val">${new Set(osA.map(o=>o.clienteId)).size}</div><div class="kpi-sub">no Período A</div></div>
+    <div class="kpi" style="border-left-color:#dc3545;"><div class="kpi-label">Estoque Crítico</div><div class="kpi-val" style="color:#dc3545;">${state.stock.filter(s=>s.quantidade<=s.minimo).length}</div><div class="kpi-sub">itens abaixo do mínimo</div></div>
+  </div>
+
+  <!-- GRÁFICOS -->
+  <div class="charts-grid">
+    ${imgs['chart-status-a'] ? `<div class="chart-box"><div class="chart-title">OS por Status — Período A</div><img src="${imgs['chart-status-a']}"></div>` : ''}
+    ${imgs['chart-fat-diario'] ? `<div class="chart-box"><div class="chart-title">Faturamento Diário</div><img src="${imgs['chart-fat-diario']}"></div>` : ''}
+    ${imgs['chart-pf-pj'] ? `<div class="chart-box"><div class="chart-title">Clientes PF vs PJ</div><img src="${imgs['chart-pf-pj']}"></div>` : ''}
+    ${imgs['chart-fornecedor'] ? `<div class="chart-box"><div class="chart-title">Gastos por Fornecedor</div><img src="${imgs['chart-fornecedor']}"></div>` : ''}
+    ${imgs['chart-lucro'] ? `<div class="chart-box"><div class="chart-title">Lucro Estimado</div><img src="${imgs['chart-lucro']}"></div>` : ''}
+    ${imgs['chart-pecas'] ? `<div class="chart-box"><div class="chart-title">Peças Mais Utilizadas</div><img src="${imgs['chart-pecas']}"></div>` : ''}
+  </div>
+
+  <!-- TABELAS -->
+  <div class="tables-grid">
+    <div>
+      <div class="section-title">🏆 Top 5 Clientes</div>
+      <table>
+        <thead><tr><th>#</th><th>Cliente</th><th>OS</th><th>Total</th></tr></thead>
+        <tbody>
+          ${top5.map((c,i)=>`<tr><td>${i+1}</td><td>${escapeHtml(c.nome)}</td><td style="text-align:center;">${c.qtd}</td><td>${formatCurrency(c.total)}</td></tr>`).join('')||'<tr><td colspan="4" style="text-align:center;color:#999;">Sem dados</td></tr>'}
+        </tbody>
+      </table>
+    </div>
+    <div>
+      <div class="section-title">📦 OS por Status</div>
+      <table>
+        <thead><tr><th>Status</th><th style="text-align:center;">Qtd</th><th style="text-align:right;">Total (R$)</th></tr></thead>
+        <tbody>
+          ${STATUS_ALL.map(s => {
+            const count = osA.filter(o=>o.status===s).length;
+            const total = osA.filter(o=>o.status===s).reduce((sum,o)=>sum+(o.total||0),0);
+            return count ? `<tr><td>${s}</td><td style="text-align:center;">${count}</td><td style="text-align:right;">${formatCurrency(total)}</td></tr>` : '';
+          }).join('')}
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- OS RECENTES -->
+  <div class="os-table">
+    <div class="section-title">📋 Ordens de Serviço do Período</div>
+    <table>
+      <thead><tr><th>Nº OS</th><th>Cliente</th><th>Aparelho</th><th>Status</th><th>Total</th><th>Entrada</th></tr></thead>
+      <tbody>
+        ${osA.sort((a,b)=>b.numero-a.numero).slice(0,20).map(o=>`
+          <tr>
+            <td>#${String(o.numero).padStart(4,'0')}</td>
+            <td>${escapeHtml(o.clienteNome||'—')}</td>
+            <td>${escapeHtml(o.aparelho||'—')}</td>
+            <td>${o.status}</td>
+            <td>${formatCurrency(o.total)}</td>
+            <td>${formatDate(o.dataEntrada)}</td>
+          </tr>`).join('')}
+      </tbody>
+    </table>
+    ${osA.length > 20 ? `<div style="font-size:9pt;color:#888;margin-top:6pt;text-align:center;">Exibindo 20 de ${osA.length} OS. Exporte em CSV para lista completa.</div>` : ''}
+  </div>
+
+  <!-- RODAPÉ -->
+  <div class="footer">
+    <span>MobitOS — Mobit Soluções Assistência Técnica</span>
+    <span>Relatório gerado em ${new Date().toLocaleString('pt-BR')}</span>
+  </div>
+
+</div>
+${'<'+_sc+'>'}window.onload = () => { window.print(); }${'</'+_sc+'>'}
+</body>
+</html>`;
+
+  const win = window.open('', '_blank', 'width=900,height=750');
+  win.document.write(html);
+  win.document.close();
+}
+
+function exportDashboardCSV(){
+  const aDe  = document.getElementById('dash-a-de').value;
+  const aAte = document.getElementById('dash-a-ate').value;
+  const osA  = state.os.filter(o => o.dataEntrada >= aDe && o.dataEntrada <= aAte);
+  const fatA = osA.reduce((s,o) => s + (o.total||0), 0);
+  const compA = state.compras.filter(c => c.dataPedido >= aDe && c.dataPedido <= aAte);
+  const gastosA = compA.reduce((s,c) => s + (c.valorTotal||0), 0);
+  const NL = '\n';
+  let csv = '"Relatório Gerencial MobitOS"' + NL;
+  csv += `"Período A: ${formatDate(aDe)} a ${formatDate(aAte)}"` + NL + NL;
+  csv += '"INDICADORES"' + NL;
+  csv += `"Faturamento","${formatCurrency(fatA)}"` + NL;
+  csv += `"Total de OS","${osA.length}"` + NL;
+  csv += `"OS Concluídas","${osA.filter(o=>['Concluído','Entregue'].includes(o.status)).length}"` + NL;
+  csv += `"Gastos com Peças","${formatCurrency(gastosA)}"` + NL;
+  csv += `"Lucro Estimado","${formatCurrency(fatA - gastosA)}"` + NL + NL;
+  csv += '"OS DO PERÍODO"' + NL;
+  csv += '"Nº OS","Cliente","Aparelho","Status","Total","Data Entrada"' + NL;
+  osA.forEach(o => {
+    csv += `"#${String(o.numero).padStart(4,'0')}","${o.clienteNome||''}","${o.aparelho||''}","${o.status}","${(o.total||0).toFixed(2)}","${formatDate(o.dataEntrada)}"` + NL;
+  });
+  const bom = '\uFEFF';
+  const blob = new Blob([bom+csv], {type:'text/csv;charset=utf-8;'});
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a'); a.href=url; a.download=`relatorio-mobit-${aDe}.csv`;
+  document.body.appendChild(a); a.click(); document.body.removeChild(a); URL.revokeObjectURL(url);
+  showToast('Relatório CSV exportado com sucesso.');
 }
 
 function stockPill(item){
@@ -2196,8 +2816,9 @@ function renderOSTable(){
       <td><span class="badge ${statusBadgeClass(o.status)}">${o.status}</span></td>
       <td class="mono">${formatCurrency(o.total)}</td>
       <td class="mono">${formatDate(o.dataEntrada)}</td>
-      <td>
+      <td style="display:flex;gap:6px;">
         <button class="btn btn-ghost btn-sm" onclick="viewOS('${o.id}')">Ver</button>
+        <button class="btn btn-ghost btn-sm" onclick="openOSModal('${o.id}')">Editar</button>
       </td>
     </tr>
   `).join('');
@@ -2421,7 +3042,7 @@ function openOSModal(osId){
     // Preencher cliente no autocomplete
     const cli = state.clients.find(c => c.id === o.clienteId);
     if(cli){
-      document.getElementById('ac-cliente-input').value = `${cli.nome} — ${cli.telefone}`;
+      document.getElementById('ac-cliente-input').value = `${cli.nome} — ${cli.cpfcnpj || cli.telefone}`;
       document.getElementById('os-cliente-id').value = cli.id;
       onOSClientChange();
     }
@@ -2477,7 +3098,7 @@ function populateClientSelect(){
   const currentId = document.getElementById('os-cliente-id').value;
   if(currentId){
     const c = state.clients.find(x => x.id === currentId);
-    if(c) document.getElementById('ac-cliente-input').value = `${c.nome} — ${c.telefone}`;
+    if(c) document.getElementById('ac-cliente-input').value = `${c.nome} — ${c.cpfcnpj || c.telefone}`;
   }
 }
 
@@ -2798,7 +3419,16 @@ async function saveOS(){
       parts.forEach(p => adjustStock(p.stockId, -p.qtd));
 
       if(oldStatus !== status){
-        addHistoryEntry(id, `Status alterado de "${oldStatus}" para "${status}".`);
+        try {
+          const comentario = await pedirComentarioStatus(oldStatus, status);
+          const texto = `Status alterado de "${oldStatus}" para "${status}".` +
+            (comentario ? ` Obs: ${comentario}` : '');
+          addHistoryEntry(id, texto);
+        } catch(e) {
+          // Usuário cancelou — reverter status no select
+          document.getElementById('os-status').value = oldStatus;
+          return;
+        }
       } else {
         addHistoryEntry(id, 'Ordem de serviço atualizada.');
       }
@@ -3434,8 +4064,8 @@ function viewOS(osId){
             <select id="quick-status-select" onchange="quickUpdateStatus('${o.id}', this.value)">
               <option ${o.status==='Aberto'?'selected':''}>Aberto</option>
               <option ${o.status==='Aguardando aprovação'?'selected':''}>Aguardando aprovação</option>
-              <option ${o.status==='Em andamento'?'selected':''}>Em andamento</option>
               <option ${o.status==='Aguardando peça'?'selected':''}>Aguardando peça</option>
+              <option ${o.status==='Em andamento'?'selected':''}>Em andamento</option>
               <option ${o.status==='Concluído'?'selected':''}>Concluído</option>
               <option ${o.status==='Entregue'?'selected':''}>Entregue</option>
               <option ${o.status==='Cancelado'?'selected':''}>Cancelado</option>
@@ -3459,17 +4089,32 @@ function viewOS(osId){
   openModal('os-view-overlay');
 }
 
-function quickUpdateStatus(osId, newStatus){
+async function quickUpdateStatus(osId, newStatus){
   const o = state.os.find(x => x.id === osId);
   if(!o) return;
-  const old = o.status;
-  if(old === newStatus) return;
-  o.status = newStatus;
-  addHistoryEntry(osId, `Status alterado de "${old}" para "${newStatus}".`);
-  showToast(`Status da OS #${o.numero} atualizado para "${newStatus}".`);
-  renderOSTable();
-  renderDashboard();
-  viewOS(osId); // refresh view
+  const oldStatus = o.status;
+  if(oldStatus === newStatus) return;
+
+  try {
+    const comentario = await pedirComentarioStatus(oldStatus, newStatus);
+    o.status = newStatus;
+    const texto = `Status alterado de "${oldStatus}" para "${newStatus}".` +
+      (comentario ? ` Obs: ${comentario}` : '');
+    addHistoryEntry(osId, texto);
+
+    // Persistir no Supabase
+    sbPatch('ordens_servico', 'id', osId, {
+      status: newStatus,
+      historico: state.history[osId] || []
+    }).catch(console.error);
+
+    showToast(`Status da OS #${o.numero} atualizado para "${newStatus}".`);
+    renderOSTable();
+    renderDashboard();
+    viewOS(osId);
+  } catch(e) {
+    // Usuário cancelou — não faz nada
+  }
 }
 
 function printOS(){
@@ -4370,13 +5015,122 @@ async function importCSV(){
 
 
 
+
+/* =========================================================
+   COMENTÁRIO DE ALTERAÇÃO DE STATUS
+   ========================================================= */
+let _statusComentarioResolve = null;
+let _statusComentarioReject  = null;
+
+function pedirComentarioStatus(oldStatus, newStatus){
+  return new Promise((resolve, reject) => {
+    _statusComentarioResolve = (comentario) => {
+      closeModal('status-comentario-overlay');
+      resolve(comentario || '');
+    };
+    _statusComentarioReject = () => {
+      closeModal('status-comentario-overlay');
+      reject(new Error('cancelado'));
+    };
+
+    document.getElementById('status-comentario-info').innerHTML =
+      `Status alterado de <strong>${escapeHtml(oldStatus)}</strong> → <strong style="color:var(--accent);">${escapeHtml(newStatus)}</strong>`;
+    document.getElementById('status-comentario-texto').value = '';
+    openModal('status-comentario-overlay');
+    setTimeout(() => document.getElementById('status-comentario-texto').focus(), 100);
+  });
+}
+
 /* =========================================================
    MÓDULO KANBAN — Tarefas
    ========================================================= */
 let _kanbanTab = 'geral'; // 'geral' | 'minhas'
 
-const COLUNAS = ['A Fazer', 'Em andamento', 'Concluído'];
+// Colunas dinâmicas — salvas no Supabase como config
+let _colunas = ['A Fazer', 'Em andamento', 'Concluído'];
+
+async function loadColunas(){
+  try {
+    const r = await sbGetConfig('kanban_colunas');
+    if(r) _colunas = JSON.parse(r);
+    const rc = await sbGetConfig('kanban_colunas_cores');
+    if(rc){
+      window._colunasCores = JSON.parse(rc);
+      Object.assign(COR_COL, window._colunasCores);
+    }
+  } catch(e){ _colunas = ['A Fazer', 'Em andamento', 'Concluído']; }
+}
+
+async function saveColunas(){
+  await sbSetConfig('kanban_colunas', JSON.stringify(_colunas));
+  if(window._colunasCores && Object.keys(window._colunasCores).length){
+    await sbSetConfig('kanban_colunas_cores', JSON.stringify(window._colunasCores));
+  }
+}
+
+function openNovaColuna(){
+  document.getElementById('coluna-nome').value = '';
+  document.getElementById('coluna-cor').value = '#6c757d';
+
+  // Renderizar paleta de cores
+  const coresCol = ['#0094d4','#28a745','#ffc107','#dc3545','#6f42c1','#fd7e14','#20c997','#6c757d'];
+  document.getElementById('coluna-cores-wrap').innerHTML = coresCol.map(c =>
+    `<div onclick="selecionarCorColuna('${c}')" id="col-cor-opt-${c.slice(1)}"
+      style="width:24px;height:24px;border-radius:50%;background:${c};cursor:pointer;
+      border:2px solid transparent;transition:all .15s;" title="${c}"></div>`
+  ).join('');
+  selecionarCorColuna('#6c757d');
+
+  openModal('coluna-modal-overlay');
+  setTimeout(() => document.getElementById('coluna-nome').focus(), 100);
+}
+
+function selecionarCorColuna(cor){
+  document.querySelectorAll('[id^="col-cor-opt-"]').forEach(el => {
+    el.style.border = '2px solid transparent';
+    el.style.transform = 'scale(1)';
+  });
+  const el = document.getElementById('col-cor-opt-' + cor.replace('#',''));
+  if(el){ el.style.border = '2px solid #fff'; el.style.transform = 'scale(1.25)'; }
+  document.getElementById('coluna-cor').value = cor;
+}
+
+function salvarNovaColuna(){
+  const nome = document.getElementById('coluna-nome').value.trim();
+  if(!nome){ showToast('Informe o nome da coluna.', true); return; }
+  if(_colunas.includes(nome)){ showToast('Essa coluna já existe.', true); return; }
+  const cor = document.getElementById('coluna-cor').value;
+
+  _colunas.push(nome);
+  // Salvar cor da coluna junto com as colunas
+  if(!window._colunasCores) window._colunasCores = {};
+  window._colunasCores[nome] = cor;
+  COR_COL[nome] = cor;
+
+  saveColunas().catch(console.error);
+  closeModal('coluna-modal-overlay');
+  renderKanban();
+  showToast('Coluna "' + nome + '" criada.');
+}
+
+function removerColuna(col){
+  const temCards = state.tarefas.some(t => t.coluna === col);
+  if(temCards){
+    showToast('Mova ou exclua as tarefas desta coluna antes de removê-la.', true);
+    return;
+  }
+  if(!confirm('Remover a coluna "' + col + '"?')) return;
+  _colunas = _colunas.filter(c => c !== col);
+  saveColunas().catch(console.error);
+  renderKanban();
+  showToast('Coluna removida.');
+}
+
+const COLUNAS_FIXAS = ['A Fazer', 'Em andamento', 'Concluído'];
 const COR_COL = { 'A Fazer':'#0094d4', 'Em andamento':'#ffc107', 'Concluído':'#28a745' };
+function getCorCol(col){
+  return COR_COL[col] || '#6c757d';
+}
 const COR_PRI = { 'Baixa':'pri-baixa', 'Normal':'pri-normal', 'Alta':'pri-alta', 'Urgente':'pri-urgente' };
 
 async function loadTarefas(){
@@ -4403,20 +5157,20 @@ function switchKanbanTab(tab){
 async function renderKanban(){
   if(!state.tarefas) state.tarefas = [];
   if(!state.tarefas.length) await loadTarefas();
+  if(_colunas.length === 3 && _colunas[0] === 'A Fazer') await loadColunas();
 
   const user = getCurrentUser();
   let lista = [...state.tarefas];
 
   if(_kanbanTab === 'minhas'){
     lista = lista.filter(t => t.atribuidoId === user?.id);
-  } else {
-    lista = lista.filter(t => !t.atribuidoId);
   }
+  // aba 'geral' mostra todas sem filtro
 
   const board = document.getElementById('kanban-board');
   if(!board) return;
 
-  board.innerHTML = COLUNAS.map(col => {
+  board.innerHTML = _colunas.map(col => {
     const cards = lista.filter(t => t.coluna === col);
     const cardsHTML = cards.map(t => {
       const prazoStr = t.prazo ? formatDate(t.prazo) : '';
@@ -4450,7 +5204,8 @@ async function renderKanban(){
         ondragover="event.preventDefault()"
         ondrop="onCardDrop(event,'${col}')">
         <div class="kanban-col-header">
-          <span class="kanban-col-title" style="color:${COR_COL[col]};">${col}</span>
+          <span class="kanban-col-title" style="color:${getCorCol(col)};">${col}</span>
+          ${!COLUNAS_FIXAS.includes(col) ? `<button onclick="event.stopPropagation();removerColuna('${col}')" style="background:none;border:none;color:var(--text-faint);cursor:pointer;font-size:14px;padding:0 4px;" title="Remover coluna">&times;</button>` : ''}
           <span class="kanban-col-count">${cards.length}</span>
         </div>
         ${cardsHTML}
@@ -4472,6 +5227,18 @@ async function openTarefaModal(id, colunaInicial){
       sel.appendChild(opt);
     });
   } catch(e){ console.error(e); }
+
+  // Atualizar opções de coluna com colunas dinâmicas
+  const selCol = document.getElementById('tarefa-coluna');
+  selCol.innerHTML = _colunas.map(c => `<option value="${escapeHtml(c)}">${escapeHtml(c)}</option>`).join('');
+
+  // Renderizar paleta de cores
+  const cores = ['#0094d4','#28a745','#ffc107','#dc3545','#6f42c1','#fd7e14','#20c997','#6c757d'];
+  document.getElementById('tarefa-cores-wrap').innerHTML = cores.map(c =>
+    `<div onclick="selecionarCorCard('${c}')" id="cor-opt-${c.slice(1)}"
+      style="width:24px;height:24px;border-radius:50%;background:${c};cursor:pointer;
+      border:2px solid transparent;transition:all .15s;" title="${c}"></div>`
+  ).join('');
 
   // Reset
   document.getElementById('tarefa-id').value = '';
