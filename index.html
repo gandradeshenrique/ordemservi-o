@@ -559,6 +559,16 @@
   .dash-filtros-btns{
     display:flex; gap:8px; align-items:flex-end; flex-wrap:wrap;
   }
+  /* Período B — oculto por padrão, visível quando classe ativa */
+  #dash-periodo-b-wrap{ display:none; }
+  #dash-periodo-b-wrap.dash-periodo-b-visible{
+    display:flex !important;
+    align-items:center;
+    gap:16px;
+    flex-wrap:wrap;
+    width:100%;
+    box-sizing:border-box;
+  }
 
   /* ── Hamburguer botão (mobile) ── */
   .sidebar-toggle{
@@ -664,26 +674,21 @@
     #dash-row1{ grid-template-columns:1fr !important; }
 
     /* Filtros — empilhar em coluna, largura total */
-    .dash-filtros-inner{
+    #dash-filtros{ padding:14px !important; overflow:hidden !important; box-sizing:border-box !important; }
+    .dash-filtros-inner{ flex-direction:column !important; gap:14px !important; align-items:stretch !important; width:100% !important; box-sizing:border-box !important; }
+    .dash-periodo-bloco{ width:100% !important; min-width:0 !important; box-sizing:border-box !important; }
+    .dash-datas-row{ flex-direction:column !important; align-items:stretch !important; gap:6px !important; width:100% !important; box-sizing:border-box !important; }
+    .dash-date-input{ width:100% !important; min-width:0 !important; max-width:100% !important; box-sizing:border-box !important; display:block !important; }
+    .dash-ate-label{ display:none !important; }
+    .dash-filtros-btns{ flex-direction:row !important; flex-wrap:wrap; width:100% !important; box-sizing:border-box !important; }
+    .dash-filtros-btns .btn{ flex:1; justify-content:center; min-width:0; }
+    #dash-periodo-b-wrap.dash-periodo-b-visible{
       flex-direction:column !important;
-      gap:14px !important;
-      align-items:stretch !important;
-    }
-    .dash-periodo-bloco{ width:100%; }
-    .dash-datas-row{
-      flex-direction:column !important;
+      width:100% !important;
       align-items:stretch !important;
       gap:6px !important;
+      box-sizing:border-box !important;
     }
-    .dash-date-input{ width:100% !important; min-width:0 !important; }
-    .dash-ate-label{ display:none !important; }
-    .dash-filtros-btns{
-      flex-direction:row !important;
-      flex-wrap:wrap;
-      width:100%;
-    }
-    .dash-filtros-btns .btn{ flex:1; justify-content:center; }
-    #dash-periodo-b-wrap{ flex-direction:column !important; width:100%; }
     .dash-separador{ display:none !important; }
 
     /* Força 1 coluna nos rows de gráficos/tabelas do dashboard */
@@ -1071,7 +1076,7 @@
             </div>
           </div>
           <!-- Período B (comparativo) -->
-          <div id="dash-periodo-b-wrap" style="display:none; align-items:center; gap:16px; flex-wrap:wrap; width:100%;">
+          <div id="dash-periodo-b-wrap">
             <div style="width:1px;background:var(--border);align-self:stretch;min-height:40px;" class="dash-separador"></div>
             <div class="dash-periodo-bloco">
               <div style="font-size:11px;font-weight:700;color:#f59e0b;text-transform:uppercase;letter-spacing:.05em;margin-bottom:6px;">Período (Comparativo)</div>
@@ -2827,14 +2832,14 @@ function getDiasRange(de, ate){
 function togglePeriodoB(){
   const wrap = document.getElementById('dash-periodo-b-wrap');
   const btn  = document.getElementById('btn-toggle-periodo-b');
-  const ativo = wrap.style.display !== 'none' && wrap.style.display !== '';
+  const ativo = wrap.classList.contains('dash-periodo-b-visible');
   if(ativo){
-    wrap.style.display = 'none';
+    wrap.classList.remove('dash-periodo-b-visible');
     btn.textContent = '+ Comparativo';
     btn.style.color = 'var(--text-dim)';
     btn.style.borderColor = 'var(--border)';
   } else {
-    wrap.style.display = 'flex';
+    wrap.classList.add('dash-periodo-b-visible');
     btn.textContent = '✕ Comparativo';
     btn.style.color = 'var(--accent)';
     btn.style.borderColor = 'var(--accent)';
@@ -2844,7 +2849,7 @@ function togglePeriodoB(){
 
 function isPeriodoBAtivo(){
   const wrap = document.getElementById('dash-periodo-b-wrap');
-  return wrap && wrap.style.display !== 'none' && wrap.style.display !== '';
+  return wrap && wrap.classList.contains('dash-periodo-b-visible');
 }
 
 function dashSetMesAtual(){
