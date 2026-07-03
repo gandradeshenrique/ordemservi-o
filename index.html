@@ -546,6 +546,20 @@
     margin: 0 0 12px;
   }
 
+  /* ── Filtros do Dashboard ── */
+  .dash-filtros-inner{
+    display:flex; gap:24px; flex-wrap:wrap; align-items:flex-end;
+  }
+  .dash-periodo-bloco{ flex:1; min-width:0; }
+  .dash-datas-row{
+    display:flex; gap:8px; align-items:center;
+  }
+  .dash-date-input{ width:140px; }
+  .dash-ate-label{ color:var(--text-dim); font-size:12px; white-space:nowrap; }
+  .dash-filtros-btns{
+    display:flex; gap:8px; align-items:flex-end; flex-wrap:wrap;
+  }
+
   /* ── Hamburguer botão (mobile) ── */
   .sidebar-toggle{
     display:none;
@@ -647,19 +661,30 @@
     /* Dashboard */
     #dash-kpis{ grid-template-columns:repeat(2,1fr) !important; gap:10px; }
     #dash-filtros{ padding:14px; }
-    #dash-filtros > div:first-child{ flex-direction:column !important; gap:10px !important; }
-    #dash-filtros input[type=date]{ width:100% !important; min-width:0 !important; }
-    #dash-filtros > div:first-child > div > div[style*="display:flex"]{ flex-wrap:wrap; gap:6px !important; }
-    #dash-periodo-b-wrap{ flex-direction:column !important; }
     #dash-row1{ grid-template-columns:1fr !important; }
 
-    /* Força 1 coluna em qualquer grid de 2 colunas no dashboard */
-    #page-dashboard [style*="grid-template-columns:1fr 1fr"],
-    #page-dashboard [style*="grid-template-columns: 1fr 1fr"],
-    #page-dashboard [style*="grid-template-columns:1fr 1fr;"],
-    #page-dashboard [style*="grid-template-columns:1fr 1fr;gap"]{
-      grid-template-columns:1fr !important;
+    /* Filtros — empilhar em coluna, largura total */
+    .dash-filtros-inner{
+      flex-direction:column !important;
+      gap:14px !important;
+      align-items:stretch !important;
     }
+    .dash-periodo-bloco{ width:100%; }
+    .dash-datas-row{
+      flex-direction:column !important;
+      align-items:stretch !important;
+      gap:6px !important;
+    }
+    .dash-date-input{ width:100% !important; min-width:0 !important; }
+    .dash-ate-label{ display:none !important; }
+    .dash-filtros-btns{
+      flex-direction:row !important;
+      flex-wrap:wrap;
+      width:100%;
+    }
+    .dash-filtros-btns .btn{ flex:1; justify-content:center; }
+    #dash-periodo-b-wrap{ flex-direction:column !important; width:100%; }
+    .dash-separador{ display:none !important; }
 
     /* Força 1 coluna nos rows de gráficos/tabelas do dashboard */
     #dash-row2, #dash-row3, #dash-row4{
@@ -676,23 +701,6 @@
       padding:6px 8px !important;
       font-size:12px !important;
       word-break:break-word;
-    }
-
-    /* Filtro de período — inputs empilhados */
-    #dash-filtros div[style*="display:flex"][style*="gap:8px"]{
-      flex-direction:column;
-      align-items:stretch;
-    }
-    #dash-filtros div[style*="display:flex"][style*="gap:8px"] input[type=date]{
-      width:100% !important;
-    }
-    #dash-filtros div[style*="display:flex"][style*="gap:8px"] span{
-      display:none;
-    }
-    /* Botões do filtro em linha */
-    #dash-filtros div[style*="display:flex"][style*="gap:8px;align-items:flex-end"]{
-      flex-direction:row !important;
-      flex-wrap:wrap;
     }
 
     /* Kanban */
@@ -1052,30 +1060,33 @@
 
       <!-- Seletor de períodos -->
       <div class="card" style="margin-bottom:18px;" id="dash-filtros">
-        <div style="display:flex; gap:24px; flex-wrap:wrap; align-items:flex-end;">
-          <div>
+        <div class="dash-filtros-inner">
+          <!-- Período A -->
+          <div class="dash-periodo-bloco">
             <div style="font-size:11px;font-weight:700;color:var(--accent);text-transform:uppercase;letter-spacing:.05em;margin-bottom:6px;">Período</div>
-            <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
-              <input type="date" id="dash-a-de" style="width:140px;min-width:0;flex:1;">
-              <span style="color:var(--text-dim);font-size:12px;">até</span>
-              <input type="date" id="dash-a-ate" style="width:140px;min-width:0;flex:1;">
+            <div class="dash-datas-row">
+              <input type="date" id="dash-a-de" class="dash-date-input">
+              <span class="dash-ate-label">até</span>
+              <input type="date" id="dash-a-ate" class="dash-date-input">
             </div>
           </div>
-          <div id="dash-periodo-b-wrap" style="display:none; align-items:center; gap:16px; flex-wrap:wrap;">
-            <div style="width:1px;background:var(--border);align-self:stretch;min-height:40px;"></div>
-            <div>
+          <!-- Período B (comparativo) -->
+          <div id="dash-periodo-b-wrap" style="display:none; align-items:center; gap:16px; flex-wrap:wrap; width:100%;">
+            <div style="width:1px;background:var(--border);align-self:stretch;min-height:40px;" class="dash-separador"></div>
+            <div class="dash-periodo-bloco">
               <div style="font-size:11px;font-weight:700;color:#f59e0b;text-transform:uppercase;letter-spacing:.05em;margin-bottom:6px;">Período (Comparativo)</div>
-              <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
-                <input type="date" id="dash-b-de" style="width:140px;min-width:0;flex:1;">
-                <span style="color:var(--text-dim);font-size:12px;">até</span>
-                <input type="date" id="dash-b-ate" style="width:140px;min-width:0;flex:1;">
+              <div class="dash-datas-row">
+                <input type="date" id="dash-b-de" class="dash-date-input">
+                <span class="dash-ate-label">até</span>
+                <input type="date" id="dash-b-ate" class="dash-date-input">
               </div>
             </div>
           </div>
-          <div style="display:flex;gap:8px;align-items:flex-end;flex-wrap:wrap;">
-            <button class="btn btn-primary" onclick="document.getElementById('dash-a-de').dataset.userSet='1';renderDashboard()" style="margin-bottom:1px;">Atualizar</button>
-            <button class="btn" onclick="dashSetMesAtual()" style="margin-bottom:1px;">Mês atual</button>
-            <button id="btn-toggle-periodo-b" class="btn" onclick="togglePeriodoB()" style="margin-bottom:1px;border-color:var(--border);color:var(--text-dim);">
+          <!-- Botões -->
+          <div class="dash-filtros-btns">
+            <button class="btn btn-primary" onclick="document.getElementById('dash-a-de').dataset.userSet='1';renderDashboard()">Atualizar</button>
+            <button class="btn" onclick="dashSetMesAtual()">Mês atual</button>
+            <button id="btn-toggle-periodo-b" class="btn" onclick="togglePeriodoB()" style="border-color:var(--border);color:var(--text-dim);">
               + Comparativo
             </button>
           </div>
