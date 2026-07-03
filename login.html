@@ -507,7 +507,8 @@
           <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/>
           <circle cx="12" cy="7" r="4"/>
         </svg>
-        <input type="text" id="inp-user" placeholder="Usuário" autocomplete="username" autofocus>
+        <input type="text" id="inp-user" placeholder="Usuário" autocomplete="username" autofocus
+               autocapitalize="none" autocorrect="off" spellcheck="false">
       </div>
 
       <div class="input-group">
@@ -628,7 +629,7 @@ const SB_URL = 'https://zrghmwdzxslpuyglsvnq.supabase.co';
 const SB_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InpyZ2htd2R6eHNscHV5Z2xzdm5xIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODIwOTE0NzksImV4cCI6MjA5NzY2NzQ3OX0.l2KE4vTA7CsXBGdRIfuBFqiHBACSueXUO8neEKXsOX4';
 
 async function doLogin(){
-  const usuario = document.getElementById('inp-user').value.trim();
+  const usuario = document.getElementById('inp-user').value.trim().toLowerCase();
   const senha   = document.getElementById('inp-pass').value;
   const err     = document.getElementById('login-error');
   const btn     = document.querySelector('.btn-login');

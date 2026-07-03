@@ -634,6 +634,8 @@
     /* Tabelas com scroll */
     .table-wrap{ overflow-x:auto; -webkit-overflow-scrolling:touch; border-radius:var(--radius); }
     table{ min-width:520px; }
+    /* Exceção: tabelas dentro de cards do dashboard não precisam de min-width */
+    .card table{ min-width:0 !important; }
     tbody td{ padding:10px 12px; font-size:13px; }
     thead th{ padding:9px 12px; }
 
@@ -645,16 +647,52 @@
     /* Dashboard */
     #dash-kpis{ grid-template-columns:repeat(2,1fr) !important; gap:10px; }
     #dash-filtros{ padding:14px; }
-    #dash-filtros input[type=date]{ width:100% !important; }
+    #dash-filtros > div:first-child{ flex-direction:column !important; gap:10px !important; }
+    #dash-filtros input[type=date]{ width:100% !important; min-width:0 !important; }
+    #dash-filtros > div:first-child > div > div[style*="display:flex"]{ flex-wrap:wrap; gap:6px !important; }
     #dash-periodo-b-wrap{ flex-direction:column !important; }
     #dash-row1{ grid-template-columns:1fr !important; }
 
     /* Força 1 coluna em qualquer grid de 2 colunas no dashboard */
-    #page-dashboard [style*="grid-template-columns:1fr 1fr"]{
+    #page-dashboard [style*="grid-template-columns:1fr 1fr"],
+    #page-dashboard [style*="grid-template-columns: 1fr 1fr"],
+    #page-dashboard [style*="grid-template-columns:1fr 1fr;"],
+    #page-dashboard [style*="grid-template-columns:1fr 1fr;gap"]{
       grid-template-columns:1fr !important;
     }
-    #page-dashboard [style*="grid-template-columns: 1fr 1fr"]{
+
+    /* Força 1 coluna nos rows de gráficos/tabelas do dashboard */
+    #dash-row2, #dash-row3, #dash-row4{
       grid-template-columns:1fr !important;
+    }
+
+    /* Tabelas TOP 5 e ESTOQUE CRÍTICO — sem min-width fixo */
+    #dash-row4 table{
+      min-width:0 !important;
+      width:100% !important;
+    }
+    #dash-row4 table th,
+    #dash-row4 table td{
+      padding:6px 8px !important;
+      font-size:12px !important;
+      word-break:break-word;
+    }
+
+    /* Filtro de período — inputs empilhados */
+    #dash-filtros div[style*="display:flex"][style*="gap:8px"]{
+      flex-direction:column;
+      align-items:stretch;
+    }
+    #dash-filtros div[style*="display:flex"][style*="gap:8px"] input[type=date]{
+      width:100% !important;
+    }
+    #dash-filtros div[style*="display:flex"][style*="gap:8px"] span{
+      display:none;
+    }
+    /* Botões do filtro em linha */
+    #dash-filtros div[style*="display:flex"][style*="gap:8px;align-items:flex-end"]{
+      flex-direction:row !important;
+      flex-wrap:wrap;
     }
 
     /* Kanban */
@@ -1017,20 +1055,20 @@
         <div style="display:flex; gap:24px; flex-wrap:wrap; align-items:flex-end;">
           <div>
             <div style="font-size:11px;font-weight:700;color:var(--accent);text-transform:uppercase;letter-spacing:.05em;margin-bottom:6px;">Período</div>
-            <div style="display:flex;gap:8px;align-items:center;">
-              <input type="date" id="dash-a-de" style="width:140px;">
+            <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
+              <input type="date" id="dash-a-de" style="width:140px;min-width:0;flex:1;">
               <span style="color:var(--text-dim);font-size:12px;">até</span>
-              <input type="date" id="dash-a-ate" style="width:140px;">
+              <input type="date" id="dash-a-ate" style="width:140px;min-width:0;flex:1;">
             </div>
           </div>
           <div id="dash-periodo-b-wrap" style="display:none; align-items:center; gap:16px; flex-wrap:wrap;">
             <div style="width:1px;background:var(--border);align-self:stretch;min-height:40px;"></div>
             <div>
               <div style="font-size:11px;font-weight:700;color:#f59e0b;text-transform:uppercase;letter-spacing:.05em;margin-bottom:6px;">Período (Comparativo)</div>
-              <div style="display:flex;gap:8px;align-items:center;">
-                <input type="date" id="dash-b-de" style="width:140px;">
+              <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
+                <input type="date" id="dash-b-de" style="width:140px;min-width:0;flex:1;">
                 <span style="color:var(--text-dim);font-size:12px;">até</span>
-                <input type="date" id="dash-b-ate" style="width:140px;">
+                <input type="date" id="dash-b-ate" style="width:140px;min-width:0;flex:1;">
               </div>
             </div>
           </div>
@@ -1060,7 +1098,7 @@
       </div>
 
       <!-- Gráficos linha 2 -->
-      <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:16px;min-width:0;">
+      <div id="dash-row2" style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:16px;min-width:0;">
         <div class="card">
           <div class="section-title" style="margin-bottom:14px;">Clientes PF vs PJ</div>
           <div style="position:relative;height:200px;"><canvas id="chart-pf-pj"></canvas></div>
@@ -1072,7 +1110,7 @@
       </div>
 
       <!-- Gráficos linha 3 -->
-      <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:16px;min-width:0;">
+      <div id="dash-row3" style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:16px;min-width:0;">
         <div class="card">
           <div class="section-title" style="margin-bottom:14px;">💰 Lucro estimado</div>
           <div style="position:relative;height:200px;"><canvas id="chart-lucro"></canvas></div>
@@ -1084,7 +1122,7 @@
       </div>
 
       <!-- Tabelas -->
-      <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:16px;">
+      <div id="dash-row4" style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:16px;min-width:0;">
         <div class="card">
           <div class="section-title" style="margin-bottom:10px;">🏆 Top 5 clientes</div>
           <table style="width:100%;border-collapse:collapse;font-size:13px;">
