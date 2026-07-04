@@ -722,6 +722,7 @@
     .btn-sm{ min-height:36px; }
     input, select, textarea{ min-height:44px; }
     .nav-item{ min-height:46px; }
+    #cotacao-layout{ grid-template-columns: 1fr !important; }
     .ac-item{ padding:12px 14px; }
     .kanban-add-btn{ min-height:40px; }
 
@@ -952,6 +953,9 @@
     </button>
     <button class="nav-item" data-page="kanban" onclick="goToPage('kanban')">
       <span class="nav-icon">&#128203;</span> Tarefas
+    </button>
+    <button class="nav-item" data-page="cotacao" onclick="goToPage('cotacao')">
+      <span class="nav-icon">🔍</span> Cotação
     </button>
 
     <div class="nav-divider"></div>
@@ -1300,6 +1304,62 @@
           </tr></thead>
           <tbody id="compras-table-body"></tbody>
         </table>
+      </div>
+    </div>
+
+    <!-- ===================== COTAÇÃO ===================== -->
+    <div class="page" id="page-cotacao">
+      <div class="page-header">
+        <div>
+          <h1>Cotação de peças</h1>
+          <p>Consulta automática de preços na CNN Internacional e Skytech</p>
+        </div>
+        <button class="btn btn-primary" onclick="iniciarNovaCotacao()">+ Nova cotação</button>
+      </div>
+
+      <!-- Lista de itens para cotar -->
+      <div style="display:grid; grid-template-columns:1fr 1fr; gap:16px; margin-bottom:16px;" id="cotacao-layout">
+
+        <!-- Coluna esquerda: montar lista -->
+        <div class="card" style="padding:16px;">
+          <div style="font-size:13px; font-weight:700; margin-bottom:12px; color:var(--text);">📋 Lista de peças para cotar</div>
+
+          <div style="display:flex; gap:8px; margin-bottom:10px;">
+            <input type="text" id="cotacao-input-peca" placeholder="Ex: Tela iPhone 13, Bateria Moto G84..."
+              style="flex:1; padding:8px 10px; background:var(--panel-2); border:1px solid var(--border); border-radius:7px; color:var(--text); font-size:13px;"
+              onkeydown="if(event.key==='Enter') adicionarItemCotacao()">
+            <button class="btn btn-primary" onclick="adicionarItemCotacao()" style="padding:8px 14px; white-space:nowrap;">+ Adicionar</button>
+          </div>
+
+          <div id="cotacao-lista" style="display:flex; flex-direction:column; gap:6px; min-height:60px;">
+            <div id="cotacao-lista-vazia" style="color:var(--text-faint); font-size:13px; padding:12px 0; text-align:center;">Nenhuma peça adicionada ainda.</div>
+          </div>
+
+          <div style="margin-top:14px; display:flex; gap:8px;">
+            <button class="btn btn-primary" id="btn-consultar-cotacao" onclick="executarCotacao()" style="flex:1;" disabled>
+              🔍 Consultar preços
+            </button>
+            <button class="btn" onclick="limparCotacao()" style="padding:8px 12px;" title="Limpar lista">🗑</button>
+          </div>
+        </div>
+
+        <!-- Coluna direita: resultado -->
+        <div class="card" style="padding:16px;" id="cotacao-resultado-card">
+          <div style="font-size:13px; font-weight:700; margin-bottom:12px; color:var(--text);">📊 Resultado da cotação</div>
+          <div id="cotacao-status-msg" style="color:var(--text-faint); font-size:13px; text-align:center; padding:20px 0;">
+            Monte a lista de peças e clique em "Consultar preços".
+          </div>
+          <div id="cotacao-resultado-body" style="display:none;"></div>
+        </div>
+
+      </div>
+
+      <!-- Histórico de cotações -->
+      <div class="card" style="padding:16px;">
+        <div style="font-size:13px; font-weight:700; margin-bottom:12px; color:var(--text);">🕐 Cotações recentes</div>
+        <div id="cotacao-historico-body">
+          <div style="color:var(--text-faint); font-size:13px; text-align:center; padding:12px 0;">Nenhuma cotação realizada nesta sessão.</div>
+        </div>
       </div>
     </div>
 
@@ -2341,93 +2401,59 @@ document.addEventListener('click', e => {
 });
 
 /* =========================================================
-   SUPABASE — Camada de dados via Edge Function (sem keys expostas)
+   SUPABASE — Configuração e camada de dados
    ========================================================= */
-const SB_URL  = '__SUPABASE_URL__';
-const API_FN  = `${SB_URL}/functions/v1/api`;
-const AUTH_FN = `${SB_URL}/functions/v1/auth`;
+const SB_URL = 'https://zrghmwdzxslpuyglsvnq.supabase.co';
+const SB_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InpyZ2htd2R6eHNscHV5Z2xzdm5xIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODIwOTE0NzksImV4cCI6MjA5NzY2NzQ3OX0.l2KE4vTA7CsXBGdRIfuBFqiHBACSueXUO8neEKXsOX4';
 
-function getToken(){
-  return sessionStorage.getItem('mobit_token') || '';
-}
-
-function apiHeaders(){
+function sbHeaders(extra){
   return {
+    'apikey': SB_KEY,
+    'Authorization': 'Bearer ' + SB_KEY,
     'Content-Type': 'application/json',
-    'x-session-token': getToken()
+    'Prefer': 'return=representation',
+    ...extra
   };
 }
 
-async function apiCall(payload){
-  const r = await fetch(API_FN, {
-    method: 'POST',
-    headers: apiHeaders(),
-    body: JSON.stringify(payload)
-  });
-  if(r.status === 401){
-    // Sessão expirada — redireciona para login
-    sessionStorage.removeItem('mobit_token');
-    sessionStorage.removeItem('mobit_user');
-    showToast('Sessão expirada. Redirecionando...', true);
-    setTimeout(()=>{ window.location.href='login.html'; }, 1500);
-    throw new Error('Sessão expirada');
-  }
-  if(!r.ok){
-    const err = await r.json().catch(()=>({ error: `HTTP ${r.status}` }));
-    throw new Error(err.error || `Erro ${r.status}`);
-  }
+async function sbGet(table, params=''){
+  const r = await fetch(`${SB_URL}/rest/v1/${table}?${params}`, { headers: sbHeaders() });
+  if(!r.ok) throw new Error(`GET ${table} ${r.status}`);
   return r.json();
 }
 
-async function sbGet(table, params=''){
-  // Converte query string em objeto de filtros para a Edge Function
-  const parsed = {};
-  const filtros = {};
-  let order = null;
-  let select = '*';
-
-  if(params){
-    params.split('&').forEach(part => {
-      const [k, v] = part.split('=');
-      if(!k) return;
-      if(k === 'order'){
-        // ex: "nome.asc" ou "numero.desc"
-        order = decodeURIComponent(v || '');
-      } else if(k === 'select'){
-        select = decodeURIComponent(v || '*');
-      } else {
-        // ex: "ativo=eq.true" ou "chave=eq.next_os_number"
-        filtros[decodeURIComponent(k)] = decodeURIComponent(v || '');
-      }
-    });
-  }
-
-  return apiCall({
-    metodo: 'GET',
-    tabela: table,
-    params: { select, order, filtros: Object.keys(filtros).length ? filtros : undefined }
-  });
-}
-
 async function sbPost(table, body){
-  return apiCall({ metodo: 'POST', tabela: table, corpo: body });
+  const r = await fetch(`${SB_URL}/rest/v1/${table}`, {
+    method:'POST', headers: sbHeaders(), body: JSON.stringify(body)
+  });
+  if(!r.ok) throw new Error(`POST ${table} ${r.status}: ${await r.text()}`);
+  return r.json();
 }
 
 async function sbPatch(table, id_col, id_val, body){
-  return apiCall({ metodo: 'PATCH', tabela: table, id_col, id_val, corpo: body });
+  const r = await fetch(`${SB_URL}/rest/v1/${table}?${id_col}=eq.${encodeURIComponent(id_val)}`, {
+    method:'PATCH', headers: sbHeaders(), body: JSON.stringify(body)
+  });
+  if(!r.ok) throw new Error(`PATCH ${table} ${r.status}: ${await r.text()}`);
+  return r.json();
 }
 
 async function sbDelete(table, id_col, id_val){
-  return apiCall({ metodo: 'DELETE', tabela: table, id_col, id_val });
+  const r = await fetch(`${SB_URL}/rest/v1/${table}?${id_col}=eq.${encodeURIComponent(id_val)}`, {
+    method:'DELETE', headers: sbHeaders({'Prefer':''})
+  });
+  if(!r.ok) throw new Error(`DELETE ${table} ${r.status}`);
 }
 
 async function sbGetConfig(chave){
   const rows = await sbGet('configuracoes', `chave=eq.${chave}&select=valor`);
-  return Array.isArray(rows) && rows.length ? rows[0].valor : null;
+  return rows.length ? rows[0].valor : null;
 }
 
 async function sbSetConfig(chave, valor){
-  await sbPatch('configuracoes', 'chave', chave, { valor: String(valor) });
+  await fetch(`${SB_URL}/rest/v1/configuracoes?chave=eq.${chave}`, {
+    method:'PATCH', headers: sbHeaders(), body: JSON.stringify({valor: String(valor)})
+  });
 }
 
 /* =========================================================
@@ -2540,6 +2566,7 @@ function goToPage(page){
   if(page === 'clientes') renderClientsTable();
   if(page === 'compras') renderComprasTable();
   if(page === 'kanban') renderKanban();
+  if(page === 'cotacao') initCotacaoPage();
 }
 
 /* =========================================================
@@ -4107,7 +4134,7 @@ Retorne SOMENTE JSON válido, sem texto adicional:
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'x-session-token': getToken()
+        'Authorization': 'Bearer ' + SB_KEY
       },
       body: JSON.stringify({ base64: _pedidoBase64, mimeType: _pedidoMime })
     });
@@ -5958,8 +5985,9 @@ async function saveCompra(){
   try {
     if(editId){
       await sbPatch('compras', 'id', editId, payload);
-      // Deletar itens antigos e reinserir via Edge Function
-      await sbDelete('compras_itens', 'compra_id', editId);
+      // Deletar itens antigos e reinserir
+      await fetch(`${SB_URL}/rest/v1/compras_itens?compra_id=eq.${editId}`,
+        { method:'DELETE', headers: sbHeaders({'Prefer':''}) });
       for(const it of itens){
         await sbPost('compras_itens', { ...it, compra_id: editId });
       }
@@ -6192,12 +6220,6 @@ function getCurrentUser(){
 
 function logout(){
   clearTimeout(_logoutTimer);
-  // Invalida token no servidor (sem await — não bloqueia o redirecionamento)
-  fetch(`${AUTH_FN}?action=logout`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json', 'x-session-token': getToken() }
-  }).catch(()=>{});
-  sessionStorage.removeItem('mobit_token');
   sessionStorage.removeItem('mobit_user');
   window.location.href = 'login.html';
 }
@@ -6247,6 +6269,251 @@ function initAutoLogout(){
   renderStockTable();
   renderClientsTable();
 })();
+
+/* =========================================================
+   MÓDULO DE COTAÇÃO
+   ========================================================= */
+
+let _cotacaoItens = [];
+let _cotacaoHistorico = [];
+
+function initCotacaoPage(){
+  renderCotacaoLista();
+  renderCotacaoHistorico();
+}
+
+function iniciarNovaCotacao(){
+  limparCotacao();
+  document.getElementById('cotacao-input-peca').focus();
+}
+
+function adicionarItemCotacao(){
+  const input = document.getElementById('cotacao-input-peca');
+  const val = input.value.trim();
+  if(!val) return;
+  _cotacaoItens.push(val);
+  input.value = '';
+  input.focus();
+  renderCotacaoLista();
+}
+
+function removerItemCotacao(idx){
+  _cotacaoItens.splice(idx, 1);
+  renderCotacaoLista();
+}
+
+function renderCotacaoLista(){
+  const lista = document.getElementById('cotacao-lista');
+  const vazia = document.getElementById('cotacao-lista-vazia');
+  const btnConsultar = document.getElementById('btn-consultar-cotacao');
+
+  if(!_cotacaoItens.length){
+    lista.innerHTML = '';
+    lista.appendChild(vazia || document.createElement('div'));
+    if(vazia) vazia.style.display = 'block';
+    btnConsultar.disabled = true;
+    return;
+  }
+
+  if(vazia) vazia.style.display = 'none';
+  btnConsultar.disabled = false;
+
+  lista.innerHTML = _cotacaoItens.map((item, i) => `
+    <div style="display:flex; align-items:center; gap:8px; padding:8px 10px; background:var(--panel-2); border-radius:7px; border:1px solid var(--border);">
+      <span style="flex:1; font-size:13px; color:var(--text);">${escapeHtml(item)}</span>
+      <button onclick="removerItemCotacao(${i})" style="background:none; border:none; color:var(--text-faint); cursor:pointer; font-size:16px; line-height:1; padding:0 2px;" title="Remover">&times;</button>
+    </div>
+  `).join('');
+}
+
+function limparCotacao(){
+  _cotacaoItens = [];
+  renderCotacaoLista();
+  document.getElementById('cotacao-status-msg').style.display = 'block';
+  document.getElementById('cotacao-status-msg').textContent = 'Monte a lista de peças e clique em "Consultar preços".';
+  document.getElementById('cotacao-status-msg').style.color = 'var(--text-faint)';
+  document.getElementById('cotacao-resultado-body').style.display = 'none';
+}
+
+async function executarCotacao(){
+  if(!_cotacaoItens.length) return;
+
+  const btn = document.getElementById('btn-consultar-cotacao');
+  const statusMsg = document.getElementById('cotacao-status-msg');
+  const resultadoBody = document.getElementById('cotacao-resultado-body');
+
+  btn.disabled = true;
+  btn.textContent = '⏳ Consultando...';
+  statusMsg.style.display = 'block';
+  statusMsg.style.color = 'var(--text-dim)';
+  statusMsg.textContent = 'Consultando preços nos fornecedores... isso pode levar alguns segundos.';
+  resultadoBody.style.display = 'none';
+
+  const listaPecas = _cotacaoItens.map((p, i) => `${i+1}. ${p}`).join('\n');
+
+  const prompt = `Você é um assistente especializado em cotação de peças para celular no Brasil. 
+Preciso que você consulte os preços das seguintes peças em DOIS fornecedores:
+
+FORNECEDOR 1 — CNN Internacional: https://www.internacionalcnn.com
+FORNECEDOR 2 — Skytech Solutions: https://www.skytechsolutions.com.br
+
+PEÇAS PARA COTAR:
+${listaPecas}
+
+INSTRUÇÕES:
+- Para cada peça, busque o preço em cada fornecedor usando web search
+- Na Skytech, use a busca do site: https://www.skytechsolutions.com.br/produtos/?q=TERMO
+- Na CNN, acesse o catálogo pela categoria correspondente
+- Se encontrar variações (OLED/FHD, Original/Genérica), liste as opções com preços
+- Se não encontrar em algum fornecedor, indique "Não encontrado"
+- Preços devem ser em R$ com 2 casas decimais
+
+Retorne SOMENTE um JSON válido, sem texto adicional, no formato:
+{
+  "itens": [
+    {
+      "peca": "nome da peça buscada",
+      "cnn": [{"descricao": "...", "preco": 0.00}],
+      "skytech": [{"descricao": "...", "preco": 0.00}]
+    }
+  ]
+}
+
+Se não encontrar em um fornecedor, retorne array vazio [] para aquele fornecedor.`;
+
+  try {
+    const response = await fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        model: 'claude-sonnet-4-6',
+        max_tokens: 4000,
+        tools: [{ type: 'web_search_20250305', name: 'web_search' }],
+        messages: [{ role: 'user', content: prompt }]
+      })
+    });
+
+    if(!response.ok){
+      const errText = await response.text();
+      throw new Error('Erro na API: ' + errText);
+    }
+
+    const data = await response.json();
+
+    // Extrair texto da resposta (pode vir junto com tool_use blocks)
+    const textoResposta = data.content
+      .filter(b => b.type === 'text')
+      .map(b => b.text)
+      .join('');
+
+    // Extrair JSON da resposta
+    const jsonMatch = textoResposta.match(/\{[\s\S]*\}/);
+    if(!jsonMatch) throw new Error('Resposta da IA não contém JSON válido.');
+
+    const resultado = JSON.parse(jsonMatch[0]);
+    if(!resultado.itens || !resultado.itens.length) throw new Error('Nenhum resultado encontrado.');
+
+    // Salvar no histórico
+    const entrada = {
+      data: new Date().toLocaleString('pt-BR'),
+      itens: [..._cotacaoItens],
+      resultado: resultado.itens
+    };
+    _cotacaoHistorico.unshift(entrada);
+
+    // Exibir resultado
+    renderCotacaoResultado(resultado.itens);
+    renderCotacaoHistorico();
+
+    statusMsg.style.display = 'none';
+    resultadoBody.style.display = 'block';
+
+  } catch(e) {
+    statusMsg.textContent = 'Erro ao consultar: ' + e.message;
+    statusMsg.style.color = 'var(--red)';
+    console.error('Erro cotação:', e);
+  } finally {
+    btn.disabled = false;
+    btn.textContent = '🔍 Consultar preços';
+  }
+}
+
+function renderCotacaoResultado(itens){
+  const body = document.getElementById('cotacao-resultado-body');
+
+  body.innerHTML = itens.map(item => {
+    const temCNN = item.cnn && item.cnn.length > 0;
+    const temSkytech = item.skytech && item.skytech.length > 0;
+
+    const menorCNN = temCNN ? Math.min(...item.cnn.map(x => x.preco)) : Infinity;
+    const menorSkytech = temSkytech ? Math.min(...item.skytech.map(x => x.preco)) : Infinity;
+    const maisBarato = menorCNN < menorSkytech ? 'cnn' : menorSkytech < menorCNN ? 'skytech' : null;
+
+    const renderOpcoes = (opcoes, fornecedor) => {
+      if(!opcoes || !opcoes.length) return `<div style="color:var(--text-faint); font-size:12px; padding:6px 0;">Não encontrado</div>`;
+      return opcoes.map(op => {
+        const isMenor = maisBarato === fornecedor && op.preco === (fornecedor === 'cnn' ? menorCNN : menorSkytech);
+        return `<div style="display:flex; justify-content:space-between; align-items:center; padding:5px 0; border-bottom:1px solid var(--border);">
+          <span style="font-size:12px; color:var(--text-dim); flex:1;">${escapeHtml(op.descricao)}</span>
+          <span style="font-family:monospace; font-size:13px; font-weight:700; color:${isMenor ? 'var(--green)' : 'var(--text)'}; margin-left:10px; white-space:nowrap;">
+            ${isMenor ? '⭐ ' : ''}${formatCurrency(op.preco)}
+          </span>
+        </div>`;
+      }).join('');
+    };
+
+    return `
+      <div style="margin-bottom:14px; padding:12px; background:var(--panel-2); border-radius:8px; border:1px solid var(--border);">
+        <div style="font-weight:700; font-size:13px; margin-bottom:10px; color:var(--accent);">📦 ${escapeHtml(item.peca)}</div>
+        <div style="display:grid; grid-template-columns:1fr 1fr; gap:12px;">
+          <div>
+            <div style="font-size:11px; font-weight:700; color:var(--text-faint); text-transform:uppercase; margin-bottom:6px; display:flex; align-items:center; gap:5px;">
+              CNN Internacional
+              ${maisBarato === 'cnn' ? '<span style="background:var(--green-bg); color:var(--green); font-size:10px; padding:1px 5px; border-radius:4px;">Mais barato</span>' : ''}
+            </div>
+            ${renderOpcoes(item.cnn, 'cnn')}
+          </div>
+          <div>
+            <div style="font-size:11px; font-weight:700; color:var(--text-faint); text-transform:uppercase; margin-bottom:6px; display:flex; align-items:center; gap:5px;">
+              Skytech Solutions
+              ${maisBarato === 'skytech' ? '<span style="background:var(--green-bg); color:var(--green); font-size:10px; padding:1px 5px; border-radius:4px;">Mais barato</span>' : ''}
+            </div>
+            ${renderOpcoes(item.skytech, 'skytech')}
+          </div>
+        </div>
+      </div>
+    `;
+  }).join('');
+}
+
+function renderCotacaoHistorico(){
+  const body = document.getElementById('cotacao-historico-body');
+  if(!_cotacaoHistorico.length){
+    body.innerHTML = '<div style="color:var(--text-faint); font-size:13px; text-align:center; padding:12px 0;">Nenhuma cotação realizada nesta sessão.</div>';
+    return;
+  }
+
+  body.innerHTML = _cotacaoHistorico.map((entry, i) => `
+    <div style="padding:10px 12px; background:var(--panel-2); border-radius:7px; border:1px solid var(--border); margin-bottom:8px; cursor:pointer;"
+      onclick="verCotacaoHistorico(${i})">
+      <div style="display:flex; justify-content:space-between; align-items:center;">
+        <span style="font-size:13px; font-weight:600;">${entry.itens.length} peça${entry.itens.length > 1 ? 's' : ''}: ${entry.itens.slice(0,2).map(escapeHtml).join(', ')}${entry.itens.length > 2 ? '...' : ''}</span>
+        <span style="font-size:11px; color:var(--text-faint);">${entry.data}</span>
+      </div>
+    </div>
+  `).join('');
+}
+
+function verCotacaoHistorico(idx){
+  const entry = _cotacaoHistorico[idx];
+  if(!entry) return;
+  _cotacaoItens = [...entry.itens];
+  renderCotacaoLista();
+  renderCotacaoResultado(entry.resultado);
+  document.getElementById('cotacao-status-msg').style.display = 'none';
+  document.getElementById('cotacao-resultado-body').style.display = 'block';
+  window.scrollTo({ top: 0, behavior: 'smooth' });
+}
 </script>
 
 </body>
