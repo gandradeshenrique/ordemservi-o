@@ -14,11 +14,17 @@ jobs:
       - uses: actions/checkout@v4
 
       - name: Injetar variáveis de ambiente
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
         run: |
-          sed -i 's|__SUPABASE_URL__|${{ secrets.SUPABASE_URL }}|g' index.html
-          sed -i 's|__SUPABASE_URL__|${{ secrets.SUPABASE_URL }}|g' login.html
-          sed -i 's|__SUPABASE_ANON_KEY__|${{ secrets.SUPABASE_ANON_KEY }}|g' index.html
-          sed -i 's|__SUPABASE_ANON_KEY__|${{ secrets.SUPABASE_ANON_KEY }}|g' login.html
+          echo "Substituindo placeholders..."
+          sed -i "s|__SUPABASE_URL__|${SUPABASE_URL}|g" index.html
+          sed -i "s|__SUPABASE_URL__|${SUPABASE_URL}|g" login.html
+          sed -i "s|__SUPABASE_ANON_KEY__|${SUPABASE_ANON_KEY}|g" index.html
+          sed -i "s|__SUPABASE_ANON_KEY__|${SUPABASE_ANON_KEY}|g" login.html
+          echo "Verificando substituição:"
+          grep -n "SB_URL\|SUPABASE_URL" login.html | head -5
 
       - name: Deploy para GitHub Pages
         uses: peaceiris/actions-gh-pages@v3
