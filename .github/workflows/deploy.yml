@@ -18,16 +18,16 @@ jobs:
           SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
           SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
         run: |
-          echo "Substituindo placeholders..."
           sed -i "s|__SUPABASE_URL__|${SUPABASE_URL}|g" index.html
           sed -i "s|__SUPABASE_URL__|${SUPABASE_URL}|g" login.html
           sed -i "s|__SUPABASE_ANON_KEY__|${SUPABASE_ANON_KEY}|g" index.html
           sed -i "s|__SUPABASE_ANON_KEY__|${SUPABASE_ANON_KEY}|g" login.html
-          echo "Verificando substituição:"
-          grep -n "SB_URL\|SUPABASE_URL" login.html | head -5
+          echo "Verificando:"
+          grep -n "SB_URL" login.html | head -3
 
       - name: Deploy para GitHub Pages
         uses: peaceiris/actions-gh-pages@v3
         with:
           github_token: ${{ secrets.GITHUB_TOKEN }}
           publish_dir: .
+          force_orphan: true
