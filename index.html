@@ -6349,68 +6349,24 @@ async function executarCotacao(){
   statusMsg.textContent = 'Consultando preços nos fornecedores... isso pode levar alguns segundos.';
   resultadoBody.style.display = 'none';
 
-  const listaPecas = _cotacaoItens.map((p, i) => `${i+1}. ${p}`).join('\n');
-
-  const prompt = `Você é um assistente especializado em cotação de peças para celular no Brasil. 
-Preciso que você consulte os preços das seguintes peças em DOIS fornecedores:
-
-FORNECEDOR 1 — CNN Internacional: https://www.internacionalcnn.com
-FORNECEDOR 2 — Skytech Solutions: https://www.skytechsolutions.com.br
-
-PEÇAS PARA COTAR:
-${listaPecas}
-
-INSTRUÇÕES:
-- Para cada peça, busque o preço em cada fornecedor usando web search
-- Na Skytech, use a busca do site: https://www.skytechsolutions.com.br/produtos/?q=TERMO
-- Na CNN, acesse o catálogo pela categoria correspondente
-- Se encontrar variações (OLED/FHD, Original/Genérica), liste as opções com preços
-- Se não encontrar em algum fornecedor, indique "Não encontrado"
-- Preços devem ser em R$ com 2 casas decimais
-
-Retorne SOMENTE um JSON válido, sem texto adicional, no formato:
-{
-  "itens": [
-    {
-      "peca": "nome da peça buscada",
-      "cnn": [{"descricao": "...", "preco": 0.00}],
-      "skytech": [{"descricao": "...", "preco": 0.00}]
-    }
-  ]
-}
-
-Se não encontrar em um fornecedor, retorne array vazio [] para aquele fornecedor.`;
-
   try {
-    const response = await fetch('https://api.anthropic.com/v1/messages', {
+    // Chama via Edge Function do Supabase (evita bloqueio CORS do browser)
+    const response = await fetch(`${SB_URL}/functions/v1/cotacao-pecas`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        model: 'claude-sonnet-4-6',
-        max_tokens: 4000,
-        tools: [{ type: 'web_search_20250305', name: 'web_search' }],
-        messages: [{ role: 'user', content: prompt }]
-      })
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': 'Bearer ' + SB_KEY
+      },
+      body: JSON.stringify({ itens: _cotacaoItens })
     });
 
     if(!response.ok){
       const errText = await response.text();
-      throw new Error('Erro na API: ' + errText);
+      throw new Error('Erro na Edge Function: ' + errText);
     }
 
-    const data = await response.json();
-
-    // Extrair texto da resposta (pode vir junto com tool_use blocks)
-    const textoResposta = data.content
-      .filter(b => b.type === 'text')
-      .map(b => b.text)
-      .join('');
-
-    // Extrair JSON da resposta
-    const jsonMatch = textoResposta.match(/\{[\s\S]*\}/);
-    if(!jsonMatch) throw new Error('Resposta da IA não contém JSON válido.');
-
-    const resultado = JSON.parse(jsonMatch[0]);
+    const resultado = await response.json();
+    if(resultado.error) throw new Error(resultado.error);
     if(!resultado.itens || !resultado.itens.length) throw new Error('Nenhum resultado encontrado.');
 
     // Salvar no histórico
