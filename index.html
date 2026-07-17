@@ -722,7 +722,6 @@
     .btn-sm{ min-height:36px; }
     input, select, textarea{ min-height:44px; }
     .nav-item{ min-height:46px; }
-    #cotacao-layout{ grid-template-columns: 1fr !important; }
     .ac-item{ padding:12px 14px; }
     .kanban-add-btn{ min-height:40px; }
 
@@ -953,9 +952,6 @@
     </button>
     <button class="nav-item" data-page="kanban" onclick="goToPage('kanban')">
       <span class="nav-icon">&#128203;</span> Tarefas
-    </button>
-    <button class="nav-item" data-page="cotacao" onclick="goToPage('cotacao')">
-      <span class="nav-icon">🔍</span> Cotação
     </button>
 
     <div class="nav-divider"></div>
@@ -1304,62 +1300,6 @@
           </tr></thead>
           <tbody id="compras-table-body"></tbody>
         </table>
-      </div>
-    </div>
-
-    <!-- ===================== COTAÇÃO ===================== -->
-    <div class="page" id="page-cotacao">
-      <div class="page-header">
-        <div>
-          <h1>Cotação de peças</h1>
-          <p>Consulta automática de preços na CNN Internacional e Skytech</p>
-        </div>
-        <button class="btn btn-primary" onclick="iniciarNovaCotacao()">+ Nova cotação</button>
-      </div>
-
-      <!-- Lista de itens para cotar -->
-      <div style="display:grid; grid-template-columns:1fr 1fr; gap:16px; margin-bottom:16px;" id="cotacao-layout">
-
-        <!-- Coluna esquerda: montar lista -->
-        <div class="card" style="padding:16px;">
-          <div style="font-size:13px; font-weight:700; margin-bottom:12px; color:var(--text);">📋 Lista de peças para cotar</div>
-
-          <div style="display:flex; gap:8px; margin-bottom:10px;">
-            <input type="text" id="cotacao-input-peca" placeholder="Ex: Tela iPhone 13, Bateria Moto G84..."
-              style="flex:1; padding:8px 10px; background:var(--panel-2); border:1px solid var(--border); border-radius:7px; color:var(--text); font-size:13px;"
-              onkeydown="if(event.key==='Enter') adicionarItemCotacao()">
-            <button class="btn btn-primary" onclick="adicionarItemCotacao()" style="padding:8px 14px; white-space:nowrap;">+ Adicionar</button>
-          </div>
-
-          <div id="cotacao-lista" style="display:flex; flex-direction:column; gap:6px; min-height:60px;">
-            <div id="cotacao-lista-vazia" style="color:var(--text-faint); font-size:13px; padding:12px 0; text-align:center;">Nenhuma peça adicionada ainda.</div>
-          </div>
-
-          <div style="margin-top:14px; display:flex; gap:8px;">
-            <button class="btn btn-primary" id="btn-consultar-cotacao" onclick="executarCotacao()" style="flex:1;" disabled>
-              🔍 Consultar preços
-            </button>
-            <button class="btn" onclick="limparCotacao()" style="padding:8px 12px;" title="Limpar lista">🗑</button>
-          </div>
-        </div>
-
-        <!-- Coluna direita: resultado -->
-        <div class="card" style="padding:16px;" id="cotacao-resultado-card">
-          <div style="font-size:13px; font-weight:700; margin-bottom:12px; color:var(--text);">📊 Resultado da cotação</div>
-          <div id="cotacao-status-msg" style="color:var(--text-faint); font-size:13px; text-align:center; padding:20px 0;">
-            Monte a lista de peças e clique em "Consultar preços".
-          </div>
-          <div id="cotacao-resultado-body" style="display:none;"></div>
-        </div>
-
-      </div>
-
-      <!-- Histórico de cotações -->
-      <div class="card" style="padding:16px;">
-        <div style="font-size:13px; font-weight:700; margin-bottom:12px; color:var(--text);">🕐 Cotações recentes</div>
-        <div id="cotacao-historico-body">
-          <div style="color:var(--text-faint); font-size:13px; text-align:center; padding:12px 0;">Nenhuma cotação realizada nesta sessão.</div>
-        </div>
       </div>
     </div>
 
@@ -2125,14 +2065,14 @@
       <div class="field">
         <label>Preço de custo (R$)</label>
         <input type="number" id="stock-custo" min="0" step="0.01" placeholder="0,00"
-          oninput="const v=parseFloat(this.value)||0; const venda=document.getElementById('stock-venda'); if(!venda.dataset.manual) venda.value=v?((v*2).toFixed(2)):'';">
+          oninput="const v=parseFloat(this.value)||0; const venda=document.getElementById('stock-venda'); if(!venda.dataset.manual) venda.value=v?(calcularVendaAutomatica(v).toFixed(2)):'';">
       </div>
       <div class="field">
         <label>Preço de venda (R$)</label>
-        <input type="number" id="stock-venda" min="0" step="0.01" placeholder="Preenchido automaticamente (2×custo)"
+        <input type="number" id="stock-venda" min="0" step="0.01" placeholder="Preenchido automaticamente (≤R$75→R$150 / acima→2×custo)"
           oninput="this.dataset.manual=this.value?'1':'';"
           onfocus="this.placeholder='0,00';"
-          onblur="this.placeholder=this.value?'':'Preenchido automaticamente (2×custo)';">
+          onblur="this.placeholder=this.value?'':'Preenchido automaticamente (≤R$75→R$150 / acima→2×custo)';">
       </div>
     </div>
 
@@ -2566,12 +2506,17 @@ function goToPage(page){
   if(page === 'clientes') renderClientsTable();
   if(page === 'compras') renderComprasTable();
   if(page === 'kanban') renderKanban();
-  if(page === 'cotacao') initCotacaoPage();
 }
 
 /* =========================================================
    HELPERS
    ========================================================= */
+// Regra de valor de venda: custo <= 75 => venda R$150,00; custo > 75 => venda = 2x custo
+function calcularVendaAutomatica(custo){
+  const c = parseFloat(custo) || 0;
+  if(!c) return 0;
+  return c <= 75 ? 150 : parseFloat((c * 2).toFixed(2));
+}
 function formatCurrency(v){
   return 'R$ ' + (Number(v)||0).toLocaleString('pt-BR', {minimumFractionDigits:2, maximumFractionDigits:2});
 }
@@ -4213,7 +4158,7 @@ async function salvarPedidoNoEstoque(){
       id, codigo: item.codigo || '', nome: item.nome || item.descricao || '',
       detalhes: item.detalhes || '',
       categoria: item.categoria || 'Peça', compativel: '', quantidade: item.qtd,
-      minimo: 0, local: '', custo: item.preco, venda: parseFloat((item.preco * 2).toFixed(2)),
+      minimo: 0, local: '', custo: item.preco, venda: calcularVendaAutomatica(item.preco),
       fornecedor, pedido: numeroPedido, data_pedido: dataPedido
     };
 
@@ -6269,207 +6214,6 @@ function initAutoLogout(){
   renderStockTable();
   renderClientsTable();
 })();
-
-/* =========================================================
-   MÓDULO DE COTAÇÃO
-   ========================================================= */
-
-let _cotacaoItens = [];
-let _cotacaoHistorico = [];
-
-function initCotacaoPage(){
-  renderCotacaoLista();
-  renderCotacaoHistorico();
-}
-
-function iniciarNovaCotacao(){
-  limparCotacao();
-  document.getElementById('cotacao-input-peca').focus();
-}
-
-function adicionarItemCotacao(){
-  const input = document.getElementById('cotacao-input-peca');
-  const val = input.value.trim();
-  if(!val) return;
-  _cotacaoItens.push(val);
-  input.value = '';
-  input.focus();
-  renderCotacaoLista();
-}
-
-function removerItemCotacao(idx){
-  _cotacaoItens.splice(idx, 1);
-  renderCotacaoLista();
-}
-
-function renderCotacaoLista(){
-  const lista = document.getElementById('cotacao-lista');
-  const vazia = document.getElementById('cotacao-lista-vazia');
-  const btnConsultar = document.getElementById('btn-consultar-cotacao');
-
-  if(!_cotacaoItens.length){
-    lista.innerHTML = '';
-    lista.appendChild(vazia || document.createElement('div'));
-    if(vazia) vazia.style.display = 'block';
-    btnConsultar.disabled = true;
-    return;
-  }
-
-  if(vazia) vazia.style.display = 'none';
-  btnConsultar.disabled = false;
-
-  lista.innerHTML = _cotacaoItens.map((item, i) => `
-    <div style="display:flex; align-items:center; gap:8px; padding:8px 10px; background:var(--panel-2); border-radius:7px; border:1px solid var(--border);">
-      <span style="flex:1; font-size:13px; color:var(--text);">${escapeHtml(item)}</span>
-      <button onclick="removerItemCotacao(${i})" style="background:none; border:none; color:var(--text-faint); cursor:pointer; font-size:16px; line-height:1; padding:0 2px;" title="Remover">&times;</button>
-    </div>
-  `).join('');
-}
-
-function limparCotacao(){
-  _cotacaoItens = [];
-  renderCotacaoLista();
-  document.getElementById('cotacao-status-msg').style.display = 'block';
-  document.getElementById('cotacao-status-msg').textContent = 'Monte a lista de peças e clique em "Consultar preços".';
-  document.getElementById('cotacao-status-msg').style.color = 'var(--text-faint)';
-  document.getElementById('cotacao-resultado-body').style.display = 'none';
-}
-
-async function executarCotacao(){
-  if(!_cotacaoItens.length) return;
-
-  const btn = document.getElementById('btn-consultar-cotacao');
-  const statusMsg = document.getElementById('cotacao-status-msg');
-  const resultadoBody = document.getElementById('cotacao-resultado-body');
-
-  btn.disabled = true;
-  btn.textContent = '⏳ Consultando...';
-  statusMsg.style.display = 'block';
-  statusMsg.style.color = 'var(--text-dim)';
-  statusMsg.textContent = 'Consultando preços nos fornecedores... isso pode levar alguns segundos.';
-  resultadoBody.style.display = 'none';
-
-  try {
-    // Chama via Edge Function do Supabase (evita bloqueio CORS do browser)
-    const response = await fetch(`${SB_URL}/functions/v1/cotacao-pecas`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': 'Bearer ' + SB_KEY
-      },
-      body: JSON.stringify({ itens: _cotacaoItens })
-    });
-
-    if(!response.ok){
-      const errText = await response.text();
-      throw new Error('Erro na Edge Function: ' + errText);
-    }
-
-    const resultado = await response.json();
-    if(resultado.error) throw new Error(resultado.error);
-    if(!resultado.itens || !resultado.itens.length) throw new Error('Nenhum resultado encontrado.');
-
-    // Salvar no histórico
-    const entrada = {
-      data: new Date().toLocaleString('pt-BR'),
-      itens: [..._cotacaoItens],
-      resultado: resultado.itens
-    };
-    _cotacaoHistorico.unshift(entrada);
-
-    // Exibir resultado
-    renderCotacaoResultado(resultado.itens);
-    renderCotacaoHistorico();
-
-    statusMsg.style.display = 'none';
-    resultadoBody.style.display = 'block';
-
-  } catch(e) {
-    statusMsg.textContent = 'Erro ao consultar: ' + e.message;
-    statusMsg.style.color = 'var(--red)';
-    console.error('Erro cotação:', e);
-  } finally {
-    btn.disabled = false;
-    btn.textContent = '🔍 Consultar preços';
-  }
-}
-
-function renderCotacaoResultado(itens){
-  const body = document.getElementById('cotacao-resultado-body');
-
-  body.innerHTML = itens.map(item => {
-    const temCNN = item.cnn && item.cnn.length > 0;
-    const temSkytech = item.skytech && item.skytech.length > 0;
-
-    const menorCNN = temCNN ? Math.min(...item.cnn.map(x => x.preco)) : Infinity;
-    const menorSkytech = temSkytech ? Math.min(...item.skytech.map(x => x.preco)) : Infinity;
-    const maisBarato = menorCNN < menorSkytech ? 'cnn' : menorSkytech < menorCNN ? 'skytech' : null;
-
-    const renderOpcoes = (opcoes, fornecedor) => {
-      if(!opcoes || !opcoes.length) return `<div style="color:var(--text-faint); font-size:12px; padding:6px 0;">Não encontrado</div>`;
-      return opcoes.map(op => {
-        const isMenor = maisBarato === fornecedor && op.preco === (fornecedor === 'cnn' ? menorCNN : menorSkytech);
-        return `<div style="display:flex; justify-content:space-between; align-items:center; padding:5px 0; border-bottom:1px solid var(--border);">
-          <span style="font-size:12px; color:var(--text-dim); flex:1;">${escapeHtml(op.descricao)}</span>
-          <span style="font-family:monospace; font-size:13px; font-weight:700; color:${isMenor ? 'var(--green)' : 'var(--text)'}; margin-left:10px; white-space:nowrap;">
-            ${isMenor ? '⭐ ' : ''}${formatCurrency(op.preco)}
-          </span>
-        </div>`;
-      }).join('');
-    };
-
-    return `
-      <div style="margin-bottom:14px; padding:12px; background:var(--panel-2); border-radius:8px; border:1px solid var(--border);">
-        <div style="font-weight:700; font-size:13px; margin-bottom:10px; color:var(--accent);">📦 ${escapeHtml(item.peca)}</div>
-        <div style="display:grid; grid-template-columns:1fr 1fr; gap:12px;">
-          <div>
-            <div style="font-size:11px; font-weight:700; color:var(--text-faint); text-transform:uppercase; margin-bottom:6px; display:flex; align-items:center; gap:5px;">
-              CNN Internacional
-              ${maisBarato === 'cnn' ? '<span style="background:var(--green-bg); color:var(--green); font-size:10px; padding:1px 5px; border-radius:4px;">Mais barato</span>' : ''}
-            </div>
-            ${renderOpcoes(item.cnn, 'cnn')}
-          </div>
-          <div>
-            <div style="font-size:11px; font-weight:700; color:var(--text-faint); text-transform:uppercase; margin-bottom:6px; display:flex; align-items:center; gap:5px;">
-              Skytech Solutions
-              ${maisBarato === 'skytech' ? '<span style="background:var(--green-bg); color:var(--green); font-size:10px; padding:1px 5px; border-radius:4px;">Mais barato</span>' : ''}
-            </div>
-            ${renderOpcoes(item.skytech, 'skytech')}
-          </div>
-        </div>
-      </div>
-    `;
-  }).join('');
-}
-
-function renderCotacaoHistorico(){
-  const body = document.getElementById('cotacao-historico-body');
-  if(!_cotacaoHistorico.length){
-    body.innerHTML = '<div style="color:var(--text-faint); font-size:13px; text-align:center; padding:12px 0;">Nenhuma cotação realizada nesta sessão.</div>';
-    return;
-  }
-
-  body.innerHTML = _cotacaoHistorico.map((entry, i) => `
-    <div style="padding:10px 12px; background:var(--panel-2); border-radius:7px; border:1px solid var(--border); margin-bottom:8px; cursor:pointer;"
-      onclick="verCotacaoHistorico(${i})">
-      <div style="display:flex; justify-content:space-between; align-items:center;">
-        <span style="font-size:13px; font-weight:600;">${entry.itens.length} peça${entry.itens.length > 1 ? 's' : ''}: ${entry.itens.slice(0,2).map(escapeHtml).join(', ')}${entry.itens.length > 2 ? '...' : ''}</span>
-        <span style="font-size:11px; color:var(--text-faint);">${entry.data}</span>
-      </div>
-    </div>
-  `).join('');
-}
-
-function verCotacaoHistorico(idx){
-  const entry = _cotacaoHistorico[idx];
-  if(!entry) return;
-  _cotacaoItens = [...entry.itens];
-  renderCotacaoLista();
-  renderCotacaoResultado(entry.resultado);
-  document.getElementById('cotacao-status-msg').style.display = 'none';
-  document.getElementById('cotacao-resultado-body').style.display = 'block';
-  window.scrollTo({ top: 0, behavior: 'smooth' });
-}
 </script>
 
 </body>
