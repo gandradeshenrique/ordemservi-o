@@ -3600,6 +3600,121 @@ function partAcClose(rowId){
   if(list) list.style.display = 'none';
 }
 
+let _aePartRowCounter = 0;
+function addAePartRow(btn, existing){
+  const card = btn.closest('.aparelho-extra-card');
+  const list = card.querySelector('.ae-parts-list');
+  const row  = document.createElement('div');
+  const rowId = 'ae-part-' + (++_aePartRowCounter);
+  row.className = 'part-row';
+  row.id = rowId;
+  row.style.cssText = 'display:flex; gap:8px; align-items:flex-start; margin-bottom:8px; flex-wrap:wrap;';
+
+  function partLabel(s){
+    const cat = s.categoria ? s.categoria + ' · ' : '';
+    const det = s.detalhes  ? ' · ' + s.detalhes  : '';
+    return cat + s.nome + det;
+  }
+
+  row.innerHTML = `
+    <div style="flex:1; min-width:200px; position:relative;">
+      <input type="text" class="part-ac-input"
+        placeholder="Digite para buscar peça..."
+        autocomplete="off"
+        style="width:100%;"
+        oninput="aePartAcFilter(this,'${rowId}')"
+        onfocus="aePartAcFilter(this,'${rowId}')"
+        onblur="setTimeout(()=>aePartAcClose('${rowId}'),200)">
+      <input type="hidden" class="part-stock-id">
+      <div class="part-ac-list ac-dropdown" id="ae-pac-${rowId}" style="display:none; position:absolute; top:100%; left:0; right:0; z-index:200; background:var(--panel); border:1px solid var(--border); border-radius:var(--radius); max-height:220px; overflow-y:auto; box-shadow:0 4px 16px rgba(0,0,0,.35);"></div>
+    </div>
+    <input type="number" class="part-qtd" min="1" step="1" value="${existing ? existing.qtd : 1}" style="width:64px;" oninput="updateOSTotal()">
+    <input type="number" class="part-preco" min="0" step="0.01" value="${existing ? existing.preco : ''}" placeholder="Preço" style="width:96px;" oninput="updateOSTotal()">
+    <button type="button" class="remove-part" onclick="
+      this.closest('.part-row').remove();
+      updateOSTotal();
+    ">&times;</button>
+  `;
+
+  list.appendChild(row);
+
+  if(existing && existing.stockId){
+    const s = state.stock.find(x => x.id === existing.stockId);
+    if(s){
+      row.querySelector('.part-ac-input').value = partLabel(s);
+      row.querySelector('.part-stock-id').value = s.id;
+      row.querySelector('.part-preco').value = existing.preco;
+    }
+  }
+
+  updateOSTotal();
+}
+
+function aePartAcFilter(input, rowId){
+  const q    = input.value.trim().toLowerCase();
+  const list = document.getElementById('ae-pac-' + rowId);
+  const row  = document.getElementById(rowId);
+
+  const hiddenId = row.querySelector('.part-stock-id').value;
+  if(hiddenId){
+    const sel = state.stock.find(s => s.id === hiddenId);
+    const expectedLabel = sel ? (sel.categoria ? sel.categoria + ' · ' : '') + sel.nome + (sel.detalhes ? ' · ' + sel.detalhes : '') : '';
+    if(input.value !== expectedLabel){
+      row.querySelector('.part-stock-id').value = '';
+      row.querySelector('.part-preco').value = '';
+      updateOSTotal();
+    }
+  }
+
+  const sorted = [...state.stock].sort((a,b) => {
+    const ca = a.categoria || '', cb = b.categoria || '';
+    return ca.localeCompare(cb) || a.nome.localeCompare(b.nome);
+  });
+
+  const filtered = q
+    ? sorted.filter(s =>
+        (s.categoria||'').toLowerCase().includes(q) ||
+        s.nome.toLowerCase().includes(q) ||
+        (s.detalhes||'').toLowerCase().includes(q) ||
+        (s.codigo||'').toLowerCase().includes(q)
+      )
+    : sorted;
+
+  if(!filtered.length){ list.style.display='none'; return; }
+
+  list.innerHTML = filtered.map(s => {
+    const cat = s.categoria
+      ? `<span style="font-size:10px;font-weight:700;color:var(--accent);background:rgba(45,160,224,0.12);border-radius:3px;padding:1px 5px;margin-right:5px;">${escapeHtml(s.categoria)}</span>`
+      : '';
+    const det = s.detalhes
+      ? `<span style="font-size:11px;color:var(--text-dim);margin-left:5px;">${escapeHtml(s.detalhes)}</span>`
+      : '';
+    const qtd = `<span style="font-size:11px;color:${s.quantidade<=s.minimo?'var(--red)':'var(--text-faint)'};margin-left:auto;white-space:nowrap;">${s.quantidade} disp.</span>`;
+    const label = (s.categoria ? s.categoria + ' · ' : '') + s.nome + (s.detalhes ? ' · ' + s.detalhes : '');
+    return `<div class="ac-item" style="display:flex;align-items:center;gap:4px;"
+      onmousedown="aePartAcSelect('${rowId}','${s.id}','${label.replace(/'/g,"\\'")}','${s.venda}')">
+      ${cat}<strong>${escapeHtml(s.nome)}</strong>${det}${qtd}
+    </div>`;
+  }).join('');
+
+  list.style.display = 'block';
+}
+
+function aePartAcSelect(rowId, stockId, label, preco){
+  const row = document.getElementById(rowId);
+  row.querySelector('.part-ac-input').value = label;
+  row.querySelector('.part-stock-id').value = stockId;
+  const precoInput = row.querySelector('.part-preco');
+  if(!precoInput.value) precoInput.value = preco;
+  document.getElementById('ae-pac-' + rowId).style.display = 'none';
+  updateOSTotal();
+}
+
+function aePartAcClose(rowId){
+  const list = document.getElementById('ae-pac-' + rowId);
+  if(list) list.style.display = 'none';
+}
+
 function onPartSelectChange(select){
   // mantido por compatibilidade
   updateOSTotal();
@@ -3607,6 +3722,8 @@ function onPartSelectChange(select){
 
 function updateOSTotal(){
   let total = 0;
+
+  // Peças do aparelho principal
   document.querySelectorAll('#os-parts-list .part-row').forEach(row => {
     const qtd = parseFloat(row.querySelector('.part-qtd').value) || 0;
     const preco = parseFloat(row.querySelector('.part-preco').value) || 0;
@@ -3614,6 +3731,22 @@ function updateOSTotal(){
   });
   const maoObra = parseFloat(document.getElementById('os-mao-obra').value) || 0;
   total += maoObra;
+
+  // Peças e mão de obra dos aparelhos extras
+  document.querySelectorAll('.aparelho-extra-card').forEach(card => {
+    let sub = 0;
+    card.querySelectorAll('.ae-parts-list .part-row').forEach(row => {
+      const qtd = parseFloat(row.querySelector('.part-qtd').value) || 0;
+      const preco = parseFloat(row.querySelector('.part-preco').value) || 0;
+      sub += qtd * preco;
+    });
+    const aeMao = parseFloat(card.querySelector('.ae-mao-obra')?.value) || 0;
+    sub += aeMao;
+    const subtotalEl = card.querySelector('.ae-subtotal');
+    if(subtotalEl) subtotalEl.textContent = formatCurrency(sub);
+    total += sub;
+  });
+
   document.getElementById('os-total-display').textContent = formatCurrency(total);
 }
 
@@ -3691,7 +3824,22 @@ async function saveOS(){
       card.querySelector('.ae-acs-chip').checked    ? 'Chip'      : '',
       card.querySelector('.ae-acs-carregador').checked ? 'Carregador' : ''
     ].filter(Boolean).join(', ');
-    if(modelo) aparelhosExtras.push({ modelo, imei, defeito, senha, acessorios });
+    if(modelo) aparelhosExtras.push({
+      modelo, imei, defeito, senha, acessorios,
+      parts: (() => {
+        const ps = [];
+        card.querySelectorAll('.ae-parts-list .part-row').forEach(row => {
+          const stockId = row.querySelector('.part-stock-id')?.value || '';
+          if(!stockId) return;
+          const qtd = parseFloat(row.querySelector('.part-qtd').value) || 0;
+          const preco = parseFloat(row.querySelector('.part-preco').value) || 0;
+          const stockItem = state.stock.find(s => s.id === stockId);
+          ps.push({ stockId, nome: stockItem ? stockItem.nome : 'Item removido', qtd, preco });
+        });
+        return ps;
+      })(),
+      maoObra: parseFloat(card.querySelector('.ae-mao-obra')?.value) || 0
+    });
   });
 
   // Collect parts
@@ -3706,7 +3854,11 @@ async function saveOS(){
   });
 
   const maoObra = parseFloat(document.getElementById('os-mao-obra').value) || 0;
-  const total = parts.reduce((sum,p) => sum + p.qtd * p.preco, 0) + maoObra;
+  const extrasTotal = aparelhosExtras.reduce((sum, a) => {
+    const partsSum = (a.parts || []).reduce((s, p) => s + p.qtd * p.preco, 0);
+    return sum + partsSum + (a.maoObra || 0);
+  }, 0);
+  const total = parts.reduce((sum,p) => sum + p.qtd * p.preco, 0) + maoObra + extrasTotal;
 
   const id = document.getElementById('os-id').value;
   const status = document.getElementById('os-status').value;
@@ -3959,8 +4111,26 @@ function addAparelhoExtra(existing){
           </div>
         </div>
       </div>
+
+      <!-- Peças deste aparelho -->
+      <div class="ae-parts-section" style="border-top:1px solid var(--border); padding:10px 16px 2px;">
+        <label style="font-size:12px; font-weight:700; color:var(--text-dim); text-transform:uppercase; letter-spacing:0.05em;">Peças utilizadas</label>
+        <div class="ae-parts-list parts-list" style="margin-top:8px;"></div>
+        <div style="display:flex; gap:10px; align-items:center; margin-top:6px; flex-wrap:wrap;">
+          <button type="button" class="btn btn-sm ae-add-part-btn" onclick="addAePartRow(this)" style="font-size:12px;">+ Peça do estoque</button>
+          <div style="display:flex; align-items:center; gap:6px;">
+            <label style="font-weight:400; font-size:13px; white-space:nowrap; margin:0;">Mão de obra R$</label>
+            <input type="number" class="ae-mao-obra" placeholder="0,00" min="0" step="0.01"
+              style="width:90px; font-size:13px; padding:6px 8px;"
+              oninput="updateOSTotal()">
+          </div>
+        </div>
+        <div style="text-align:right; font-size:13px; font-weight:600; color:var(--accent); margin-top:6px; padding-bottom:10px;">
+          Subtotal: <span class="ae-subtotal">R$ 0,00</span>
+        </div>
+      </div>
     </div>
-  `;
+  \`;
 
   list.appendChild(card);
 
@@ -3980,6 +4150,15 @@ function addAparelhoExtra(existing){
       resumoAnt.style.display = 'flex';
       if(iconAnt) iconAnt.textContent = '▶ expandir';
     }
+  }
+
+  // Preencher peças existentes ao editar
+  if(existing && existing.parts && existing.parts.length){
+    existing.parts.forEach(p => addAePartRow(card.querySelector('.ae-add-part-btn'), p));
+  }
+  if(existing && existing.maoObra){
+    card.querySelector('.ae-mao-obra').value = existing.maoObra;
+    updateOSTotal();
   }
 
   // Se for carregamento de edição com dados existentes, já colapsa
@@ -4322,7 +4501,9 @@ function viewOS(osId){
 
         ${(o.aparelhosExtras && o.aparelhosExtras.length) ? `
         <div class="section-title">Aparelhos adicionais (${o.aparelhosExtras.length})</div>
-        ${o.aparelhosExtras.map((a,i) => `
+        ${o.aparelhosExtras.map((a,i) => {
+          const aSub = (a.parts||[]).reduce((s,p)=>s+p.qtd*p.preco,0) + (a.maoObra||0);
+          return `
           <div class="card" style="margin-bottom:10px; border-left:3px solid var(--accent);">
             <div class="kv-list">
               <div class="kv-row"><span class="kv-label">Aparelho ${i+2}</span><span class="kv-value">${escapeHtml(a.modelo)}</span></div>
@@ -4331,8 +4512,21 @@ function viewOS(osId){
               ${a.senha ? `<div class="kv-row"><span class="kv-label">Senha</span><span class="kv-value mono">${escapeHtml(a.senha)}</span></div>` : ''}
               ${a.acessorios ? `<div class="kv-row"><span class="kv-label">Acessórios</span><span class="kv-value">${escapeHtml(a.acessorios)}</span></div>` : ''}
             </div>
-          </div>
-        `).join('')}
+            ${(a.parts && a.parts.length) || a.maoObra ? `
+            <div class="table-wrap" style="margin-top:10px; border:none;">
+              <table>
+                <thead><tr><th>Item</th><th>Qtd.</th><th>Preço</th><th>Subtotal</th></tr></thead>
+                <tbody>
+                  ${(a.parts||[]).map(p=>`<tr><td>${escapeHtml(p.nome)}</td><td style="text-align:center">${p.qtd}</td><td style="text-align:right">${formatCurrency(p.preco)}</td><td style="text-align:right">${formatCurrency(p.qtd*p.preco)}</td></tr>`).join('')}
+                  ${a.maoObra ? `<tr><td>Mão de obra</td><td style="text-align:center">—</td><td style="text-align:right">${formatCurrency(a.maoObra)}</td><td style="text-align:right">${formatCurrency(a.maoObra)}</td></tr>` : ''}
+                </tbody>
+                <tfoot>
+                  <tr><td colspan="3" style="text-align:right; font-weight:700;">Subtotal</td><td style="text-align:right; font-weight:700; color:var(--accent);">${formatCurrency(aSub)}</td></tr>
+                </tfoot>
+              </table>
+            </div>` : ''}
+          </div>`;
+        }).join('')}
         ` : ''}
 
         ${o.checklist ? `
@@ -4648,30 +4842,51 @@ function printOS(){
   ${(o.aparelhosExtras && o.aparelhosExtras.length) ? `
   <div style="margin-bottom:6pt;">
     <div style="font-size:10pt; font-weight:700; color:#0094d4; border-bottom:1pt solid #0094d4; padding-bottom:3pt; margin-bottom:5pt; text-transform:uppercase; letter-spacing:0.5px;">Aparelhos adicionais</div>
-    <table style="width:100%; border-collapse:collapse; font-size:9.5pt;">
-      <thead>
-        <tr style="background:#f0f0f0;">
-          <th style="border:0.5pt solid #aaa; padding:3pt 6pt; text-align:left;">#</th>
-          <th style="border:0.5pt solid #aaa; padding:3pt 6pt; text-align:left;">Modelo</th>
-          <th style="border:0.5pt solid #aaa; padding:3pt 6pt; text-align:left;">IMEI / Série</th>
-          <th style="border:0.5pt solid #aaa; padding:3pt 6pt; text-align:left;">Defeito relatado</th>
-          <th style="border:0.5pt solid #aaa; padding:3pt 6pt; text-align:left;">Senha</th>
-          <th style="border:0.5pt solid #aaa; padding:3pt 6pt; text-align:left;">Acessórios</th>
-        </tr>
-      </thead>
-      <tbody>
-        ${o.aparelhosExtras.map((a,i) => `
-          <tr>
-            <td style="border:0.5pt solid #aaa; padding:3pt 6pt; text-align:center; color:#0094d4; font-weight:700;">${i+2}</td>
-            <td style="border:0.5pt solid #aaa; padding:3pt 6pt;">${escapeHtml(a.modelo)}</td>
-            <td style="border:0.5pt solid #aaa; padding:3pt 6pt; font-family:monospace;">${escapeHtml(a.imei||'—')}</td>
-            <td style="border:0.5pt solid #aaa; padding:3pt 6pt;">${escapeHtml(a.defeito||'—')}</td>
-            <td style="border:0.5pt solid #aaa; padding:3pt 6pt; font-family:monospace;">${escapeHtml(a.senha||'—')}</td>
-            <td style="border:0.5pt solid #aaa; padding:3pt 6pt;">${escapeHtml(a.acessorios||'—')}</td>
-          </tr>
-        `).join('')}
-      </tbody>
-    </table>
+    ${o.aparelhosExtras.map((a,i) => {
+      const aSub = (a.parts||[]).reduce((s,p)=>s+p.qtd*p.preco,0) + (a.maoObra||0);
+      return `
+      <div style="margin-bottom:8pt; border:0.5pt solid #ccc; border-radius:3pt; overflow:hidden;">
+        <table style="width:100%; border-collapse:collapse; font-size:9.5pt;">
+          <thead>
+            <tr style="background:#e8f4fb;">
+              <th colspan="6" style="padding:3pt 6pt; text-align:left; color:#0094d4; font-size:9pt;">
+                Aparelho ${i+2}: ${escapeHtml(a.modelo)}
+                ${a.imei ? ' &nbsp;|&nbsp; IMEI: ' + escapeHtml(a.imei) : ''}
+                ${a.senha ? ' &nbsp;|&nbsp; Senha: ' + escapeHtml(a.senha) : ''}
+              </th>
+            </tr>
+            ${a.defeito ? `<tr style="background:#f7f7f7;"><td colspan="6" style="padding:2pt 6pt; font-size:8.5pt; color:#555;">Defeito: ${escapeHtml(a.defeito)}</td></tr>` : ''}
+          </thead>
+          ${(a.parts && a.parts.length) || a.maoObra ? `
+          <tbody>
+            <tr style="background:#f0f0f0;">
+              <th style="border-top:0.5pt solid #aaa; padding:2pt 6pt; text-align:left; font-size:8.5pt;" colspan="2">Item / Serviço</th>
+              <th style="border-top:0.5pt solid #aaa; padding:2pt 6pt; text-align:center; font-size:8.5pt;">Qtd.</th>
+              <th style="border-top:0.5pt solid #aaa; padding:2pt 6pt; text-align:right; font-size:8.5pt;">Preço unit.</th>
+              <th style="border-top:0.5pt solid #aaa; padding:2pt 6pt; text-align:right; font-size:8.5pt;" colspan="2">Subtotal</th>
+            </tr>
+            ${(a.parts||[]).map(p=>`
+            <tr>
+              <td style="border-top:0.5pt solid #eee; padding:2pt 6pt;" colspan="2">${escapeHtml(p.nome)}</td>
+              <td style="border-top:0.5pt solid #eee; padding:2pt 6pt; text-align:center;">${p.qtd}</td>
+              <td style="border-top:0.5pt solid #eee; padding:2pt 6pt; text-align:right;">${(p.preco||0).toLocaleString('pt-BR',{minimumFractionDigits:2})}</td>
+              <td style="border-top:0.5pt solid #eee; padding:2pt 6pt; text-align:right;" colspan="2">${(p.qtd*p.preco||0).toLocaleString('pt-BR',{minimumFractionDigits:2})}</td>
+            </tr>`).join('')}
+            ${a.maoObra ? `
+            <tr>
+              <td style="border-top:0.5pt solid #eee; padding:2pt 6pt;" colspan="2">Mão de obra</td>
+              <td style="border-top:0.5pt solid #eee; padding:2pt 6pt; text-align:center;">—</td>
+              <td style="border-top:0.5pt solid #eee; padding:2pt 6pt; text-align:right;">${a.maoObra.toLocaleString('pt-BR',{minimumFractionDigits:2})}</td>
+              <td style="border-top:0.5pt solid #eee; padding:2pt 6pt; text-align:right;" colspan="2">${a.maoObra.toLocaleString('pt-BR',{minimumFractionDigits:2})}</td>
+            </tr>` : ''}
+            <tr style="background:#f0f0f0;">
+              <td colspan="5" style="border-top:0.5pt solid #aaa; padding:2pt 6pt; text-align:right; font-weight:700;">Subtotal Aparelho ${i+2}</td>
+              <td style="border-top:0.5pt solid #aaa; padding:2pt 6pt; text-align:right; font-weight:700; color:#0094d4;">${aSub.toLocaleString('pt-BR',{minimumFractionDigits:2})}</td>
+            </tr>
+          </tbody>` : ''}
+        </table>
+      </div>`;
+    }).join('')}
   </div>
   ` : ''}
 
@@ -4702,6 +4917,7 @@ function printOS(){
   <div class="p-section-label">Manutenção Realizada:</div>
   <div class="p-text-area" style="min-height:40pt;">
     ${o.parts.length || o.maoObra ? `
+    <div style="font-size:8.5pt; font-weight:700; color:#0094d4; margin-bottom:3pt;">${(o.aparelhosExtras && o.aparelhosExtras.length) ? 'Aparelho 1: ' + escapeHtml(o.aparelho) : ''}</div>
     <table class="p-parts-table">
       <thead><tr><th>Item / Serviço</th><th style="text-align:center">Qtd.</th><th style="text-align:right">Preço unit.</th><th style="text-align:right">Subtotal</th></tr></thead>
       <tbody>
