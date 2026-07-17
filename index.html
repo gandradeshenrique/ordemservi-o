@@ -4,6 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>OficinaOS — Gestão de Assistência Técnica</title>
+<link rel="icon" type="image/png" href="logo.png">
 <style>
   :root{
     --bg: #15181c;
@@ -2065,14 +2066,14 @@
       <div class="field">
         <label>Preço de custo (R$)</label>
         <input type="number" id="stock-custo" min="0" step="0.01" placeholder="0,00"
-          oninput="const v=parseFloat(this.value)||0; const venda=document.getElementById('stock-venda'); if(!venda.dataset.manual) venda.value=v?(calcularVendaAutomatica(v).toFixed(2)):'';">
+          oninput="const v=parseFloat(this.value)||0; const venda=document.getElementById('stock-venda'); if(!venda.dataset.manual) venda.value=v?((v*2).toFixed(2)):'';">
       </div>
       <div class="field">
         <label>Preço de venda (R$)</label>
-        <input type="number" id="stock-venda" min="0" step="0.01" placeholder="Preenchido automaticamente (≤R$75→R$150 / acima→2×custo)"
+        <input type="number" id="stock-venda" min="0" step="0.01" placeholder="Preenchido automaticamente (2×custo)"
           oninput="this.dataset.manual=this.value?'1':'';"
           onfocus="this.placeholder='0,00';"
-          onblur="this.placeholder=this.value?'':'Preenchido automaticamente (≤R$75→R$150 / acima→2×custo)';">
+          onblur="this.placeholder=this.value?'':'Preenchido automaticamente (2×custo)';">
       </div>
     </div>
 
@@ -2511,12 +2512,6 @@ function goToPage(page){
 /* =========================================================
    HELPERS
    ========================================================= */
-// Regra de valor de venda: custo <= 75 => venda R$150,00; custo > 75 => venda = 2x custo
-function calcularVendaAutomatica(custo){
-  const c = parseFloat(custo) || 0;
-  if(!c) return 0;
-  return c <= 75 ? 150 : parseFloat((c * 2).toFixed(2));
-}
 function formatCurrency(v){
   return 'R$ ' + (Number(v)||0).toLocaleString('pt-BR', {minimumFractionDigits:2, maximumFractionDigits:2});
 }
@@ -4158,7 +4153,7 @@ async function salvarPedidoNoEstoque(){
       id, codigo: item.codigo || '', nome: item.nome || item.descricao || '',
       detalhes: item.detalhes || '',
       categoria: item.categoria || 'Peça', compativel: '', quantidade: item.qtd,
-      minimo: 0, local: '', custo: item.preco, venda: calcularVendaAutomatica(item.preco),
+      minimo: 0, local: '', custo: item.preco, venda: parseFloat((item.preco * 2).toFixed(2)),
       fornecedor, pedido: numeroPedido, data_pedido: dataPedido
     };
 

@@ -4,6 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>MobitOS — Mobit Soluções</title>
+<link rel="icon" type="image/png" href="logo.png">
 <style>
   @import url('https://fonts.googleapis.com/css2?family=Rajdhani:wght@400;500;600;700&family=Inter:wght@300;400;500;600&display=swap');
 
@@ -623,9 +624,9 @@ for(let i=0;i<18;i++){
   document.body.appendChild(el);
 }
 
-// ── Configuração — sem keys expostas, tudo via Edge Function ───────
-const SB_URL = '__SUPABASE_URL__';
-const AUTH_FN = `${SB_URL}/functions/v1/auth`;
+// ── Login ──────────────────────────────────────────────────────────
+const SB_URL = 'https://zrghmwdzxslpuyglsvnq.supabase.co';
+const SB_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InpyZ2htd2R6eHNscHV5Z2xzdm5xIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODIwOTE0NzksImV4cCI6MjA5NzY2NzQ3OX0.l2KE4vTA7CsXBGdRIfuBFqiHBACSueXUO8neEKXsOX4';
 
 async function doLogin(){
   const usuario = document.getElementById('inp-user').value.trim();
@@ -643,48 +644,45 @@ async function doLogin(){
   btn.disabled = true;
 
   try {
-    // Chama Edge Function — a service_role key nunca chega ao navegador
-    const res = await fetch(`${AUTH_FN}?action=login`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ usuario, senha })
-    });
+    const res = await fetch(
+      `${SB_URL}/rest/v1/usuarios?usuario=eq.${encodeURIComponent(usuario)}&senha_hash=eq.${encodeURIComponent(senha)}&ativo=eq.true&select=id,usuario,nome,perfil,primeiro_acesso`,
+      { headers: { apikey: SB_KEY, Authorization: 'Bearer ' + SB_KEY } }
+    );
+    const rows = await res.json();
 
-    const data = await res.json();
+    if(rows && rows.length > 0){
+      const user = rows[0];
+      if(document.getElementById('chk-remember').checked){
+        localStorage.setItem('mobit_remember', usuario);
+      }
+      err.classList.remove('show');
+      btn.textContent = 'Entrando...';
+      btn.disabled = false;
+      btn.style.opacity = '1';
 
-    if(!res.ok) throw new Error(data.error || 'Credenciais inválidas');
-
-    const { token, user } = data;
-
-    if(document.getElementById('chk-remember').checked){
-      localStorage.setItem('mobit_remember', usuario);
-    }
-    err.classList.remove('show');
-    btn.textContent = 'Entrando...';
-    btn.disabled = false;
-    btn.style.opacity = '1';
-
-    if(user.primeiro_acesso){
-      // Guardar token temporário e dados do usuário para a troca de senha
-      sessionStorage.setItem('mobit_temp_token', token);
-      sessionStorage.setItem('mobit_temp_user', JSON.stringify(user));
-      document.getElementById('card-login').style.display = 'none';
-      document.getElementById('card-troca-senha').style.display = 'block';
-      document.getElementById('inp-nova-senha').focus();
+      if(user.primeiro_acesso){
+        // Guardar usuário temporariamente para usar na troca de senha
+        sessionStorage.setItem('mobit_temp_user', JSON.stringify(user));
+        // Mostrar card de troca de senha
+        document.getElementById('card-login').style.display = 'none';
+        document.getElementById('card-troca-senha').style.display = 'block';
+        document.getElementById('inp-nova-senha').focus();
+      } else {
+        sessionStorage.setItem('mobit_user', JSON.stringify(user));
+        setTimeout(()=>{ window.location.href='index.html'; }, 600);
+      }
     } else {
-      // Sessão definitiva — token + dados do usuário
-      sessionStorage.setItem('mobit_token', token);
-      sessionStorage.setItem('mobit_user', JSON.stringify(user));
-      setTimeout(()=>{ window.location.href='index.html'; }, 600);
+      throw new Error('Credenciais inválidas');
     }
   } catch(e) {
-    err.textContent = e.message || 'Usuário ou senha incorretos.';
+    err.textContent = 'Usuário ou senha incorretos.';
     err.classList.add('show');
     document.getElementById('inp-pass').value='';
     document.getElementById('inp-pass').focus();
     btn.textContent = 'Entrar';
     btn.style.opacity = '1';
     btn.disabled = false;
+    // Tremer card
     const card = document.querySelector('.login-card');
     card.style.transform='translateX(6px)';
     setTimeout(()=>{ card.style.transform='translateX(-6px)'; },80);
@@ -783,24 +781,28 @@ async function trocarSenha(){
   btn.disabled = true;
 
   try {
-    const user       = JSON.parse(sessionStorage.getItem('mobit_temp_user'));
-    const token_temp = sessionStorage.getItem('mobit_temp_token');
+    const user = JSON.parse(sessionStorage.getItem('mobit_temp_user'));
 
-    // Trocar senha via Edge Function — sem expor keys no navegador
-    const res = await fetch(`${AUTH_FN}?action=trocar-senha`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ token_temp, nova_senha: nova, usuario_id: user.id })
-    });
+    // Atualizar senha e marcar primeiro_acesso como false
+    const res = await fetch(
+      `https://zrghmwdzxslpuyglsvnq.supabase.co/rest/v1/usuarios?id=eq.${user.id}`,
+      {
+        method: 'PATCH',
+        headers: {
+          apikey: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InpyZ2htd2R6eHNscHV5Z2xzdm5xIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODIwOTE0NzksImV4cCI6MjA5NzY2NzQ3OX0.l2KE4vTA7CsXBGdRIfuBFqiHBACSueXUO8neEKXsOX4',
+          Authorization: 'Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InpyZ2htd2R6eHNscHV5Z2xzdm5xIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODIwOTE0NzksImV4cCI6MjA5NzY2NzQ3OX0.l2KE4vTA7CsXBGdRIfuBFqiHBACSueXUO8neEKXsOX4',
+          'Content-Type': 'application/json',
+          Prefer: 'return=representation'
+        },
+        body: JSON.stringify({ senha_hash: nova, primeiro_acesso: false })
+      }
+    );
 
-    const data = await res.json();
-    if(!res.ok) throw new Error(data.error || 'Erro ao salvar');
+    if(!res.ok) throw new Error('Erro ao salvar');
 
-    // Limpar sessão temporária e gravar sessão definitiva
+    // Limpar temp e gravar sessão definitiva
     sessionStorage.removeItem('mobit_temp_user');
-    sessionStorage.removeItem('mobit_temp_token');
     user.primeiro_acesso = false;
-    sessionStorage.setItem('mobit_token', data.token);
     sessionStorage.setItem('mobit_user', JSON.stringify(user));
 
     btn.textContent = 'Senha salva! Entrando...';
