@@ -5511,9 +5511,9 @@ function exportCSV(tipo){
 
     const custoOperacionalOS = o => (o.logisticaPecas||0) + (o.custoHoras||0) + (o.logisticaEquipamento||0);
     const impostoDevice = r => r.subtotalBruto * TAXA_IMPOSTO_OS;
-    const custoTotalDevice = r => custoPecasOS(r.device) + custoOperacionalOS(r.os) * r.shareIgual;
-    const totalLiquidoDevice = r => r.subtotalBruto - impostoDevice(r);
-    const lucroDevice = r => totalLiquidoDevice(r) - custoTotalDevice(r);
+    // Custo Total agora soma peças + custos operacionais rateados + o imposto
+    const custoTotalDevice = r => custoPecasOS(r.device) + custoOperacionalOS(r.os) * r.shareIgual + impostoDevice(r);
+    const lucroDevice = r => r.subtotalBruto - custoTotalDevice(r);
 
     const cols = [
       { label:'Nº OS',          fn: r => String(r.os.numero).padStart(4,'0') },
@@ -5528,19 +5528,19 @@ function exportCSV(tipo){
       { label:'Status',         fn: r => r.os.status },
       { label:'Forma Pgto',     fn: r => r.os.pagamento },
       { label:'Garantia (dias)',fn: r => r.os.garantia, type:'number', fmt:'0' },
+      { label:'Valor Total do Reparo (aparelho) (R$)', fn: r => r.subtotalBruto, type:'number' },
       { label:'Mão de Obra (aparelho)', fn: r => r.device.maoObra||0, type:'number' },
       { label:'Custo Peças (aparelho) (R$)', fn: r => custoPecasOS(r.device), type:'number' },
       { label:'Logística Peças (aparelho) (R$)', fn: r => (r.os.logisticaPecas||0) * r.shareIgual, type:'number' },
       { label:'Horas de Serviço (aparelho)', fn: r => (r.os.horasServico||0) * r.shareIgual, type:'number', fmt:'0.00' },
       { label:'Custo Horas (aparelho) (R$)', fn: r => (r.os.custoHoras||0) * r.shareIgual, type:'number' },
       { label:'Logística Equipamento (aparelho) (R$)', fn: r => (r.os.logisticaEquipamento||0) * r.shareIgual, type:'number' },
-      { label:'Custo Total (aparelho) (R$)', fn: r => custoTotalDevice(r), type:'number' },
       { label:'Imposto (aparelho) (R$)', fn: r => impostoDevice(r), type:'number' },
-      { label:'Total (aparelho) (R$)', fn: r => totalLiquidoDevice(r), type:'number' },
+      { label:'Custo Total (aparelho) (R$)', fn: r => custoTotalDevice(r), type:'number' },
       { label:'Lucro (aparelho) (R$)', fn: r => lucroDevice(r), type:'number' },
       { label:'Margem (aparelho) (%)', fn: r => {
-          const tl = totalLiquidoDevice(r);
-          return tl > 0 ? lucroDevice(r) / tl : 0;
+          const bruto = r.subtotalBruto;
+          return bruto > 0 ? lucroDevice(r) / bruto : 0;
         }, type:'number', fmt:'0.0%' },
       { label:'Data Entrada',   fn: r => formatDate(r.os.dataEntrada) },
       { label:'Data Prevista',  fn: r => formatDate(r.os.dataPrevista) },
