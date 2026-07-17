@@ -4,7 +4,6 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>OficinaOS — Gestão de Assistência Técnica</title>
-<link rel="icon" type="image/png" href="logo.png">
 <style>
   :root{
     --bg: #15181c;
@@ -899,6 +898,7 @@
 
 </style>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 </head>
 <body>
 
@@ -1007,7 +1007,7 @@
               font-size:13px;text-align:left;cursor:pointer;display:flex;align-items:center;gap:8px;
               border-top:1px solid var(--border);"
               onmouseover="this.style.background='var(--panel-2)'" onmouseout="this.style.background='none'">
-              📊 Exportar CSV
+              📊 Exportar Excel
             </button>
           </div>
         </div>
@@ -1284,7 +1284,7 @@
         <button class="btn btn-sm" onclick="limparFiltrosCompra()">Limpar filtros</button>
         <div style="margin-left:auto; display:flex; gap:8px;">
           <button class="btn btn-sm" onclick="openLancarNFModal()">📄 Lançar NF CNN</button>
-          <button class="btn btn-sm" onclick="exportComprasCSV()">⬇ Exportar CSV</button>
+          <button class="btn btn-sm" onclick="exportComprasCSV()">⬇ Exportar Excel</button>
         </div>
       </div>
       <div id="compras-resumo" style="margin:12px 0; display:grid; grid-template-columns:repeat(auto-fit,minmax(160px,1fr)); gap:12px;">
@@ -2192,7 +2192,7 @@
       <!-- ABA EXPORTAR -->
       <div id="tab-export" style="padding:24px;">
         <p style="font-size:13px; color:var(--text-dim); margin-bottom:18px;">
-          Escolha o que deseja exportar. Os arquivos serão baixados em formato <strong>Excel (.xlsx)</strong> ou <strong>CSV</strong>.
+          Escolha o que deseja exportar. Os arquivos serão baixados em formato <strong>Excel (.xlsx)</strong>, com colunas prontas para uso.
         </p>
 
         <!-- OS -->
@@ -2221,13 +2221,13 @@
               <input type="date" id="exp-os-ate" style="width:100%; background:var(--panel-2); border:1px solid var(--border); border-radius:6px; color:var(--text); padding:7px 10px; font-size:13px;">
             </div>
           </div>
-          <button onclick="exportCSV('os')" class="btn btn-sm" style="width:100%;">Exportar Ordens de Serviço (.csv)</button>
+          <button onclick="exportCSV('os')" class="btn btn-sm" style="width:100%;">Exportar Ordens de Serviço (.xlsx)</button>
         </div>
 
         <!-- Clientes -->
         <div style="border:1px solid var(--border); border-radius:8px; padding:16px; margin-bottom:12px;">
           <div style="font-size:13px; font-weight:700; margin-bottom:10px;">👤 Clientes</div>
-          <button onclick="exportCSV('clientes')" class="btn btn-sm" style="width:100%;">Exportar Clientes (.csv)</button>
+          <button onclick="exportCSV('clientes')" class="btn btn-sm" style="width:100%;">Exportar Clientes (.xlsx)</button>
         </div>
 
         <!-- Estoque -->
@@ -2257,7 +2257,7 @@
               Somente itens abaixo do estoque mínimo
             </label>
           </div>
-          <button onclick="exportCSV('estoque')" class="btn btn-sm" style="width:100%;">Exportar Estoque (.csv)</button>
+          <button onclick="exportCSV('estoque')" class="btn btn-sm" style="width:100%;">Exportar Estoque (.xlsx)</button>
         </div>
       </div>
 
@@ -3059,26 +3059,43 @@ function exportDashboardCSV(){
   const fatA = osA.reduce((s,o) => s + (o.total||0), 0);
   const compA = state.compras.filter(c => c.dataPedido >= aDe && c.dataPedido <= aAte);
   const gastosA = compA.reduce((s,c) => s + (c.valorTotal||0), 0);
-  const NL = '\n';
-  let csv = '"Relatório Gerencial MobitOS"' + NL;
-  csv += `"Período: ${formatDate(aDe)} a ${formatDate(aAte)}"` + NL + NL;
-  csv += '"INDICADORES"' + NL;
-  csv += `"Faturamento","${formatCurrency(fatA)}"` + NL;
-  csv += `"Total de OS","${osA.length}"` + NL;
-  csv += `"OS Concluídas","${osA.filter(o=>['Concluído','Entregue'].includes(o.status)).length}"` + NL;
-  csv += `"Gastos com Peças","${formatCurrency(gastosA)}"` + NL;
-  csv += `"Lucro Estimado","${formatCurrency(fatA - gastosA)}"` + NL + NL;
-  csv += '"OS DO PERÍODO"' + NL;
-  csv += '"Nº OS","Cliente","Aparelho","Status","Total","Data Entrada"' + NL;
+
+  const aoa = [
+    ['Relatório Gerencial MobitOS'],
+    [`Período: ${formatDate(aDe)} a ${formatDate(aAte)}`],
+    [],
+    ['INDICADORES'],
+    ['Faturamento', fatA],
+    ['Total de OS', osA.length],
+    ['OS Concluídas', osA.filter(o=>['Concluído','Entregue'].includes(o.status)).length],
+    ['Gastos com Peças', gastosA],
+    ['Lucro Estimado', fatA - gastosA],
+    [],
+    ['OS DO PERÍODO'],
+    ['Nº OS','Cliente','Aparelho','Status','Total','Data Entrada'],
+  ];
   osA.forEach(o => {
-    csv += `"#${String(o.numero).padStart(4,'0')}","${o.clienteNome||''}","${o.aparelho||''}","${o.status}","${(o.total||0).toFixed(2)}","${formatDate(o.dataEntrada)}"` + NL;
+    aoa.push([`#${String(o.numero).padStart(4,'0')}`, o.clienteNome||'', o.aparelho||'', o.status, o.total||0, formatDate(o.dataEntrada)]);
   });
-  const bom = '\uFEFF';
-  const blob = new Blob([bom+csv], {type:'text/csv;charset=utf-8;'});
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement('a'); a.href=url; a.download=`relatorio-mobit-${aDe}.csv`;
-  document.body.appendChild(a); a.click(); document.body.removeChild(a); URL.revokeObjectURL(url);
-  showToast('Relatório CSV exportado com sucesso.');
+
+  const ws = XLSX.utils.aoa_to_sheet(aoa);
+  ws['!cols'] = [
+    { wch:18 }, { wch:22 }, { wch:22 }, { wch:16 }, { wch:14 }, { wch:14 }
+  ];
+  // Formata como moeda as células de valor no bloco de indicadores
+  ['B5','B8','B9'].forEach(ref => { if(ws[ref]) ws[ref].z = '#,##0.00'; });
+  const headerRow = 11; // linha "Nº OS", 0-indexed = 11
+  for(let r = headerRow+1; r < aoa.length; r++){
+    const ref = XLSX.utils.encode_cell({ r, c:4 });
+    if(ws[ref]) ws[ref].z = '#,##0.00';
+  }
+  if(osA.length){
+    ws['!autofilter'] = { ref: XLSX.utils.encode_range({ s:{r:headerRow,c:0}, e:{r:headerRow+osA.length,c:5} }) };
+  }
+  ws['!views'] = [{ state:'frozen', ySplit: headerRow+1 }];
+
+  downloadXLSX(ws, `relatorio-mobit-${aDe}.xlsx`, 'Relatório');
+  showToast('Relatório exportado com sucesso.');
 }
 
 function stockPill(item){
@@ -5080,27 +5097,53 @@ function switchDataTab(tab){
   document.getElementById('tab-import-btn').style.color  = tab==='import' ? 'var(--text)' : 'var(--text-dim)';
 }
 
-/* ---- EXPORTAR CSV ---- */
-function toCSV(rows, cols){
-  const NL = '\n';
-  const header = cols.map(c => '"' + c.label + '"').join(',');
-  const body   = rows.map(r =>
-    cols.map(c => {
-      const v = c.fn ? c.fn(r) : (r[c.key] ?? '');
-      return '"' + String(v).replace(/"/g, '""') + '"';
-    }).join(',')
-  ).join(NL);
-  return header + NL + body;
+/* ---- EXPORTAR XLSX ---- */
+// Gera uma planilha real (colunas de verdade, largura ajustada, cabeçalho
+// congelado e filtro automático) em vez de texto CSV — isso evita o problema
+// de tudo cair numa única coluna quando o Excel (localização BR) usa ";"
+// como separador de lista padrão em vez de ",".
+function toWorksheet(rows, cols){
+  const header = cols.map(c => c.label);
+  const data = rows.map(r => cols.map(c => {
+    const raw = c.fn ? c.fn(r) : (r[c.key] ?? '');
+    if(c.type === 'number') return (typeof raw === 'number') ? raw : (parseFloat(raw) || 0);
+    return raw ?? '';
+  }));
+
+  const ws = XLSX.utils.aoa_to_sheet([header, ...data]);
+
+  // Largura de coluna baseada no maior conteúdo
+  ws['!cols'] = cols.map((c, i) => {
+    const maxLen = Math.max(
+      c.label.length,
+      ...data.map(row => String(row[i] ?? '').length)
+    );
+    return { wch: Math.min(Math.max(maxLen + 2, 10), 45) };
+  });
+
+  // Cabeçalho fixo (congelado) e filtro automático, como numa planilha profissional
+  if(data.length){
+    ws['!autofilter'] = { ref: XLSX.utils.encode_range({ s:{r:0,c:0}, e:{r:data.length,c:cols.length-1} }) };
+  }
+  ws['!views'] = [{ state:'frozen', ySplit:1 }];
+
+  // Formatação numérica (moeda) nas colunas marcadas como number
+  cols.forEach((c, i) => {
+    if(c.type === 'number'){
+      for(let r=1; r<=data.length; r++){
+        const ref = XLSX.utils.encode_cell({ r, c:i });
+        if(ws[ref]) ws[ref].z = c.fmt || '#,##0.00';
+      }
+    }
+  });
+
+  return ws;
 }
 
-function downloadCSV(csv, filename){
-  const bom  = '﻿'; // BOM para Excel reconhecer UTF-8
-  const blob = new Blob([bom + csv], { type:'text/csv;charset=utf-8;' });
-  const url  = URL.createObjectURL(blob);
-  const a    = document.createElement('a');
-  a.href = url; a.download = filename;
-  document.body.appendChild(a); a.click();
-  document.body.removeChild(a); URL.revokeObjectURL(url);
+function downloadXLSX(ws, filename, sheetName){
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, sheetName || 'Dados');
+  XLSX.writeFile(wb, filename);
 }
 
 function exportCSV(tipo){
@@ -5127,15 +5170,15 @@ function exportCSV(tipo){
       { label:'Diagnóstico',    key:'diagnostico' },
       { label:'Status',         key:'status' },
       { label:'Forma Pgto',     key:'pagamento' },
-      { label:'Garantia (dias)',key:'garantia' },
-      { label:'Mão de Obra',    fn: o => (o.maoObra||0).toFixed(2) },
-      { label:'Total (R$)',     fn: o => (o.total||0).toFixed(2) },
+      { label:'Garantia (dias)',key:'garantia', type:'number', fmt:'0' },
+      { label:'Mão de Obra',    fn: o => o.maoObra||0, type:'number' },
+      { label:'Total (R$)',     fn: o => o.total||0, type:'number' },
       { label:'Data Entrada',   fn: o => formatDate(o.dataEntrada) },
       { label:'Data Prevista',  fn: o => formatDate(o.dataPrevista) },
       { label:'Observações',    key:'observacoes' },
     ];
     const suffix = statusFiltro ? `-${statusFiltro.replace(/\s/g,'-')}` : '-todos';
-    downloadCSV(toCSV(dados, cols), `mobit-os${suffix}-${todayISO()}.csv`);
+    downloadXLSX(toWorksheet(dados, cols), `mobit-os${suffix}-${todayISO()}.xlsx`, 'Ordens de Serviço');
     showToast(`${dados.length} OS exportadas com sucesso.`);
   }
 
@@ -5150,7 +5193,7 @@ function exportCSV(tipo){
       { label:'Endereço',   key:'endereco' },
       { label:'Obs.',       key:'observacoes' },
     ];
-    downloadCSV(toCSV(state.clients, cols), `mobit-clientes-${todayISO()}.csv`);
+    downloadXLSX(toWorksheet(state.clients, cols), `mobit-clientes-${todayISO()}.xlsx`, 'Clientes');
     showToast(`${state.clients.length} clientes exportados.`);
   }
 
@@ -5170,16 +5213,16 @@ function exportCSV(tipo){
       { label:'Nome',        key:'nome' },
       { label:'Item',        key:'categoria' },
       { label:'Compatível',  key:'compativel' },
-      { label:'Qtd Atual',   key:'quantidade' },
-      { label:'Qtd Mínima',  key:'minimo' },
+      { label:'Qtd Atual',   key:'quantidade', type:'number', fmt:'0' },
+      { label:'Qtd Mínima',  key:'minimo', type:'number', fmt:'0' },
       { label:'Localização', key:'local' },
-      { label:'Custo (R$)',  fn: s => (s.custo||0).toFixed(2) },
-      { label:'Venda (R$)',  fn: s => (s.venda||0).toFixed(2) },
+      { label:'Custo (R$)',  fn: s => s.custo||0, type:'number' },
+      { label:'Venda (R$)',  fn: s => s.venda||0, type:'number' },
       { label:'Fornecedor',  key:'fornecedor' },
       { label:'Nº Pedido',   key:'pedido' },
       { label:'Data Pedido', key:'dataPedido' },
     ];
-    downloadCSV(toCSV(dados, cols), `mobit-estoque-${todayISO()}.csv`);
+    downloadXLSX(toWorksheet(dados, cols), `mobit-estoque-${todayISO()}.xlsx`, 'Estoque');
     showToast(`${dados.length} itens exportados.`);
   }
 }
@@ -6088,7 +6131,7 @@ async function salvarNFCNN(){
   showToast(`NF ${nf} associada a ${ok} pedido(s).`);
 }
 
-/* ---- Exportar CSV de compras ---- */
+/* ---- Exportar Excel de compras ---- */
 function exportComprasCSV(){
   const forn   = document.getElementById('compra-filter-forn')?.value || '';
   const status = document.getElementById('compra-filter-status')?.value || '';
@@ -6103,48 +6146,59 @@ function exportComprasCSV(){
 
   if(!list.length){ showToast('Nenhuma compra para exportar.', true); return; }
 
-  const NL = '\n';
   const fornNomes = { CNN:'CNN Oriental', SKYTECH:'Skytech' };
-  let csv = ['"Fornecedor"','"Data Pedido"','"Nº Pedido"','"Nº NF"','"Data NF"',
-    '"Código"','"Item"','"Qtd"','"P.Unit (R$)"','"Total Item (R$)"',
-    '"Total Pedido (R$)"','"Status"','"Data Pagamento"'].join(',') + NL;
+  const header = ['Fornecedor','Data Pedido','Nº Pedido','Nº NF','Data NF',
+    'Código','Item','Qtd','P.Unit (R$)','Total Item (R$)',
+    'Total Pedido (R$)','Status','Data Pagamento'];
+  const rows = [];
 
   list.forEach(c => {
     if(c.itens.length){
       c.itens.forEach((it, idx) => {
-        csv += [
-          `"${fornNomes[c.fornecedor]||c.fornecedor}"`,
-          `"${formatDate(c.dataPedido)||''}"`,
-          `"${c.numeroPedido||''}"`,
-          `"${c.numeroNF||''}"`,
-          `"${formatDate(c.dataNF)||''}"`,
-          `"${it.codigo||''}"`,
-          `"${it.nome||''}"`,
-          `"${it.qtd}"`,
-          `"${(it.precoUnit||0).toFixed(2)}"`,
-          `"${(it.total||0).toFixed(2)}"`,
-          idx===0 ? `"${c.valorTotal.toFixed(2)}"` : '""',
-          idx===0 ? `"${c.status}"` : '""',
-          idx===0 ? `"${formatDate(c.dataPagamento)||''}"` : '""'
-        ].join(',') + NL;
+        rows.push([
+          fornNomes[c.fornecedor]||c.fornecedor,
+          formatDate(c.dataPedido)||'',
+          c.numeroPedido||'',
+          c.numeroNF||'',
+          formatDate(c.dataNF)||'',
+          it.codigo||'',
+          it.nome||'',
+          it.qtd||0,
+          it.precoUnit||0,
+          it.total||0,
+          idx===0 ? c.valorTotal : '',
+          idx===0 ? c.status : '',
+          idx===0 ? (formatDate(c.dataPagamento)||'') : ''
+        ]);
       });
     } else {
-      csv += [`"${fornNomes[c.fornecedor]||c.fornecedor}"`,
-        `"${formatDate(c.dataPedido)||''}"`,`"${c.numeroPedido||''}"`,
-        `"${c.numeroNF||''}"`,`"${formatDate(c.dataNF)||''}"`,
-        '""','""','""','""','""',
-        `"${c.valorTotal.toFixed(2)}"`,`"${c.status}"`,
-        `"${formatDate(c.dataPagamento)||''}"`].join(',') + NL;
+      rows.push([
+        fornNomes[c.fornecedor]||c.fornecedor,
+        formatDate(c.dataPedido)||'', c.numeroPedido||'',
+        c.numeroNF||'', formatDate(c.dataNF)||'',
+        '','','','','',
+        c.valorTotal, c.status, formatDate(c.dataPagamento)||''
+      ]);
     }
   });
 
-  const bom  = '\uFEFF';
-  const blob = new Blob([bom + csv], { type:'text/csv;charset=utf-8;' });
-  const url  = URL.createObjectURL(blob);
-  const a    = document.createElement('a');
-  a.href = url; a.download = 'mobit-compras-' + todayISO() + '.csv';
-  document.body.appendChild(a); a.click();
-  document.body.removeChild(a); URL.revokeObjectURL(url);
+  const ws = XLSX.utils.aoa_to_sheet([header, ...rows]);
+  ws['!cols'] = [
+    { wch:16 }, { wch:13 }, { wch:14 }, { wch:12 }, { wch:12 },
+    { wch:12 }, { wch:26 }, { wch:8 }, { wch:12 }, { wch:14 },
+    { wch:14 }, { wch:14 }, { wch:14 }
+  ];
+  // Colunas monetárias: P.Unit, Total Item, Total Pedido (índices 8, 9, 10)
+  [8,9,10].forEach(colIdx => {
+    for(let r=1; r<=rows.length; r++){
+      const ref = XLSX.utils.encode_cell({ r, c:colIdx });
+      if(ws[ref] && typeof ws[ref].v === 'number') ws[ref].z = '#,##0.00';
+    }
+  });
+  ws['!autofilter'] = { ref: XLSX.utils.encode_range({ s:{r:0,c:0}, e:{r:rows.length,c:header.length-1} }) };
+  ws['!views'] = [{ state:'frozen', ySplit:1 }];
+
+  downloadXLSX(ws, 'mobit-compras-' + todayISO() + '.xlsx', 'Compras');
   showToast(list.length + ' compra(s) exportada(s).');
 }
 
