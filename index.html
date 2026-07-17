@@ -4849,92 +4849,65 @@ function printOS(){
     ` : ''}
   </div>
 
-  ${(o.aparelhosExtras && o.aparelhosExtras.length) ? `
-  <div style="margin-bottom:6pt;">
-    <div style="font-size:10pt; font-weight:700; color:#0094d4; border-bottom:1pt solid #0094d4; padding-bottom:3pt; margin-bottom:5pt; text-transform:uppercase; letter-spacing:0.5px;">Aparelhos adicionais</div>
-    ${o.aparelhosExtras.map((a,i) => {
-      const aSub = (a.parts||[]).reduce((s,p)=>s+p.qtd*p.preco,0) + (a.maoObra||0);
-      return `
-      <div style="margin-bottom:8pt; border:0.5pt solid #ccc; border-radius:3pt; overflow:hidden;">
-        <table style="width:100%; border-collapse:collapse; font-size:9.5pt;">
-          <thead>
-            <tr style="background:#e8f4fb;">
-              <th colspan="6" style="padding:3pt 6pt; text-align:left; color:#0094d4; font-size:9pt;">
-                Aparelho ${i+2}: ${escapeHtml(a.modelo)}
-                ${a.imei ? ' &nbsp;|&nbsp; IMEI: ' + escapeHtml(a.imei) : ''}
-                ${a.senha ? ' &nbsp;|&nbsp; Senha: ' + escapeHtml(a.senha) : ''}
-              </th>
-            </tr>
-            ${a.defeito ? `<tr style="background:#f7f7f7;"><td colspan="6" style="padding:2pt 6pt; font-size:8.5pt; color:#555;">Defeito: ${escapeHtml(a.defeito)}</td></tr>` : ''}
-          </thead>
-          ${(a.parts && a.parts.length) || a.maoObra ? `
-          <tbody>
-            <tr style="background:#f0f0f0;">
-              <th style="border-top:0.5pt solid #aaa; padding:2pt 6pt; text-align:left; font-size:8.5pt;" colspan="2">Item / Serviço</th>
-              <th style="border-top:0.5pt solid #aaa; padding:2pt 6pt; text-align:center; font-size:8.5pt;">Qtd.</th>
-              <th style="border-top:0.5pt solid #aaa; padding:2pt 6pt; text-align:right; font-size:8.5pt;">Preço unit.</th>
-              <th style="border-top:0.5pt solid #aaa; padding:2pt 6pt; text-align:right; font-size:8.5pt;" colspan="2">Subtotal</th>
-            </tr>
-            ${(a.parts||[]).map(p=>`
-            <tr>
-              <td style="border-top:0.5pt solid #eee; padding:2pt 6pt;" colspan="2">${escapeHtml(p.nome)}</td>
-              <td style="border-top:0.5pt solid #eee; padding:2pt 6pt; text-align:center;">${p.qtd}</td>
-              <td style="border-top:0.5pt solid #eee; padding:2pt 6pt; text-align:right;">${(p.preco||0).toLocaleString('pt-BR',{minimumFractionDigits:2})}</td>
-              <td style="border-top:0.5pt solid #eee; padding:2pt 6pt; text-align:right;" colspan="2">${(p.qtd*p.preco||0).toLocaleString('pt-BR',{minimumFractionDigits:2})}</td>
-            </tr>`).join('')}
-            ${a.maoObra ? `
-            <tr>
-              <td style="border-top:0.5pt solid #eee; padding:2pt 6pt;" colspan="2">Mão de obra</td>
-              <td style="border-top:0.5pt solid #eee; padding:2pt 6pt; text-align:center;">—</td>
-              <td style="border-top:0.5pt solid #eee; padding:2pt 6pt; text-align:right;">${a.maoObra.toLocaleString('pt-BR',{minimumFractionDigits:2})}</td>
-              <td style="border-top:0.5pt solid #eee; padding:2pt 6pt; text-align:right;" colspan="2">${a.maoObra.toLocaleString('pt-BR',{minimumFractionDigits:2})}</td>
-            </tr>` : ''}
-            <tr style="background:#f0f0f0;">
-              <td colspan="5" style="border-top:0.5pt solid #aaa; padding:2pt 6pt; text-align:right; font-weight:700;">Subtotal Aparelho ${i+2}</td>
-              <td style="border-top:0.5pt solid #aaa; padding:2pt 6pt; text-align:right; font-weight:700; color:#0094d4;">${aSub.toLocaleString('pt-BR',{minimumFractionDigits:2})}</td>
-            </tr>
-          </tbody>` : ''}
-        </table>
-      </div>`;
-    }).join('')}
-  </div>
-  ` : ''}
-
   <hr class="p-hr">
 
-  <!-- CHECKLIST -->
+  ${!(o.aparelhosExtras && o.aparelhosExtras.length) ? `
+  <!-- CHECKLIST — apenas quando há 1 aparelho -->
   <div class="p-cl-title">LISTA DE CHECAGEM (CHECK LIST)</div>
   <div class="p-cl-sub">Os itens abaixo estão em condições de utilização?</div>
-
   <div class="p-cl-grid">
     <div class="p-cl-col">
       <table>${CL_LEFT.map(clRow).join('')}</table>
     </div>
     <div class="p-cl-col">
       <table>${CL_RIGHT.map(clRow).join('')}
-        ${['Capa','Chip','Carregador'].map(acs => { const m=acsList.includes(acs); return `<tr><td class="p-cl-label">${acs}</td><td class="p-cl-opts"><span class="p-cb${m?' p-cb-sim':''}">${m?'✔':''}</span>Sim&nbsp;&nbsp;<span class="p-cb${!m?' p-cb-nao':''}">${!m?'✔':''}</span>Não</td></tr>`; }).join('')}
+        ${['Capa','Chip','Carregador'].map(acs => { const m=acsList.includes(acs); return '<tr><td class="p-cl-label">'+acs+'</td><td class="p-cl-opts"><span class="p-cb'+(m?' p-cb-sim':'')+'">'+(m?'✔':'')+'</span>Sim&nbsp;&nbsp;<span class="p-cb'+(!m?' p-cb-nao':'')+'">'+((!m)?'✔':'')+'</span>Não</td></tr>'; }).join('')}
       </table>
     </div>
   </div>
-
   <hr class="p-hr-thin">
+  ` : ''}
 
   <!-- OBSERVAÇÕES -->
   <div class="p-section-label">Observações sobre o aparelho:</div>
   <div class="p-text-area">${escapeHtml(o.defeito||'')}${o.diagnostico ? '<br><br>Diagnóstico: '+escapeHtml(o.diagnostico) : ''}</div>
 
-  <!-- MANUTENÇÃO REALIZADA -->
+  <!-- MANUTENÇÃO REALIZADA — todos os aparelhos em ordem -->
   <div class="p-section-label">Manutenção Realizada:</div>
   <div class="p-text-area" style="min-height:40pt;">
-    ${o.parts.length || o.maoObra ? `
-    <div style="font-size:8.5pt; font-weight:700; color:#0094d4; margin-bottom:3pt;">${(o.aparelhosExtras && o.aparelhosExtras.length) ? 'Aparelho 1: ' + escapeHtml(o.aparelho) : ''}</div>
-    <table class="p-parts-table">
-      <thead><tr><th>Item / Serviço</th><th style="text-align:center">Qtd.</th><th style="text-align:right">Preço unit.</th><th style="text-align:right">Subtotal</th></tr></thead>
-      <tbody>
-        ${partsRows}
-        ${o.maoObra ? `<tr><td>Mão de obra</td><td style="text-align:center">—</td><td style="text-align:right">${formatCurrency(o.maoObra)}</td><td style="text-align:right">${formatCurrency(o.maoObra)}</td></tr>` : ''}
-      </tbody>
-    </table>` : ''}
+    ${(() => {
+      const temExtras = o.aparelhosExtras && o.aparelhosExtras.length;
+      const sub1 = (o.parts||[]).reduce((s,p)=>s+p.qtd*p.preco,0) + (o.maoObra||0);
+      const bloco1 = (o.parts.length || o.maoObra) ? `
+        ${temExtras ? '<div style="font-size:8.5pt; font-weight:700; color:#0094d4; border-bottom:0.5pt solid #0094d4; padding-bottom:2pt; margin-bottom:4pt;">Aparelho 1: '+escapeHtml(o.aparelho)+'</div>' : ''}
+        <table class="p-parts-table">
+          <thead><tr><th>Item / Serviço</th><th style="text-align:center">Qtd.</th><th style="text-align:right">Preço unit.</th><th style="text-align:right">Subtotal</th></tr></thead>
+          <tbody>
+            ${partsRows}
+            ${o.maoObra ? '<tr><td>Mão de obra</td><td style="text-align:center">—</td><td style="text-align:right">'+formatCurrency(o.maoObra)+'</td><td style="text-align:right">'+formatCurrency(o.maoObra)+'</td></tr>' : ''}
+          </tbody>
+          ${temExtras ? '<tfoot><tr class="p-total-row"><td colspan="3" style="text-align:right;">Subtotal Aparelho 1</td><td style="text-align:right; color:#0094d4;">'+formatCurrency(sub1)+'</td></tr></tfoot>' : ''}
+        </table>` : '';
+
+      const blocosExtras = temExtras ? o.aparelhosExtras.map((a,i) => {
+        const aSub = (a.parts||[]).reduce((s,p)=>s+p.qtd*p.preco,0) + (a.maoObra||0);
+        return `
+        <div style="margin-top:8pt;">
+          <div style="font-size:8.5pt; font-weight:700; color:#0094d4; border-bottom:0.5pt solid #0094d4; padding-bottom:2pt; margin-bottom:4pt;">Aparelho ${i+2}: ${escapeHtml(a.modelo)}${a.imei ? ' &nbsp;|&nbsp; IMEI: '+escapeHtml(a.imei) : ''}${a.defeito ? ' &nbsp;|&nbsp; Defeito: '+escapeHtml(a.defeito) : ''}</div>
+          ${(a.parts && a.parts.length) || a.maoObra ? `
+          <table class="p-parts-table">
+            <thead><tr><th>Item / Serviço</th><th style="text-align:center">Qtd.</th><th style="text-align:right">Preço unit.</th><th style="text-align:right">Subtotal</th></tr></thead>
+            <tbody>
+              ${(a.parts||[]).map(p=>'<tr><td>'+escapeHtml(p.nome)+'</td><td style="text-align:center">'+p.qtd+'</td><td style="text-align:right">'+formatCurrency(p.preco)+'</td><td style="text-align:right">'+formatCurrency(p.qtd*p.preco)+'</td></tr>').join('')}
+              ${a.maoObra ? '<tr><td>Mão de obra</td><td style="text-align:center">—</td><td style="text-align:right">'+formatCurrency(a.maoObra)+'</td><td style="text-align:right">'+formatCurrency(a.maoObra)+'</td></tr>' : ''}
+            </tbody>
+            <tfoot><tr class="p-total-row"><td colspan="3" style="text-align:right;">Subtotal Aparelho ${i+2}</td><td style="text-align:right; color:#0094d4;">${formatCurrency(aSub)}</td></tr></tfoot>
+          </table>` : '<p style="font-size:8.5pt; color:#888;">Nenhuma peça registrada.</p>'}
+        </div>`;
+      }).join('') : '';
+
+      return bloco1 + blocosExtras;
+    })()}
   </div>
 
   <!-- VALOR -->
