@@ -1540,6 +1540,24 @@
         </div>
       </div>
 
+      <!-- Peças do aparelho principal -->
+      <div class="ae-parts-section" style="border-top:1px solid var(--border); padding:10px 0 2px; margin-top:12px;">
+        <label style="font-size:12px; font-weight:700; color:var(--text-dim); text-transform:uppercase; letter-spacing:0.05em;">Peças utilizadas</label>
+        <div class="parts-list" id="os-parts-list" style="margin-top:8px;"></div>
+        <div style="display:flex; gap:10px; align-items:center; margin-top:6px; flex-wrap:wrap;">
+          <button type="button" class="btn btn-sm" onclick="addPartRow()">+ Peça do estoque</button>
+          <div style="display:flex; align-items:center; gap:6px;">
+            <label style="font-weight:400; font-size:13px; white-space:nowrap; margin:0;">Mão de obra R$</label>
+            <input type="number" id="os-mao-obra" placeholder="0,00" min="0" step="0.01"
+              style="width:90px; font-size:13px; padding:6px 8px;"
+              oninput="updateOSTotal()">
+          </div>
+        </div>
+        <div style="text-align:right; font-size:13px; font-weight:600; color:var(--accent); margin-top:6px; padding-bottom:4px;">
+          Subtotal: <span id="os-subtotal-display">R$ 0,00</span>
+        </div>
+      </div>
+
       </div><!-- fim #aparelho-principal-campos -->
 
       <!-- APARELHOS EXTRAS -->
@@ -1553,19 +1571,10 @@
     </fieldset>
 
     <fieldset>
-      <legend>Diagnóstico e peças</legend>
+      <legend>Diagnóstico</legend>
       <div class="field">
         <label>Diagnóstico técnico</label>
         <textarea id="os-diagnostico" placeholder="Diagnóstico após análise (pode ser preenchido depois)"></textarea>
-      </div>
-
-      <label>Peças utilizadas</label>
-      <div class="parts-list" id="os-parts-list"></div>
-      <button type="button" class="btn btn-sm" onclick="addPartRow()">+ Adicionar peça do estoque</button>
-
-      <div class="field" id="os-mao-obra-wrap" style="margin-top:14px;">
-        <label>Mão de obra (R$)</label>
-        <input type="number" id="os-mao-obra" placeholder="0,00" min="0" step="0.01" oninput="updateOSTotal()">
       </div>
 
       <div class="total-line">
@@ -3361,7 +3370,6 @@ function openOSModal(osId){
   document.getElementById('checklist-error').style.display = 'none';
   document.getElementById('os-diagnostico').value = '';
   document.getElementById('os-mao-obra').value = '';
-  document.getElementById('os-mao-obra-wrap').style.display = 'block';
   document.getElementById('os-status').value = 'Aberto';
   document.getElementById('os-data-entrada').value = todayISO();
   document.getElementById('os-data-prevista').value = '';
@@ -3418,7 +3426,6 @@ function openOSModal(osId){
     o.parts.forEach(p => addPartRow(p));
     // Se há peças, mão de obra já foi ocultada pelo addPartRow
     // Se não há peças, garantir que mão de obra aparece
-    if(!o.parts.length) document.getElementById('os-mao-obra-wrap').style.display = 'block';
     if((o.aparelhosExtras || []).length > 0){
       (o.aparelhosExtras || []).forEach(a => addAparelhoExtra(a));
       // Atualiza resumo com dados já preenchidos e colapsa
@@ -3478,9 +3485,6 @@ function openClientModalFromOS(){
 let _partRowCounter = 0;
 
 function addPartRow(existing){
-  // Ocultar mão de obra quando há peças
-  document.getElementById('os-mao-obra-wrap').style.display = 'none';
-  document.getElementById('os-mao-obra').value = '';
   updateOSTotal();
 
   const list   = document.getElementById('os-parts-list');
@@ -3514,8 +3518,6 @@ function addPartRow(existing){
     <button type="button" class="remove-part" onclick="
       this.closest('.part-row').remove();
       updateOSTotal();
-      const rem=document.querySelectorAll('#os-parts-list .part-row').length;
-      document.getElementById('os-mao-obra-wrap').style.display=rem===0?'block':'none';
     ">&times;</button>
   `;
 
@@ -3724,13 +3726,17 @@ function updateOSTotal(){
   let total = 0;
 
   // Peças do aparelho principal
+  let sub1 = 0;
   document.querySelectorAll('#os-parts-list .part-row').forEach(row => {
     const qtd = parseFloat(row.querySelector('.part-qtd').value) || 0;
     const preco = parseFloat(row.querySelector('.part-preco').value) || 0;
-    total += qtd * preco;
+    sub1 += qtd * preco;
   });
   const maoObra = parseFloat(document.getElementById('os-mao-obra').value) || 0;
-  total += maoObra;
+  sub1 += maoObra;
+  total += sub1;
+  const sub1El = document.getElementById('os-subtotal-display');
+  if(sub1El) sub1El.textContent = formatCurrency(sub1);
 
   // Peças e mão de obra dos aparelhos extras
   document.querySelectorAll('.aparelho-extra-card').forEach(card => {
@@ -4499,36 +4505,6 @@ function viewOS(osId){
           </div>
         </div>
 
-        ${(o.aparelhosExtras && o.aparelhosExtras.length) ? `
-        <div class="section-title">Aparelhos adicionais (${o.aparelhosExtras.length})</div>
-        ${o.aparelhosExtras.map((a,i) => {
-          const aSub = (a.parts||[]).reduce((s,p)=>s+p.qtd*p.preco,0) + (a.maoObra||0);
-          return `
-          <div class="card" style="margin-bottom:10px; border-left:3px solid var(--accent);">
-            <div class="kv-list">
-              <div class="kv-row"><span class="kv-label">Aparelho ${i+2}</span><span class="kv-value">${escapeHtml(a.modelo)}</span></div>
-              ${a.imei ? `<div class="kv-row"><span class="kv-label">IMEI / Série</span><span class="kv-value mono">${escapeHtml(a.imei)}</span></div>` : ''}
-              ${a.defeito ? `<div class="kv-row"><span class="kv-label">Defeito</span><span class="kv-value">${escapeHtml(a.defeito)}</span></div>` : ''}
-              ${a.senha ? `<div class="kv-row"><span class="kv-label">Senha</span><span class="kv-value mono">${escapeHtml(a.senha)}</span></div>` : ''}
-              ${a.acessorios ? `<div class="kv-row"><span class="kv-label">Acessórios</span><span class="kv-value">${escapeHtml(a.acessorios)}</span></div>` : ''}
-            </div>
-            ${(a.parts && a.parts.length) || a.maoObra ? `
-            <div class="table-wrap" style="margin-top:10px; border:none;">
-              <table>
-                <thead><tr><th>Item</th><th>Qtd.</th><th>Preço</th><th>Subtotal</th></tr></thead>
-                <tbody>
-                  ${(a.parts||[]).map(p=>`<tr><td>${escapeHtml(p.nome)}</td><td style="text-align:center">${p.qtd}</td><td style="text-align:right">${formatCurrency(p.preco)}</td><td style="text-align:right">${formatCurrency(p.qtd*p.preco)}</td></tr>`).join('')}
-                  ${a.maoObra ? `<tr><td>Mão de obra</td><td style="text-align:center">—</td><td style="text-align:right">${formatCurrency(a.maoObra)}</td><td style="text-align:right">${formatCurrency(a.maoObra)}</td></tr>` : ''}
-                </tbody>
-                <tfoot>
-                  <tr><td colspan="3" style="text-align:right; font-weight:700;">Subtotal</td><td style="text-align:right; font-weight:700; color:var(--accent);">${formatCurrency(aSub)}</td></tr>
-                </tfoot>
-              </table>
-            </div>` : ''}
-          </div>`;
-        }).join('')}
-        ` : ''}
-
         ${o.checklist ? `
         <div class="section-title">Checklist de recebimento</div>
         <div class="card" style="margin-bottom:16px;">
@@ -4560,15 +4536,40 @@ function viewOS(osId){
         ` : ''}
 
         <div class="section-title">Peças e serviços</div>
-        <div class="table-wrap" style="margin-bottom:16px;">
-          <table>
-            <thead><tr><th>Item</th><th>Qtd.</th><th>Preço</th><th>Subtotal</th></tr></thead>
-            <tbody>${partsRows}</tbody>
-            <tfoot>
-              <tr><td colspan="3" style="text-align:right; font-weight:600;">Mão de obra</td><td class="mono">${formatCurrency(o.maoObra)}</td></tr>
-              <tr><td colspan="3" style="text-align:right; font-weight:700;">Total</td><td class="mono" style="font-weight:700; color:var(--accent);">${formatCurrency(o.total)}</td></tr>
-            </tfoot>
-          </table>
+        <div class="card" style="margin-bottom:10px; border-left:3px solid var(--accent-soft, var(--accent));">
+          <div style="font-size:12px; font-weight:700; color:var(--accent); margin-bottom:8px;">Aparelho 1 — ${escapeHtml(o.aparelho)}</div>
+          <div class="table-wrap" style="border:none; margin-bottom:0;">
+            <table>
+              <thead><tr><th>Item</th><th>Qtd.</th><th>Preço</th><th>Subtotal</th></tr></thead>
+              <tbody>${partsRows}</tbody>
+              <tfoot>
+                ${o.maoObra ? `<tr><td colspan="3" style="text-align:right; font-weight:600;">Mão de obra</td><td class="mono">${formatCurrency(o.maoObra)}</td></tr>` : ''}
+                <tr><td colspan="3" style="text-align:right; font-weight:700;">Subtotal</td><td class="mono" style="font-weight:700; color:var(--accent);">${formatCurrency((o.parts||[]).reduce((s,p)=>s+p.qtd*p.preco,0)+(o.maoObra||0))}</td></tr>
+              </tfoot>
+            </table>
+          </div>
+        </div>
+        ${(o.aparelhosExtras && o.aparelhosExtras.length) ? o.aparelhosExtras.map((a,i) => {
+          const aSub = (a.parts||[]).reduce((s,p)=>s+p.qtd*p.preco,0) + (a.maoObra||0);
+          return `<div class="card" style="margin-bottom:10px; border-left:3px solid var(--accent);">
+            <div style="font-size:12px; font-weight:700; color:var(--accent); margin-bottom:8px;">Aparelho ${i+2} — ${escapeHtml(a.modelo)}</div>
+            ${(a.parts && a.parts.length) || a.maoObra ? `
+            <div class="table-wrap" style="border:none; margin-bottom:0;">
+              <table>
+                <thead><tr><th>Item</th><th>Qtd.</th><th>Preço</th><th>Subtotal</th></tr></thead>
+                <tbody>
+                  ${(a.parts||[]).map(p=>`<tr><td>${escapeHtml(p.nome)}</td><td class="mono">${p.qtd}</td><td class="mono">${formatCurrency(p.preco)}</td><td class="mono">${formatCurrency(p.qtd*p.preco)}</td></tr>`).join('')}
+                  ${a.maoObra ? `<tr><td colspan="3" style="text-align:right; font-weight:600;">Mão de obra</td><td class="mono">${formatCurrency(a.maoObra)}</td></tr>` : ''}
+                </tbody>
+                <tfoot>
+                  <tr><td colspan="3" style="text-align:right; font-weight:700;">Subtotal</td><td class="mono" style="font-weight:700; color:var(--accent);">${formatCurrency(aSub)}</td></tr>
+                </tfoot>
+              </table>
+            </div>` : '<p style="color:var(--text-faint); font-size:13px;">Nenhuma peça ou mão de obra.</p>'}
+          </div>`;
+        }).join('') : ''}
+        <div style="text-align:right; font-weight:700; font-size:15px; color:var(--accent); padding:8px 0 4px;">
+          Total geral: ${formatCurrency(o.total)}
         </div>
 
         ${o.observacoes ? `
