@@ -5485,55 +5485,65 @@ function exportCSV(tipo){
 
     if(!dados.length){ showToast('Nenhuma OS encontrada com esses filtros.', true); return; }
 
-    // Quebra cada OS em uma linha por aparelho (principal + extras), pra dar
-    // controle individual de peças/mão de obra usadas em cada reparo. Os
-    // valores que são da OS como um todo (imposto, total, lucro, margem etc.)
-    // só aparecem na linha do aparelho principal, pra não duplicar o valor
-    // ao somar a coluna no Excel.
+    // Quebra cada OS em uma linha por aparelho (principal + extras). Todos os
+    // dados da OS (Nº OS, cliente, datas etc.) se repetem em toda linha. Os
+    // custos que são só da OS como um todo (logística de peças, horas de
+    // serviço, logística do equipamento) são rateados proporcionalmente ao
+    // valor (peças + mão de obra) de cada aparelho, assim como o imposto —
+    // a soma das linhas de uma mesma OS bate exatamente com o total da OS.
     const linhas = [];
     dados.forEach(o => {
       const dispositivos = [
-        { tipo:'Principal', modelo:o.aparelho||'', imei:o.imei||'', defeito:o.defeito||'', parts:o.parts||[], maoObra:o.maoObra||0 },
-        ...(o.aparelhosExtras||[]).map((ae, idx) => ({
-          tipo:`Extra ${idx+1}`, modelo:ae.modelo||'', imei:ae.imei||'', defeito:ae.defeito||'',
+        { modelo:o.aparelho||'', imei:o.imei||'', defeito:o.defeito||'', parts:o.parts||[], maoObra:o.maoObra||0 },
+        ...(o.aparelhosExtras||[]).map(ae => ({
+          modelo:ae.modelo||'', imei:ae.imei||'', defeito:ae.defeito||'',
           parts:ae.parts||[], maoObra:ae.maoObra||0
         }))
       ];
-      dispositivos.forEach((d, idx) => linhas.push({ os:o, device:d, isPrimeira: idx===0 }));
+      const totalOS = o.total || 0;
+      dispositivos.forEach(d => {
+        const subtotalBruto = (d.parts||[]).reduce((s,p) => s + p.qtd*p.preco, 0) + (d.maoObra||0);
+        const share = totalOS > 0 ? (subtotalBruto / totalOS) : (1 / dispositivos.length);
+        linhas.push({ os:o, device:d, subtotalBruto, share });
+      });
     });
+
+    const custoOperacionalOS = o => (o.logisticaPecas||0) + (o.custoHoras||0) + (o.logisticaEquipamento||0);
+    const impostoDevice = r => r.subtotalBruto * TAXA_IMPOSTO_OS;
+    const custoTotalDevice = r => custoPecasOS(r.device) + custoOperacionalOS(r.os) * r.share;
+    const totalLiquidoDevice = r => r.subtotalBruto - impostoDevice(r);
+    const lucroDevice = r => totalLiquidoDevice(r) - custoTotalDevice(r);
 
     const cols = [
       { label:'Nº OS',          fn: r => String(r.os.numero).padStart(4,'0') },
+      { label:'Cliente',        fn: r => r.os.clienteNome },
+      { label:'Telefone',       fn: r => r.os.clienteTelefone },
+      { label:'Chamado',        fn: r => r.os.chamado },
       { label:'Aparelho',       fn: r => r.device.modelo },
-      { label:'Item',           fn: r => r.device.tipo },
-      { label:'Cliente',        fn: r => r.isPrimeira ? r.os.clienteNome : '' },
-      { label:'Telefone',       fn: r => r.isPrimeira ? r.os.clienteTelefone : '' },
-      { label:'Chamado',        fn: r => r.isPrimeira ? r.os.chamado : '' },
       { label:'IMEI',           fn: r => r.device.imei },
       { label:'Defeito',        fn: r => r.device.defeito },
       { label:'Peças Utilizadas', fn: r => (r.device.parts||[]).map(p => `${p.nome} x${p.qtd}`).join(', ') },
-      { label:'Diagnóstico',    fn: r => r.isPrimeira ? r.os.diagnostico : '' },
-      { label:'Status',         fn: r => r.isPrimeira ? r.os.status : '' },
-      { label:'Forma Pgto',     fn: r => r.isPrimeira ? r.os.pagamento : '' },
-      { label:'Garantia (dias)',fn: r => r.isPrimeira ? r.os.garantia : '', type:'number', fmt:'0' },
+      { label:'Diagnóstico',    fn: r => r.os.diagnostico },
+      { label:'Status',         fn: r => r.os.status },
+      { label:'Forma Pgto',     fn: r => r.os.pagamento },
+      { label:'Garantia (dias)',fn: r => r.os.garantia, type:'number', fmt:'0' },
       { label:'Mão de Obra (aparelho)', fn: r => r.device.maoObra||0, type:'number' },
       { label:'Custo Peças (aparelho) (R$)', fn: r => custoPecasOS(r.device), type:'number' },
-      { label:'Logística Peças (R$)', fn: r => r.isPrimeira ? (r.os.logisticaPecas||0) : '', type:'number' },
-      { label:'Horas de Serviço', fn: r => r.isPrimeira ? (r.os.horasServico||0) : '', type:'number', fmt:'0.00' },
-      { label:'Custo Horas (R$)', fn: r => r.isPrimeira ? (r.os.custoHoras||0) : '', type:'number' },
-      { label:'Logística Equipamento (R$)', fn: r => r.isPrimeira ? (r.os.logisticaEquipamento||0) : '', type:'number' },
-      { label:'Custo Total OS (R$)', fn: r => r.isPrimeira ? custoTotalOS(r.os) : '', type:'number' },
-      { label:'Imposto (R$)',   fn: r => r.isPrimeira ? impostoOS(r.os) : '', type:'number' },
-      { label:'Total OS (R$)',  fn: r => r.isPrimeira ? ((r.os.total||0) - impostoOS(r.os)) : '', type:'number' },
-      { label:'Lucro Total (R$)', fn: r => r.isPrimeira ? (((r.os.total||0) - impostoOS(r.os)) - custoTotalOS(r.os)) : '', type:'number' },
-      { label:'Margem (%)',     fn: r => {
-          if(!r.isPrimeira) return '';
-          const totalLiquido = (r.os.total||0) - impostoOS(r.os);
-          return totalLiquido > 0 ? (totalLiquido - custoTotalOS(r.os)) / totalLiquido : 0;
+      { label:'Logística Peças (aparelho) (R$)', fn: r => (r.os.logisticaPecas||0) * r.share, type:'number' },
+      { label:'Horas de Serviço (aparelho)', fn: r => (r.os.horasServico||0) * r.share, type:'number', fmt:'0.00' },
+      { label:'Custo Horas (aparelho) (R$)', fn: r => (r.os.custoHoras||0) * r.share, type:'number' },
+      { label:'Logística Equipamento (aparelho) (R$)', fn: r => (r.os.logisticaEquipamento||0) * r.share, type:'number' },
+      { label:'Custo Total (aparelho) (R$)', fn: r => custoTotalDevice(r), type:'number' },
+      { label:'Imposto (aparelho) (R$)', fn: r => impostoDevice(r), type:'number' },
+      { label:'Total (aparelho) (R$)', fn: r => totalLiquidoDevice(r), type:'number' },
+      { label:'Lucro (aparelho) (R$)', fn: r => lucroDevice(r), type:'number' },
+      { label:'Margem (aparelho) (%)', fn: r => {
+          const tl = totalLiquidoDevice(r);
+          return tl > 0 ? lucroDevice(r) / tl : 0;
         }, type:'number', fmt:'0.0%' },
-      { label:'Data Entrada',   fn: r => r.isPrimeira ? formatDate(r.os.dataEntrada) : '' },
-      { label:'Data Prevista',  fn: r => r.isPrimeira ? formatDate(r.os.dataPrevista) : '' },
-      { label:'Observações',    fn: r => r.isPrimeira ? r.os.observacoes : '' },
+      { label:'Data Entrada',   fn: r => formatDate(r.os.dataEntrada) },
+      { label:'Data Prevista',  fn: r => formatDate(r.os.dataPrevista) },
+      { label:'Observações',    fn: r => r.os.observacoes },
     ];
     const suffix = statusFiltro ? `-${statusFiltro.replace(/\s/g,'-')}` : '-todos';
     downloadXLSX(toWorksheet(linhas, cols), `mobit-os${suffix}-${todayISO()}.xlsx`, 'Ordens de Serviço');
