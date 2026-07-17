@@ -2264,7 +2264,7 @@
       <!-- ABA IMPORTAR -->
       <div id="tab-import" style="padding:24px; display:none;">
         <p style="font-size:13px; color:var(--text-dim); margin-bottom:18px;">
-          Importe dados a partir de um arquivo <strong>CSV</strong>. Baixe o modelo da tabela desejada, preencha e envie.
+          Importe dados a partir de um arquivo <strong>Excel (.xlsx)</strong>. Baixe o modelo da tabela desejada, preencha e envie.
         </p>
 
         <!-- Modelos -->
@@ -2278,7 +2278,7 @@
 
         <!-- Upload -->
         <div style="border:1px solid var(--border); border-radius:8px; padding:16px;">
-          <div style="font-size:13px; font-weight:700; margin-bottom:12px;">Enviar arquivo CSV</div>
+          <div style="font-size:13px; font-weight:700; margin-bottom:12px;">Enviar arquivo Excel</div>
           <div style="margin-bottom:12px;">
             <label style="font-size:11px; color:var(--text-dim); display:block; margin-bottom:4px;">Tipo de dado</label>
             <select id="imp-tipo" style="width:100%; background:var(--panel-2); border:1px solid var(--border); border-radius:6px; color:var(--text); padding:8px 10px; font-size:13px;">
@@ -2293,12 +2293,12 @@
             ondragleave="this.style.borderColor='var(--border)'"
             ondrop="handleFileDrop(event)">
             <div style="font-size:28px; margin-bottom:8px;">📂</div>
-            <div style="font-size:13px; color:var(--text-dim);">Clique ou arraste o arquivo CSV aqui</div>
+            <div style="font-size:13px; color:var(--text-dim);">Clique ou arraste o arquivo .xlsx aqui</div>
             <div id="imp-filename" style="font-size:12px; color:var(--accent); margin-top:6px;"></div>
           </div>
-          <input type="file" id="imp-file" accept=".csv" style="display:none" onchange="onImportFileSelect(event)">
+          <input type="file" id="imp-file" accept=".xlsx,.xls,.csv" style="display:none" onchange="onImportFileSelect(event)">
           <div id="imp-preview" style="display:none; font-size:12px; color:var(--text-dim); margin-bottom:12px; background:var(--panel-2); border-radius:6px; padding:10px;"></div>
-          <button onclick="importCSV()" class="btn btn-primary" style="width:100%;" id="btn-importar" disabled>Importar dados</button>
+          <button onclick="importData()" class="btn btn-primary" style="width:100%;" id="btn-importar" disabled>Importar dados</button>
           <div id="imp-error" style="display:none; margin-top:10px; font-size:12px; color:#ff5f6d; text-align:center;"></div>
         </div>
       </div>
@@ -5146,6 +5146,19 @@ function downloadXLSX(ws, filename, sheetName){
   XLSX.writeFile(wb, filename);
 }
 
+// Estima o custo de uma peça usada numa OS: busca o custo atual no estoque
+// pelo stockId; se a peça já foi removida do estoque, aplica a regra de
+// precificação de forma inversa (venda = 2x custo, ou R$150 fixo p/ custo <= R$75)
+// como aproximação — nesse caso o valor é uma estimativa, não o custo real histórico.
+function custoPecaOS(part){
+  const stockItem = state.stock.find(s => s.id === part.stockId);
+  const custoUnit = stockItem ? (stockItem.custo || 0) : (part.preco || 0) / 2;
+  return custoUnit * (part.qtd || 0);
+}
+function custoPecasOS(o){
+  return (o.parts || []).reduce((sum, p) => sum + custoPecaOS(p), 0);
+}
+
 function exportCSV(tipo){
   if(tipo === 'os'){
     const statusFiltro = document.getElementById('exp-os-status').value;
@@ -5172,7 +5185,11 @@ function exportCSV(tipo){
       { label:'Forma Pgto',     key:'pagamento' },
       { label:'Garantia (dias)',key:'garantia', type:'number', fmt:'0' },
       { label:'Mão de Obra',    fn: o => o.maoObra||0, type:'number' },
+      { label:'Custo Peças (R$)', fn: o => custoPecasOS(o), type:'number' },
+      { label:'Custo Total (R$)', fn: o => custoPecasOS(o), type:'number' },
       { label:'Total (R$)',     fn: o => o.total||0, type:'number' },
+      { label:'Lucro Total (R$)', fn: o => (o.total||0) - custoPecasOS(o), type:'number' },
+      { label:'Margem (%)',     fn: o => (o.total||0) > 0 ? ((o.total||0) - custoPecasOS(o)) / (o.total||0) : 0, type:'number', fmt:'0.0%' },
       { label:'Data Entrada',   fn: o => formatDate(o.dataEntrada) },
       { label:'Data Prevista',  fn: o => formatDate(o.dataPrevista) },
       { label:'Observações',    key:'observacoes' },
@@ -5229,26 +5246,22 @@ function exportCSV(tipo){
 
 /* ---- TEMPLATES ---- */
 function downloadTemplate(tipo){
-  const NL = '\n';
-  let csv = '';
+  let cols, exemplo;
   if(tipo === 'clientes'){
-    csv  = ['"Nome"','"Telefone"','"Email"','"CPF/CNPJ"','"Endere\u00e7o"','"Obs."'].join(',') + NL;
-    csv += ['"Maria Exemplo"','"(11) 99999-0000"','"maria@email.com"','"123.456.789-00"','"Rua das Flores, 10"','""'].join(',') + NL;
+    cols   = ['Nome','Telefone','Email','CPF/CNPJ','Endereço','Obs.'];
+    exemplo = ['Maria Exemplo','(11) 99999-0000','maria@email.com','123.456.789-00','Rua das Flores, 10',''];
   }
   if(tipo === 'estoque'){
-    csv  = ['"C\u00f3digo"','"Nome"','"Categoria"','"Compat\u00edvel"','"Qtd Atual"','"Qtd M\u00ednima"','"Localiza\u00e7\u00e3o"','"Custo (R$)"','"Venda (R$)"'].join(',') + NL;
-    csv += ['"P001"','"Tela iPhone 13"','"Display"','"iPhone 13"','"5"','"2"','"Gaveta A1"','"150.00"','"280.00"'].join(',') + NL;
+    cols   = ['Código','Nome','Categoria','Compatível','Qtd Atual','Qtd Mínima','Localização','Custo (R$)','Venda (R$)'];
+    exemplo = ['P001','Tela iPhone 13','Display','iPhone 13',5,2,'Gaveta A1',150.00,280.00];
   }
-  const bom  = '\uFEFF';
-  const blob = new Blob([bom + csv], { type:'text/csv;charset=utf-8;' });
-  const url  = URL.createObjectURL(blob);
-  const a    = document.createElement('a');
-  a.href = url; a.download = 'modelo-' + tipo + '.csv';
-  document.body.appendChild(a); a.click();
-  document.body.removeChild(a); URL.revokeObjectURL(url);
+  const ws = XLSX.utils.aoa_to_sheet([cols, exemplo]);
+  ws['!cols'] = cols.map((c,i) => ({ wch: Math.max(c.length+2, String(exemplo[i]).length+2, 12) }));
+  ws['!views'] = [{ state:'frozen', ySplit:1 }];
+  downloadXLSX(ws, 'modelo-' + tipo + '.xlsx', 'Modelo');
 }
 
-/* ---- IMPORTAR CSV ---- */
+/* ---- IMPORTAR EXCEL ---- */
 let _importRows = [];
 let _importFile = null;
 
@@ -5256,8 +5269,8 @@ function handleFileDrop(e){
   e.preventDefault();
   document.getElementById('imp-dropzone').style.borderColor = 'var(--border)';
   const file = e.dataTransfer.files[0];
-  if(file && file.name.endsWith('.csv')) processImportFile(file);
-  else showToast('Envie um arquivo .csv', true);
+  if(file && /\.(xlsx|xls|csv)$/i.test(file.name)) processImportFile(file);
+  else showToast('Envie um arquivo .xlsx, .xls ou .csv', true);
 }
 
 function onImportFileSelect(e){
@@ -5269,18 +5282,38 @@ function onImportFileSelect(e){
 function processImportFile(file){
   _importFile = file;
   document.getElementById('imp-filename').textContent = file.name;
+  const isCSV = /\.csv$/i.test(file.name);
   const reader = new FileReader();
+
   reader.onload = e => {
     try {
-      const text = e.target.result.replace(/^\uFEFF/,''); // remover BOM
-      const lines = text.split(/\r?\n/).filter(l => l.trim());
-      const header = parseCSVLine(lines[0]);
-      _importRows  = lines.slice(1).map(l => {
-        const vals = parseCSVLine(l);
-        const obj  = {};
-        header.forEach((h,i) => obj[h.trim()] = (vals[i]||'').trim());
-        return obj;
-      }).filter(r => Object.values(r).some(v => v));
+      let header, rows;
+
+      if(isCSV){
+        // Compatibilidade com arquivos .csv antigos
+        const text = e.target.result.replace(/^\uFEFF/,'');
+        const lines = text.split(/\r?\n/).filter(l => l.trim());
+        header = parseCSVLine(lines[0]).map(h => h.trim());
+        rows = lines.slice(1).map(l => {
+          const vals = parseCSVLine(l);
+          const obj  = {};
+          header.forEach((h,i) => obj[h] = (vals[i]||'').trim());
+          return obj;
+        });
+      } else {
+        // .xlsx / .xls via SheetJS
+        const wb = XLSX.read(e.target.result, { type:'array' });
+        const ws = wb.Sheets[wb.SheetNames[0]];
+        const aoa = XLSX.utils.sheet_to_json(ws, { header:1, defval:'', raw:true });
+        header = (aoa[0] || []).map(h => String(h).trim());
+        rows = aoa.slice(1).map(line => {
+          const obj = {};
+          header.forEach((h,i) => obj[h] = line[i] !== undefined ? line[i] : '');
+          return obj;
+        });
+      }
+
+      _importRows = rows.filter(r => Object.values(r).some(v => v !== '' && v !== null && v !== undefined));
 
       const preview = document.getElementById('imp-preview');
       preview.style.display = 'block';
@@ -5293,7 +5326,9 @@ function processImportFile(file){
       document.getElementById('imp-error').style.display = 'block';
     }
   };
-  reader.readAsText(file, 'UTF-8');
+
+  if(isCSV) reader.readAsText(file, 'UTF-8');
+  else reader.readAsArrayBuffer(file);
 }
 
 function parseCSVLine(line){
@@ -5308,7 +5343,7 @@ function parseCSVLine(line){
   return result;
 }
 
-async function importCSV(){
+async function importData(){
   const tipo = document.getElementById('imp-tipo').value;
   const err  = document.getElementById('imp-error');
   const btn  = document.getElementById('btn-importar');
@@ -5322,9 +5357,9 @@ async function importCSV(){
       for(const r of _importRows){
         if(!r['Nome']) continue;
         const id = 'c' + Date.now() + Math.random().toString(36).slice(2,6);
-        const row = { id, nome:r['Nome']||'', telefone:r['Telefone']||'',
-          email:r['Email']||'', cpfcnpj:r['CPF/CNPJ']||'',
-          endereco:r['Endereço']||r['Endereco']||'', observacoes:r['Obs.']||'' };
+        const row = { id, nome:String(r['Nome']||''), telefone:String(r['Telefone']||''),
+          email:String(r['Email']||''), cpfcnpj:String(r['CPF/CNPJ']||''),
+          endereco:String(r['Endereço']||r['Endereco']||''), observacoes:String(r['Obs.']||'') };
         await sbPost('clientes', row);
         state.clients.push(row);
         ok++;
@@ -5336,10 +5371,10 @@ async function importCSV(){
       for(const r of _importRows){
         if(!r['Nome']) continue;
         const id = 'p' + Date.now() + Math.random().toString(36).slice(2,6);
-        const row = { id, codigo:r['Código']||r['Codigo']||'', nome:r['Nome']||'',
-          categoria:r['Categoria']||'', compativel:r['Compatível']||r['Compativel']||'',
+        const row = { id, codigo:String(r['Código']||r['Codigo']||''), nome:String(r['Nome']||''),
+          categoria:String(r['Categoria']||''), compativel:String(r['Compatível']||r['Compativel']||''),
           quantidade:parseInt(r['Qtd Atual'])||0, minimo:parseInt(r['Qtd Mínima'])||0,
-          local:r['Localização']||r['Localizacao']||'',
+          local:String(r['Localização']||r['Localizacao']||''),
           custo:parseFloat(r['Custo (R$)'])||0, venda:parseFloat(r['Venda (R$)'])||0 };
         await sbPost('estoque', row);
         state.stock.push(row);
