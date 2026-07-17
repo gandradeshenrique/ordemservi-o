@@ -1371,20 +1371,24 @@
     <fieldset>
       <legend>Aparelho</legend>
 
-      <!-- Resumo colapsável — visível só quando há aparelhos extras -->
-      <div id="aparelho-principal-resumo" style="display:none; background:var(--panel-2); border:1px solid var(--border); border-radius:8px; padding:10px 14px; margin-bottom:12px; cursor:pointer;" onclick="toggleAparelhoPrincipal()">
-        <div style="display:flex; justify-content:space-between; align-items:center;">
-          <div>
-            <span style="font-size:11px; font-weight:700; color:var(--accent); text-transform:uppercase; letter-spacing:0.05em;">Aparelho 1 — </span>
-            <span id="resumo-aparelho-nome" style="font-size:13px; font-weight:600;"></span>
-            <span id="resumo-aparelho-defeito" style="font-size:12px; color:var(--text-dim); margin-left:8px;"></span>
-          </div>
-          <span id="resumo-toggle-icon" style="color:var(--text-faint); font-size:14px;">▼ expandir</span>
-        </div>
-      </div>
+      <!-- Card do aparelho principal — mesmo visual dos extras -->
+      <div id="aparelho-principal-card" style="border:1px solid var(--border); border-radius:var(--radius); overflow:hidden; background:var(--panel-2);">
 
-      <!-- Campos completos do aparelho principal -->
-      <div id="aparelho-principal-campos">
+        <!-- Barra de cabeçalho -->
+        <div style="display:flex; justify-content:space-between; align-items:center; padding:10px 14px; background:var(--panel-2); border-bottom:1px solid var(--border);">
+          <span style="font-size:12px; font-weight:700; color:var(--accent); text-transform:uppercase; letter-spacing:0.05em;">Aparelho 1</span>
+          <span id="resumo-toggle-icon" style="font-size:12px; color:var(--text-faint); cursor:pointer;" onclick="toggleAparelhoPrincipal()">▼ recolher</span>
+        </div>
+
+        <!-- Resumo colapsado -->
+        <div id="aparelho-principal-resumo" style="display:none; align-items:center; gap:8px; padding:8px 14px; cursor:pointer; background:var(--panel-2);" onclick="toggleAparelhoPrincipal()">
+          <span id="resumo-aparelho-nome" style="font-size:13px; font-weight:600;"></span>
+          <span id="resumo-aparelho-defeito" style="font-size:12px; color:var(--text-dim);"></span>
+          <span style="margin-left:auto; font-size:12px; color:var(--text-faint);">▶ expandir</span>
+        </div>
+
+        <!-- Campos completos do aparelho principal -->
+        <div id="aparelho-principal-campos" style="padding:14px 16px;">
       <div class="field-row">
         <div class="field">
           <label>Marca / Modelo *</label>
@@ -1541,7 +1545,7 @@
       </div>
 
       <!-- Peças do aparelho principal -->
-      <div class="ae-parts-section" style="border-top:1px solid var(--border); padding:10px 0 2px; margin-top:12px;">
+      <div class="ae-parts-section" style="border-top:1px solid var(--border); padding:10px 16px 2px;">
         <label style="font-size:12px; font-weight:700; color:var(--text-dim); text-transform:uppercase; letter-spacing:0.05em;">Peças utilizadas</label>
         <div class="parts-list" id="os-parts-list" style="margin-top:8px;"></div>
         <div style="display:flex; gap:10px; align-items:center; margin-top:6px; flex-wrap:wrap;">
@@ -1559,6 +1563,8 @@
       </div>
 
       </div><!-- fim #aparelho-principal-campos -->
+
+      </div><!-- fim #aparelho-principal-card -->
 
       <!-- APARELHOS EXTRAS -->
       <div id="aparelhos-extras-list" style="display:flex; flex-direction:column; gap:12px; margin-top:12px;"></div>
@@ -3380,6 +3386,7 @@ function openOSModal(osId){
   document.getElementById('aparelhos-extras-list').innerHTML = '';
   document.getElementById('aparelho-principal-resumo').style.display = 'none';
   document.getElementById('aparelho-principal-campos').style.display = 'block';
+  document.getElementById('resumo-toggle-icon').textContent = '▼ recolher';
 
   if(osId){
     const o = state.os.find(x => x.id === osId);
@@ -3987,20 +3994,22 @@ async function saveOS(){
 
 /* ---------- Aparelhos extras ---------- */
 function toggleAparelhoPrincipal(){
-  const campos = document.getElementById('aparelho-principal-campos');
-  const icon   = document.getElementById('resumo-toggle-icon');
-  const aberto = campos.style.display !== 'none';
-  campos.style.display = aberto ? 'none' : 'block';
+  const campos  = document.getElementById('aparelho-principal-campos');
+  const resumo  = document.getElementById('aparelho-principal-resumo');
+  const icon    = document.getElementById('resumo-toggle-icon');
+  const aberto  = campos.style.display !== 'none';
+  campos.style.display  = aberto ? 'none' : 'block';
+  resumo.style.display  = aberto ? 'flex' : 'none';
   icon.textContent = aberto ? '▶ expandir' : '▼ recolher';
 }
 
 function colapsarAparelhoPrincipal(){
-  const nome   = document.getElementById('ac-aparelho-input').value.trim() || '(sem modelo)';
+  const nome    = document.getElementById('ac-aparelho-input').value.trim() || '(sem modelo)';
   const defeito = document.getElementById('os-defeito').value.trim();
   document.getElementById('resumo-aparelho-nome').textContent = nome;
   document.getElementById('resumo-aparelho-defeito').textContent = defeito ? '— ' + (defeito.length > 40 ? defeito.slice(0,40)+'…' : defeito) : '';
   document.getElementById('resumo-toggle-icon').textContent = '▶ expandir';
-  document.getElementById('aparelho-principal-resumo').style.display = 'block';
+  document.getElementById('aparelho-principal-resumo').style.display = 'flex';
   document.getElementById('aparelho-principal-campos').style.display = 'none';
 }
 
