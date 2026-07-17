@@ -5403,7 +5403,12 @@ function toWorksheet(rows, cols){
   const header = cols.map(c => c.label);
   const data = rows.map(r => cols.map(c => {
     const raw = c.fn ? c.fn(r) : (r[c.key] ?? '');
-    if(c.type === 'number') return (typeof raw === 'number') ? raw : (parseFloat(raw) || 0);
+    if(c.type === 'number'){
+      // Célula vazia proposital (ex: valor de OS que só aparece na linha do
+      // aparelho principal) continua vazia, em vez de virar "0".
+      if(raw === '' || raw === null || raw === undefined) return '';
+      return (typeof raw === 'number') ? raw : (parseFloat(raw) || 0);
+    }
     return raw ?? '';
   }));
 
@@ -5480,39 +5485,59 @@ function exportCSV(tipo){
 
     if(!dados.length){ showToast('Nenhuma OS encontrada com esses filtros.', true); return; }
 
+    // Quebra cada OS em uma linha por aparelho (principal + extras), pra dar
+    // controle individual de peças/mão de obra usadas em cada reparo. Os
+    // valores que são da OS como um todo (imposto, total, lucro, margem etc.)
+    // só aparecem na linha do aparelho principal, pra não duplicar o valor
+    // ao somar a coluna no Excel.
+    const linhas = [];
+    dados.forEach(o => {
+      const dispositivos = [
+        { tipo:'Principal', modelo:o.aparelho||'', imei:o.imei||'', defeito:o.defeito||'', parts:o.parts||[], maoObra:o.maoObra||0 },
+        ...(o.aparelhosExtras||[]).map((ae, idx) => ({
+          tipo:`Extra ${idx+1}`, modelo:ae.modelo||'', imei:ae.imei||'', defeito:ae.defeito||'',
+          parts:ae.parts||[], maoObra:ae.maoObra||0
+        }))
+      ];
+      dispositivos.forEach((d, idx) => linhas.push({ os:o, device:d, isPrimeira: idx===0 }));
+    });
+
     const cols = [
-      { label:'Nº OS',          fn: o => String(o.numero).padStart(4,'0') },
-      { label:'Cliente',        key:'clienteNome' },
-      { label:'Telefone',       key:'clienteTelefone' },
-      { label:'Chamado',        key:'chamado' },
-      { label:'Aparelho',       key:'aparelho' },
-      { label:'IMEI',           key:'imei' },
-      { label:'Defeito',        key:'defeito' },
-      { label:'Diagnóstico',    key:'diagnostico' },
-      { label:'Status',         key:'status' },
-      { label:'Forma Pgto',     key:'pagamento' },
-      { label:'Garantia (dias)',key:'garantia', type:'number', fmt:'0' },
-      { label:'Mão de Obra',    fn: o => o.maoObra||0, type:'number' },
-      { label:'Custo Peças (R$)', fn: o => custoPecasOS(o), type:'number' },
-      { label:'Logística Peças (R$)', fn: o => o.logisticaPecas||0, type:'number' },
-      { label:'Horas de Serviço', fn: o => o.horasServico||0, type:'number', fmt:'0.00' },
-      { label:'Custo Horas (R$)', fn: o => o.custoHoras||0, type:'number' },
-      { label:'Logística Equipamento (R$)', fn: o => o.logisticaEquipamento||0, type:'number' },
-      { label:'Custo Total (R$)', fn: o => custoTotalOS(o), type:'number' },
-      { label:'Imposto (R$)',   fn: o => impostoOS(o), type:'number' },
-      { label:'Total (R$)',     fn: o => (o.total||0) - impostoOS(o), type:'number' },
-      { label:'Lucro Total (R$)', fn: o => ((o.total||0) - impostoOS(o)) - custoTotalOS(o), type:'number' },
-      { label:'Margem (%)',     fn: o => {
-          const totalLiquido = (o.total||0) - impostoOS(o);
-          return totalLiquido > 0 ? (totalLiquido - custoTotalOS(o)) / totalLiquido : 0;
+      { label:'Nº OS',          fn: r => String(r.os.numero).padStart(4,'0') },
+      { label:'Aparelho',       fn: r => r.device.modelo },
+      { label:'Item',           fn: r => r.device.tipo },
+      { label:'Cliente',        fn: r => r.isPrimeira ? r.os.clienteNome : '' },
+      { label:'Telefone',       fn: r => r.isPrimeira ? r.os.clienteTelefone : '' },
+      { label:'Chamado',        fn: r => r.isPrimeira ? r.os.chamado : '' },
+      { label:'IMEI',           fn: r => r.device.imei },
+      { label:'Defeito',        fn: r => r.device.defeito },
+      { label:'Peças Utilizadas', fn: r => (r.device.parts||[]).map(p => `${p.nome} x${p.qtd}`).join(', ') },
+      { label:'Diagnóstico',    fn: r => r.isPrimeira ? r.os.diagnostico : '' },
+      { label:'Status',         fn: r => r.isPrimeira ? r.os.status : '' },
+      { label:'Forma Pgto',     fn: r => r.isPrimeira ? r.os.pagamento : '' },
+      { label:'Garantia (dias)',fn: r => r.isPrimeira ? r.os.garantia : '', type:'number', fmt:'0' },
+      { label:'Mão de Obra (aparelho)', fn: r => r.device.maoObra||0, type:'number' },
+      { label:'Custo Peças (aparelho) (R$)', fn: r => custoPecasOS(r.device), type:'number' },
+      { label:'Logística Peças (R$)', fn: r => r.isPrimeira ? (r.os.logisticaPecas||0) : '', type:'number' },
+      { label:'Horas de Serviço', fn: r => r.isPrimeira ? (r.os.horasServico||0) : '', type:'number', fmt:'0.00' },
+      { label:'Custo Horas (R$)', fn: r => r.isPrimeira ? (r.os.custoHoras||0) : '', type:'number' },
+      { label:'Logística Equipamento (R$)', fn: r => r.isPrimeira ? (r.os.logisticaEquipamento||0) : '', type:'number' },
+      { label:'Custo Total OS (R$)', fn: r => r.isPrimeira ? custoTotalOS(r.os) : '', type:'number' },
+      { label:'Imposto (R$)',   fn: r => r.isPrimeira ? impostoOS(r.os) : '', type:'number' },
+      { label:'Total OS (R$)',  fn: r => r.isPrimeira ? ((r.os.total||0) - impostoOS(r.os)) : '', type:'number' },
+      { label:'Lucro Total (R$)', fn: r => r.isPrimeira ? (((r.os.total||0) - impostoOS(r.os)) - custoTotalOS(r.os)) : '', type:'number' },
+      { label:'Margem (%)',     fn: r => {
+          if(!r.isPrimeira) return '';
+          const totalLiquido = (r.os.total||0) - impostoOS(r.os);
+          return totalLiquido > 0 ? (totalLiquido - custoTotalOS(r.os)) / totalLiquido : 0;
         }, type:'number', fmt:'0.0%' },
-      { label:'Data Entrada',   fn: o => formatDate(o.dataEntrada) },
-      { label:'Data Prevista',  fn: o => formatDate(o.dataPrevista) },
-      { label:'Observações',    key:'observacoes' },
+      { label:'Data Entrada',   fn: r => r.isPrimeira ? formatDate(r.os.dataEntrada) : '' },
+      { label:'Data Prevista',  fn: r => r.isPrimeira ? formatDate(r.os.dataPrevista) : '' },
+      { label:'Observações',    fn: r => r.isPrimeira ? r.os.observacoes : '' },
     ];
     const suffix = statusFiltro ? `-${statusFiltro.replace(/\s/g,'-')}` : '-todos';
-    downloadXLSX(toWorksheet(dados, cols), `mobit-os${suffix}-${todayISO()}.xlsx`, 'Ordens de Serviço');
-    showToast(`${dados.length} OS exportadas com sucesso.`);
+    downloadXLSX(toWorksheet(linhas, cols), `mobit-os${suffix}-${todayISO()}.xlsx`, 'Ordens de Serviço');
+    showToast(`${dados.length} OS exportadas (${linhas.length} linhas de aparelho).`);
   }
 
   if(tipo === 'clientes'){
