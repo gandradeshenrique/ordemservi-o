@@ -5501,16 +5501,17 @@ function exportCSV(tipo){
         }))
       ];
       const totalOS = o.total || 0;
+      const shareIgual = 1 / dispositivos.length; // logística/horas: dividido igualmente entre os aparelhos
       dispositivos.forEach(d => {
         const subtotalBruto = (d.parts||[]).reduce((s,p) => s + p.qtd*p.preco, 0) + (d.maoObra||0);
-        const share = totalOS > 0 ? (subtotalBruto / totalOS) : (1 / dispositivos.length);
-        linhas.push({ os:o, device:d, subtotalBruto, share });
+        const share = totalOS > 0 ? (subtotalBruto / totalOS) : shareIgual; // imposto/lucro: proporcional ao valor do aparelho
+        linhas.push({ os:o, device:d, subtotalBruto, share, shareIgual });
       });
     });
 
     const custoOperacionalOS = o => (o.logisticaPecas||0) + (o.custoHoras||0) + (o.logisticaEquipamento||0);
     const impostoDevice = r => r.subtotalBruto * TAXA_IMPOSTO_OS;
-    const custoTotalDevice = r => custoPecasOS(r.device) + custoOperacionalOS(r.os) * r.share;
+    const custoTotalDevice = r => custoPecasOS(r.device) + custoOperacionalOS(r.os) * r.shareIgual;
     const totalLiquidoDevice = r => r.subtotalBruto - impostoDevice(r);
     const lucroDevice = r => totalLiquidoDevice(r) - custoTotalDevice(r);
 
@@ -5529,10 +5530,10 @@ function exportCSV(tipo){
       { label:'Garantia (dias)',fn: r => r.os.garantia, type:'number', fmt:'0' },
       { label:'Mão de Obra (aparelho)', fn: r => r.device.maoObra||0, type:'number' },
       { label:'Custo Peças (aparelho) (R$)', fn: r => custoPecasOS(r.device), type:'number' },
-      { label:'Logística Peças (aparelho) (R$)', fn: r => (r.os.logisticaPecas||0) * r.share, type:'number' },
-      { label:'Horas de Serviço (aparelho)', fn: r => (r.os.horasServico||0) * r.share, type:'number', fmt:'0.00' },
-      { label:'Custo Horas (aparelho) (R$)', fn: r => (r.os.custoHoras||0) * r.share, type:'number' },
-      { label:'Logística Equipamento (aparelho) (R$)', fn: r => (r.os.logisticaEquipamento||0) * r.share, type:'number' },
+      { label:'Logística Peças (aparelho) (R$)', fn: r => (r.os.logisticaPecas||0) * r.shareIgual, type:'number' },
+      { label:'Horas de Serviço (aparelho)', fn: r => (r.os.horasServico||0) * r.shareIgual, type:'number', fmt:'0.00' },
+      { label:'Custo Horas (aparelho) (R$)', fn: r => (r.os.custoHoras||0) * r.shareIgual, type:'number' },
+      { label:'Logística Equipamento (aparelho) (R$)', fn: r => (r.os.logisticaEquipamento||0) * r.shareIgual, type:'number' },
       { label:'Custo Total (aparelho) (R$)', fn: r => custoTotalDevice(r), type:'number' },
       { label:'Imposto (aparelho) (R$)', fn: r => impostoDevice(r), type:'number' },
       { label:'Total (aparelho) (R$)', fn: r => totalLiquidoDevice(r), type:'number' },
