@@ -5159,6 +5159,12 @@ function custoPecasOS(o){
   return (o.parts || []).reduce((sum, p) => sum + custoPecaOS(p), 0);
 }
 
+// Imposto sobre o valor bruto da OS: taxa de cartão/adquirente (2,9%) + imposto (3,65%)
+const TAXA_IMPOSTO_OS = (2.9 + 3.65) / 100;
+function impostoOS(o){
+  return (o.total || 0) * TAXA_IMPOSTO_OS;
+}
+
 function exportCSV(tipo){
   if(tipo === 'os'){
     const statusFiltro = document.getElementById('exp-os-status').value;
@@ -5187,9 +5193,13 @@ function exportCSV(tipo){
       { label:'Mão de Obra',    fn: o => o.maoObra||0, type:'number' },
       { label:'Custo Peças (R$)', fn: o => custoPecasOS(o), type:'number' },
       { label:'Custo Total (R$)', fn: o => custoPecasOS(o), type:'number' },
-      { label:'Total (R$)',     fn: o => o.total||0, type:'number' },
-      { label:'Lucro Total (R$)', fn: o => (o.total||0) - custoPecasOS(o), type:'number' },
-      { label:'Margem (%)',     fn: o => (o.total||0) > 0 ? ((o.total||0) - custoPecasOS(o)) / (o.total||0) : 0, type:'number', fmt:'0.0%' },
+      { label:'Imposto (R$)',   fn: o => impostoOS(o), type:'number' },
+      { label:'Total (R$)',     fn: o => (o.total||0) - impostoOS(o), type:'number' },
+      { label:'Lucro Total (R$)', fn: o => ((o.total||0) - impostoOS(o)) - custoPecasOS(o), type:'number' },
+      { label:'Margem (%)',     fn: o => {
+          const totalLiquido = (o.total||0) - impostoOS(o);
+          return totalLiquido > 0 ? (totalLiquido - custoPecasOS(o)) / totalLiquido : 0;
+        }, type:'number', fmt:'0.0%' },
       { label:'Data Entrada',   fn: o => formatDate(o.dataEntrada) },
       { label:'Data Prevista',  fn: o => formatDate(o.dataPrevista) },
       { label:'Observações',    key:'observacoes' },
