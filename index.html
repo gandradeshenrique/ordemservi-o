@@ -2635,9 +2635,13 @@ function renderDashboard(){
   const gastosA = compA.reduce((s,c) => s + (c.valorTotal||0), 0);
   const lucroA  = fatA - gastosA;
 
-  // Ticket médio
-  const ticketA = concA ? fatA / concA : 0;
-  const ticketB = concB ? fatB / concB : 0;
+  const compB = state.compras.filter(c => c.dataPedido >= bDe && c.dataPedido <= bAte);
+  const gastosB = compB.reduce((s,c) => s + (c.valorTotal||0), 0);
+  const lucroB  = fatB - gastosB;
+
+  // Média Margem (margem de lucro média do período)
+  const margemA = fatA ? (lucroA / fatA) * 100 : 0;
+  const margemB = fatB ? (lucroB / fatB) * 100 : 0;
 
   function delta(a, b){
     if(!b) return '';
@@ -2652,7 +2656,7 @@ function renderDashboard(){
     { label:'Faturamento',   val: formatCurrency(fatA),         sub: 'vs Período (Comparativo)' + delta(fatA, fatB),      cor:'var(--accent)' },
     { label:'OS abertas',    val: tmA,                          sub: 'vs ' + tmB + ' no Período (Comparativo)' + delta(tmA, tmB), cor:'var(--text)' },
     { label:'Concluídas',    val: concA,                        sub: 'vs ' + concB + ' no Período (Comparativo)' + delta(concA, concB), cor:'#28a745' },
-    { label:'Ticket médio', val: formatCurrency(ticketA),      sub: 'vs ' + formatCurrency(ticketB) + delta(ticketA, ticketB), cor:'var(--accent)' },
+    { label:'Média Margem', val: margemA.toFixed(1) + '%',      sub: 'vs ' + margemB.toFixed(1) + '%' + delta(margemA, margemB), cor:'var(--accent)' },
     { label:'Gastos peças', val: formatCurrency(gastosA),      sub: compA.length + ' pedido(s) no período',  cor:'#f59e0b' },
     { label:'Lucro estimado',val: formatCurrency(lucroA),       sub: 'Faturamento − Compras',                 cor: lucroA >= 0 ? '#28a745' : '#dc3545' },
     { label:'Clientes atendidos',val: new Set(osA.map(o=>o.clienteId)).size, sub: 'no período selecionado', cor:'var(--text)' },
@@ -2707,7 +2711,6 @@ function renderDashboard(){
   // ── Gráfico 4: Gastos por fornecedor (barra horizontal) ──
   const fornecedores = ['CNN','SKYTECH'];
   const gastosFornA = fornecedores.map(f => compA.filter(c=>c.fornecedor===f).reduce((s,c)=>s+(c.valorTotal||0),0));
-  const compB = state.compras.filter(c => c.dataPedido >= bDe && c.dataPedido <= bAte);
   const gastosFornB = fornecedores.map(f => compB.filter(c=>c.fornecedor===f).reduce((s,c)=>s+(c.valorTotal||0),0));
 
   const periodoBAtivoForn = isPeriodoBAtivo();
@@ -2743,8 +2746,9 @@ function renderDashboard(){
   const pecasMap = {};
   osA.forEach(o => {
     (o.parts || []).forEach(p => {
-      const nome = p.nome || 'Sem nome';
-      pecasMap[nome] = (pecasMap[nome] || 0) + (p.qtd || 1);
+      const stockItem = state.stock.find(s => s.id === p.stockId);
+      const item = (stockItem && stockItem.categoria) || 'Sem categoria';
+      pecasMap[item] = (pecasMap[item] || 0) + (p.qtd || 1);
     });
   });
   const pecasOrdenadas = Object.entries(pecasMap).sort((a,b) => b[1]-a[1]).slice(0,8);
@@ -2797,7 +2801,7 @@ function renderDashboard(){
   const critico = state.stock.filter(s=>s.quantidade<=s.minimo).slice(0,8);
   document.getElementById('dash-estoque-critico').innerHTML = critico.length
     ? critico.map(s => `<tr>
-        <td style="padding:7px 10px;">${escapeHtml(s.nome)}${s.detalhes?'<span style="font-size:11px;color:var(--text-faint);margin-left:4px;">'+escapeHtml(s.detalhes)+'</span>':''}</td>
+        <td style="padding:7px 10px;">${s.categoria?escapeHtml(s.categoria)+' - ':''}${escapeHtml(s.nome)}${s.detalhes?' - <span style="font-size:11px;color:var(--text-faint);">'+escapeHtml(s.detalhes)+'</span>':''}</td>
         <td style="padding:7px 10px;text-align:center;color:${s.quantidade===0?'#dc3545':'#f59e0b'};font-weight:700;">${s.quantidade}</td>
         <td style="padding:7px 10px;text-align:center;color:var(--text-dim);">${s.minimo}</td>
       </tr>`).join('')
@@ -4641,6 +4645,12 @@ function viewOS(osId){
           const aSub = (a.parts||[]).reduce((s,p)=>s+p.qtd*p.preco,0) + (a.maoObra||0);
           return `<div class="card" style="margin-bottom:10px; border-left:3px solid var(--accent);">
             <div style="font-size:12px; font-weight:700; color:var(--accent); margin-bottom:8px;">Aparelho ${i+2} — ${escapeHtml(a.modelo)}</div>
+            <div class="kv-list" style="margin-bottom:8px;">
+              ${a.imei ? `<div class="kv-row"><span class="kv-label">IMEI / Série</span><span class="kv-value mono">${escapeHtml(a.imei)}</span></div>` : ''}
+              ${a.defeito ? `<div class="kv-row"><span class="kv-label">Defeito</span><span class="kv-value">${escapeHtml(a.defeito)}</span></div>` : ''}
+              ${a.senha ? `<div class="kv-row"><span class="kv-label">Senha</span><span class="kv-value mono">${escapeHtml(a.senha)}</span></div>` : ''}
+              ${a.acessorios ? `<div class="kv-row"><span class="kv-label">Acessórios</span><span class="kv-value">${escapeHtml(a.acessorios)}</span></div>` : ''}
+            </div>
             ${(a.parts && a.parts.length) || a.maoObra ? `
             <div class="table-wrap" style="border:none; margin-bottom:0;">
               <table>
@@ -4927,6 +4937,36 @@ function printOS(){
     ${o.solicitante    ? '<div class="p-field"><span class="p-field-label">Solicitante:</span><span class="p-field-value">'+escapeHtml(o.solicitante)+'</span></div>' : ''}
     ` : ''}
   </div>
+
+  ${(o.aparelhosExtras && o.aparelhosExtras.length) ? `
+  <div style="margin-bottom:6pt;">
+    <div style="font-size:10pt; font-weight:700; color:#0094d4; border-bottom:1pt solid #0094d4; padding-bottom:3pt; margin-bottom:5pt; text-transform:uppercase; letter-spacing:0.5px;">Aparelhos adicionais</div>
+    <table style="width:100%; border-collapse:collapse; font-size:9.5pt;">
+      <thead>
+        <tr style="background:#f0f0f0;">
+          <th style="border:0.5pt solid #aaa; padding:3pt 6pt; text-align:left;">#</th>
+          <th style="border:0.5pt solid #aaa; padding:3pt 6pt; text-align:left;">Modelo</th>
+          <th style="border:0.5pt solid #aaa; padding:3pt 6pt; text-align:left;">IMEI / Série</th>
+          <th style="border:0.5pt solid #aaa; padding:3pt 6pt; text-align:left;">Defeito relatado</th>
+          <th style="border:0.5pt solid #aaa; padding:3pt 6pt; text-align:left;">Senha</th>
+          <th style="border:0.5pt solid #aaa; padding:3pt 6pt; text-align:left;">Acessórios</th>
+        </tr>
+      </thead>
+      <tbody>
+        ${o.aparelhosExtras.map((a,i) => `
+          <tr>
+            <td style="border:0.5pt solid #aaa; padding:3pt 6pt; text-align:center; color:#0094d4; font-weight:700;">${i+2}</td>
+            <td style="border:0.5pt solid #aaa; padding:3pt 6pt;">${escapeHtml(a.modelo)}</td>
+            <td style="border:0.5pt solid #aaa; padding:3pt 6pt; font-family:monospace;">${escapeHtml(a.imei||'—')}</td>
+            <td style="border:0.5pt solid #aaa; padding:3pt 6pt;">${escapeHtml(a.defeito||'—')}</td>
+            <td style="border:0.5pt solid #aaa; padding:3pt 6pt; font-family:monospace;">${escapeHtml(a.senha||'—')}</td>
+            <td style="border:0.5pt solid #aaa; padding:3pt 6pt;">${escapeHtml(a.acessorios||'—')}</td>
+          </tr>
+        `).join('')}
+      </tbody>
+    </table>
+  </div>
+  ` : ''}
 
   <hr class="p-hr">
 
@@ -5463,6 +5503,34 @@ function custoPecasOS(o){
   return (o.parts || []).reduce((sum, p) => sum + custoPecaOS(p), 0);
 }
 
+// Normaliza a categoria do estoque (minúsculas, sem acento) pra comparar com segurança
+function normalizeCategoria(s){
+  return (s || '').toString().trim().toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+}
+const CATEGORIAS_ACESSORIO = ['capa', 'pelicula', 'carregador'];
+
+// Custo de uma categoria específica (Capa/Película/Carregador) dentro das
+// peças de um aparelho, buscando a categoria no cadastro de Estoque.
+function custoPorCategoriaOS(device, categoriaAlvo){
+  return (device.parts || []).reduce((sum, p) => {
+    const stockItem = state.stock.find(s => s.id === p.stockId);
+    const cat = normalizeCategoria(stockItem ? stockItem.categoria : '');
+    if(cat !== categoriaAlvo) return sum;
+    return sum + custoPecaOS(p);
+  }, 0);
+}
+
+// Custo só das peças de reparo (exclui Capa/Película/Carregador, que já têm
+// coluna própria — assim não conta o mesmo valor duas vezes na planilha).
+function custoPecasReparoOS(device){
+  return (device.parts || []).reduce((sum, p) => {
+    const stockItem = state.stock.find(s => s.id === p.stockId);
+    const cat = normalizeCategoria(stockItem ? stockItem.categoria : '');
+    if(CATEGORIAS_ACESSORIO.includes(cat)) return sum;
+    return sum + custoPecaOS(p);
+  }, 0);
+}
+
 // Imposto sobre o valor bruto da OS: taxa de cartão/adquirente (2,9%) + imposto (3,65%)
 const TAXA_IMPOSTO_OS = (2.9 + 3.65) / 100;
 function impostoOS(o){
@@ -5532,7 +5600,10 @@ function exportCSV(tipo){
       { label:'Garantia (dias)',fn: r => r.os.garantia, type:'number', fmt:'0' },
       { label:'Valor Total do Reparo (aparelho) (R$)', fn: r => r.subtotalBruto, type:'number' },
       { label:'Mão de Obra (aparelho)', fn: r => r.device.maoObra||0, type:'number' },
-      { label:'Custo Peças (aparelho) (R$)', fn: r => custoPecasOS(r.device), type:'number' },
+      { label:'Custo Peças (aparelho) (R$)', fn: r => custoPecasReparoOS(r.device), type:'number' },
+      { label:'Capa (R$)',       fn: r => custoPorCategoriaOS(r.device, 'capa'), type:'number' },
+      { label:'Película (R$)',   fn: r => custoPorCategoriaOS(r.device, 'pelicula'), type:'number' },
+      { label:'Carregador (R$)', fn: r => custoPorCategoriaOS(r.device, 'carregador'), type:'number' },
       { label:'Logística Peças (aparelho) (R$)', fn: r => (r.os.logisticaPecas||0) * r.shareIgual, type:'number' },
       { label:'Horas de Serviço (aparelho)', fn: r => (r.os.horasServico||0) * r.shareIgual, type:'number', fmt:'0.00' },
       { label:'Custo Horas (aparelho) (R$)', fn: r => (r.os.custoHoras||0) * r.shareIgual, type:'number' },
