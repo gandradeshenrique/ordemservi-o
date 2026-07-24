@@ -898,6 +898,7 @@
 
 </style>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 </head>
 <body>
 
@@ -1006,7 +1007,7 @@
               font-size:13px;text-align:left;cursor:pointer;display:flex;align-items:center;gap:8px;
               border-top:1px solid var(--border);"
               onmouseover="this.style.background='var(--panel-2)'" onmouseout="this.style.background='none'">
-              📊 Exportar CSV
+              📊 Exportar Excel
             </button>
           </div>
         </div>
@@ -1283,7 +1284,7 @@
         <button class="btn btn-sm" onclick="limparFiltrosCompra()">Limpar filtros</button>
         <div style="margin-left:auto; display:flex; gap:8px;">
           <button class="btn btn-sm" onclick="openLancarNFModal()">📄 Lançar NF CNN</button>
-          <button class="btn btn-sm" onclick="exportComprasCSV()">⬇ Exportar CSV</button>
+          <button class="btn btn-sm" onclick="exportComprasCSV()">⬇ Exportar Excel</button>
         </div>
       </div>
       <div id="compras-resumo" style="margin:12px 0; display:grid; grid-template-columns:repeat(auto-fit,minmax(160px,1fr)); gap:12px;">
@@ -1371,20 +1372,24 @@
     <fieldset>
       <legend>Aparelho</legend>
 
-      <!-- Resumo colapsável — visível só quando há aparelhos extras -->
-      <div id="aparelho-principal-resumo" style="display:none; background:var(--panel-2); border:1px solid var(--border); border-radius:8px; padding:10px 14px; margin-bottom:12px; cursor:pointer;" onclick="toggleAparelhoPrincipal()">
-        <div style="display:flex; justify-content:space-between; align-items:center;">
-          <div>
-            <span style="font-size:11px; font-weight:700; color:var(--accent); text-transform:uppercase; letter-spacing:0.05em;">Aparelho 1 — </span>
-            <span id="resumo-aparelho-nome" style="font-size:13px; font-weight:600;"></span>
-            <span id="resumo-aparelho-defeito" style="font-size:12px; color:var(--text-dim); margin-left:8px;"></span>
-          </div>
-          <span id="resumo-toggle-icon" style="color:var(--text-faint); font-size:14px;">▼ expandir</span>
-        </div>
-      </div>
+      <!-- Card do aparelho principal — mesmo visual dos extras -->
+      <div id="aparelho-principal-card" style="border:1px solid var(--border); border-radius:var(--radius); overflow:hidden; background:var(--panel-2);">
 
-      <!-- Campos completos do aparelho principal -->
-      <div id="aparelho-principal-campos">
+        <!-- Barra de cabeçalho -->
+        <div style="display:flex; justify-content:space-between; align-items:center; padding:10px 14px; background:var(--panel-2); border-bottom:1px solid var(--border);">
+          <span style="font-size:12px; font-weight:700; color:var(--accent); text-transform:uppercase; letter-spacing:0.05em;">Aparelho 1</span>
+          <span id="resumo-toggle-icon" style="font-size:12px; color:var(--text-faint); cursor:pointer;" onclick="toggleAparelhoPrincipal()">▼ recolher</span>
+        </div>
+
+        <!-- Resumo colapsado -->
+        <div id="aparelho-principal-resumo" style="display:none; align-items:center; gap:8px; padding:8px 14px; cursor:pointer; background:var(--panel-2);" onclick="toggleAparelhoPrincipal()">
+          <span id="resumo-aparelho-nome" style="font-size:13px; font-weight:600;"></span>
+          <span id="resumo-aparelho-defeito" style="font-size:12px; color:var(--text-dim);"></span>
+          <span style="margin-left:auto; font-size:12px; color:var(--text-faint);">▶ expandir</span>
+        </div>
+
+        <!-- Campos completos do aparelho principal -->
+        <div id="aparelho-principal-campos" style="padding:14px 16px;">
       <div class="field-row">
         <div class="field">
           <label>Marca / Modelo *</label>
@@ -1540,7 +1545,27 @@
         </div>
       </div>
 
+      <!-- Peças do aparelho principal -->
+      <div class="ae-parts-section" style="border-top:1px solid var(--border); padding:10px 16px 2px;">
+        <label style="font-size:12px; font-weight:700; color:var(--text-dim); text-transform:uppercase; letter-spacing:0.05em;">Peças utilizadas</label>
+        <div class="parts-list" id="os-parts-list" style="margin-top:8px;"></div>
+        <div style="display:flex; gap:10px; align-items:center; margin-top:6px; flex-wrap:wrap;">
+          <button type="button" class="btn btn-sm" onclick="addPartRow()">+ Peça do estoque</button>
+          <div style="display:flex; align-items:center; gap:6px;">
+            <label style="font-weight:400; font-size:13px; white-space:nowrap; margin:0;">Mão de obra R$</label>
+            <input type="number" id="os-mao-obra" placeholder="0,00" min="0" step="0.01"
+              style="width:90px; font-size:13px; padding:6px 8px;"
+              oninput="updateOSTotal()">
+          </div>
+        </div>
+        <div style="text-align:right; font-size:13px; font-weight:600; color:var(--accent); margin-top:6px; padding-bottom:4px;">
+          Subtotal: <span id="os-subtotal-display">R$ 0,00</span>
+        </div>
+      </div>
+
       </div><!-- fim #aparelho-principal-campos -->
+
+      </div><!-- fim #aparelho-principal-card -->
 
       <!-- APARELHOS EXTRAS -->
       <div id="aparelhos-extras-list" style="display:flex; flex-direction:column; gap:12px; margin-top:12px;"></div>
@@ -1553,24 +1578,39 @@
     </fieldset>
 
     <fieldset>
-      <legend>Diagnóstico e peças</legend>
+      <legend>Diagnóstico</legend>
       <div class="field">
         <label>Diagnóstico técnico</label>
         <textarea id="os-diagnostico" placeholder="Diagnóstico após análise (pode ser preenchido depois)"></textarea>
       </div>
 
-      <label>Peças utilizadas</label>
-      <div class="parts-list" id="os-parts-list"></div>
-      <button type="button" class="btn btn-sm" onclick="addPartRow()">+ Adicionar peça do estoque</button>
-
-      <div class="field" id="os-mao-obra-wrap" style="margin-top:14px;">
-        <label>Mão de obra (R$)</label>
-        <input type="number" id="os-mao-obra" placeholder="0,00" min="0" step="0.01" oninput="updateOSTotal()">
-      </div>
-
       <div class="total-line">
         <span>Valor total da OS</span>
         <span class="total-value" id="os-total-display">R$ 0,00</span>
+      </div>
+    </fieldset>
+
+    <fieldset>
+      <legend>Custos operacionais <span style="font-weight:400; font-size:11px; color:var(--text-dim);">(uso interno — não aparece na OS impressa)</span></legend>
+      <div class="field-row">
+        <div class="field">
+          <label>Logística das peças (R$)</label>
+          <input type="number" id="os-logistica-pecas" placeholder="0,00" min="0" step="0.01">
+        </div>
+        <div class="field">
+          <label>Logística do equipamento (R$) <span style="font-weight:400; color:var(--text-dim);">— leva e traz</span></label>
+          <input type="number" id="os-logistica-equipamento" placeholder="0,00" min="0" step="0.01">
+        </div>
+      </div>
+      <div class="field-row">
+        <div class="field">
+          <label>Horas de serviço</label>
+          <input type="number" id="os-horas-servico" placeholder="0" min="0" step="0.25" oninput="calcCustoHoras()">
+        </div>
+        <div class="field">
+          <label>Custo das horas (R$) <span style="font-weight:400; color:var(--text-dim);">— auto, pode ajustar</span></label>
+          <input type="number" id="os-custo-horas" placeholder="0,00" min="0" step="0.01">
+        </div>
       </div>
     </fieldset>
 
@@ -2191,7 +2231,7 @@
       <!-- ABA EXPORTAR -->
       <div id="tab-export" style="padding:24px;">
         <p style="font-size:13px; color:var(--text-dim); margin-bottom:18px;">
-          Escolha o que deseja exportar. Os arquivos serão baixados em formato <strong>Excel (.xlsx)</strong> ou <strong>CSV</strong>.
+          Escolha o que deseja exportar. Os arquivos serão baixados em formato <strong>Excel (.xlsx)</strong>, com colunas prontas para uso.
         </p>
 
         <!-- OS -->
@@ -2220,13 +2260,13 @@
               <input type="date" id="exp-os-ate" style="width:100%; background:var(--panel-2); border:1px solid var(--border); border-radius:6px; color:var(--text); padding:7px 10px; font-size:13px;">
             </div>
           </div>
-          <button onclick="exportCSV('os')" class="btn btn-sm" style="width:100%;">Exportar Ordens de Serviço (.csv)</button>
+          <button onclick="exportCSV('os')" class="btn btn-sm" style="width:100%;">Exportar Ordens de Serviço (.xlsx)</button>
         </div>
 
         <!-- Clientes -->
         <div style="border:1px solid var(--border); border-radius:8px; padding:16px; margin-bottom:12px;">
           <div style="font-size:13px; font-weight:700; margin-bottom:10px;">👤 Clientes</div>
-          <button onclick="exportCSV('clientes')" class="btn btn-sm" style="width:100%;">Exportar Clientes (.csv)</button>
+          <button onclick="exportCSV('clientes')" class="btn btn-sm" style="width:100%;">Exportar Clientes (.xlsx)</button>
         </div>
 
         <!-- Estoque -->
@@ -2256,14 +2296,14 @@
               Somente itens abaixo do estoque mínimo
             </label>
           </div>
-          <button onclick="exportCSV('estoque')" class="btn btn-sm" style="width:100%;">Exportar Estoque (.csv)</button>
+          <button onclick="exportCSV('estoque')" class="btn btn-sm" style="width:100%;">Exportar Estoque (.xlsx)</button>
         </div>
       </div>
 
       <!-- ABA IMPORTAR -->
       <div id="tab-import" style="padding:24px; display:none;">
         <p style="font-size:13px; color:var(--text-dim); margin-bottom:18px;">
-          Importe dados a partir de um arquivo <strong>CSV</strong>. Baixe o modelo da tabela desejada, preencha e envie.
+          Importe dados a partir de um arquivo <strong>Excel (.xlsx)</strong>. Baixe o modelo da tabela desejada, preencha e envie.
         </p>
 
         <!-- Modelos -->
@@ -2277,7 +2317,7 @@
 
         <!-- Upload -->
         <div style="border:1px solid var(--border); border-radius:8px; padding:16px;">
-          <div style="font-size:13px; font-weight:700; margin-bottom:12px;">Enviar arquivo CSV</div>
+          <div style="font-size:13px; font-weight:700; margin-bottom:12px;">Enviar arquivo Excel</div>
           <div style="margin-bottom:12px;">
             <label style="font-size:11px; color:var(--text-dim); display:block; margin-bottom:4px;">Tipo de dado</label>
             <select id="imp-tipo" style="width:100%; background:var(--panel-2); border:1px solid var(--border); border-radius:6px; color:var(--text); padding:8px 10px; font-size:13px;">
@@ -2292,12 +2332,12 @@
             ondragleave="this.style.borderColor='var(--border)'"
             ondrop="handleFileDrop(event)">
             <div style="font-size:28px; margin-bottom:8px;">📂</div>
-            <div style="font-size:13px; color:var(--text-dim);">Clique ou arraste o arquivo CSV aqui</div>
+            <div style="font-size:13px; color:var(--text-dim);">Clique ou arraste o arquivo .xlsx aqui</div>
             <div id="imp-filename" style="font-size:12px; color:var(--accent); margin-top:6px;"></div>
           </div>
-          <input type="file" id="imp-file" accept=".csv" style="display:none" onchange="onImportFileSelect(event)">
+          <input type="file" id="imp-file" accept=".xlsx,.xls,.csv" style="display:none" onchange="onImportFileSelect(event)">
           <div id="imp-preview" style="display:none; font-size:12px; color:var(--text-dim); margin-bottom:12px; background:var(--panel-2); border-radius:6px; padding:10px;"></div>
-          <button onclick="importCSV()" class="btn btn-primary" style="width:100%;" id="btn-importar" disabled>Importar dados</button>
+          <button onclick="importData()" class="btn btn-primary" style="width:100%;" id="btn-importar" disabled>Importar dados</button>
           <div id="imp-error" style="display:none; margin-top:10px; font-size:12px; color:#ff5f6d; text-align:center;"></div>
         </div>
       </div>
@@ -2401,6 +2441,7 @@ async function sbSetConfig(chave, valor){
    ========================================================= */
 let state = {
   nextOSNumber: 1001,
+  valorHoraTecnica: 30,
   os: [],
   stock: [],
   clients: [],
@@ -2415,12 +2456,15 @@ let state = {
 async function loadFromSupabase(){
   showLoadingOverlay(true);
   try {
-    const [clients, stock, os, cfg] = await Promise.all([
+    const [clients, stock, os, cfg, valorHora] = await Promise.all([
       sbGet('clientes', 'order=nome.asc'),
       sbGet('estoque',  'order=nome.asc'),
       sbGet('ordens_servico', 'order=numero.desc'),
-      sbGetConfig('next_os_number')
+      sbGetConfig('next_os_number'),
+      sbGetConfig('valor_hora_tecnica')
     ]);
+
+    state.valorHoraTecnica = parseFloat(valorHora) || 30;
 
     state.clients = clients.map(c => ({
       id: c.id, nome: c.nome, telefone: c.telefone || '',
@@ -2449,6 +2493,10 @@ async function loadFromSupabase(){
       parts: o.parts || [],
       aparelhosExtras: o.aparelhos_extras || [],
       maoObra: o.mao_obra || 0, total: o.total || 0,
+      logisticaPecas: o.logistica_pecas || 0,
+      horasServico: o.horas_servico || 0,
+      custoHoras: o.custo_horas || 0,
+      logisticaEquipamento: o.logistica_equipamento || 0,
       status: o.status || 'Aberto',
       pagamento: o.pagamento || '', garantia: o.garantia || '',
       dataEntrada: o.data_entrada || '', dataPrevista: o.data_prevista || '',
@@ -2584,15 +2632,12 @@ function renderDashboard(){
 
   // Gastos de compras no período
   const compA = state.compras.filter(c => c.dataPedido >= aDe && c.dataPedido <= aAte);
-  const compB = state.compras.filter(c => c.dataPedido >= bDe && c.dataPedido <= bAte);
   const gastosA = compA.reduce((s,c) => s + (c.valorTotal||0), 0);
-  const gastosB = compB.reduce((s,c) => s + (c.valorTotal||0), 0);
   const lucroA  = fatA - gastosA;
-  const lucroB  = fatB - gastosB;
 
-  // Média Margem (margem de lucro média do período)
-  const margemA = fatA ? (lucroA / fatA) * 100 : 0;
-  const margemB = fatB ? (lucroB / fatB) * 100 : 0;
+  // Ticket médio
+  const ticketA = concA ? fatA / concA : 0;
+  const ticketB = concB ? fatB / concB : 0;
 
   function delta(a, b){
     if(!b) return '';
@@ -2607,7 +2652,7 @@ function renderDashboard(){
     { label:'Faturamento',   val: formatCurrency(fatA),         sub: 'vs Período (Comparativo)' + delta(fatA, fatB),      cor:'var(--accent)' },
     { label:'OS abertas',    val: tmA,                          sub: 'vs ' + tmB + ' no Período (Comparativo)' + delta(tmA, tmB), cor:'var(--text)' },
     { label:'Concluídas',    val: concA,                        sub: 'vs ' + concB + ' no Período (Comparativo)' + delta(concA, concB), cor:'#28a745' },
-    { label:'Média Margem', val: margemA.toFixed(1) + '%',      sub: 'vs ' + margemB.toFixed(1) + '%' + delta(margemA, margemB), cor:'var(--accent)' },
+    { label:'Ticket médio', val: formatCurrency(ticketA),      sub: 'vs ' + formatCurrency(ticketB) + delta(ticketA, ticketB), cor:'var(--accent)' },
     { label:'Gastos peças', val: formatCurrency(gastosA),      sub: compA.length + ' pedido(s) no período',  cor:'#f59e0b' },
     { label:'Lucro estimado',val: formatCurrency(lucroA),       sub: 'Faturamento − Compras',                 cor: lucroA >= 0 ? '#28a745' : '#dc3545' },
     { label:'Clientes atendidos',val: new Set(osA.map(o=>o.clienteId)).size, sub: 'no período selecionado', cor:'var(--text)' },
@@ -2662,6 +2707,7 @@ function renderDashboard(){
   // ── Gráfico 4: Gastos por fornecedor (barra horizontal) ──
   const fornecedores = ['CNN','SKYTECH'];
   const gastosFornA = fornecedores.map(f => compA.filter(c=>c.fornecedor===f).reduce((s,c)=>s+(c.valorTotal||0),0));
+  const compB = state.compras.filter(c => c.dataPedido >= bDe && c.dataPedido <= bAte);
   const gastosFornB = fornecedores.map(f => compB.filter(c=>c.fornecedor===f).reduce((s,c)=>s+(c.valorTotal||0),0));
 
   const periodoBAtivoForn = isPeriodoBAtivo();
@@ -2697,9 +2743,8 @@ function renderDashboard(){
   const pecasMap = {};
   osA.forEach(o => {
     (o.parts || []).forEach(p => {
-      const stockItem = state.stock.find(s => s.id === p.stockId);
-      const item = (stockItem && stockItem.categoria) || 'Sem categoria';
-      pecasMap[item] = (pecasMap[item] || 0) + (p.qtd || 1);
+      const nome = p.nome || 'Sem nome';
+      pecasMap[nome] = (pecasMap[nome] || 0) + (p.qtd || 1);
     });
   });
   const pecasOrdenadas = Object.entries(pecasMap).sort((a,b) => b[1]-a[1]).slice(0,8);
@@ -2752,7 +2797,7 @@ function renderDashboard(){
   const critico = state.stock.filter(s=>s.quantidade<=s.minimo).slice(0,8);
   document.getElementById('dash-estoque-critico').innerHTML = critico.length
     ? critico.map(s => `<tr>
-        <td style="padding:7px 10px;">${s.categoria?escapeHtml(s.categoria)+' - ':''}${escapeHtml(s.nome)}${s.detalhes?' - <span style="font-size:11px;color:var(--text-faint);">'+escapeHtml(s.detalhes)+'</span>':''}</td>
+        <td style="padding:7px 10px;">${escapeHtml(s.nome)}${s.detalhes?'<span style="font-size:11px;color:var(--text-faint);margin-left:4px;">'+escapeHtml(s.detalhes)+'</span>':''}</td>
         <td style="padding:7px 10px;text-align:center;color:${s.quantidade===0?'#dc3545':'#f59e0b'};font-weight:700;">${s.quantidade}</td>
         <td style="padding:7px 10px;text-align:center;color:var(--text-dim);">${s.minimo}</td>
       </tr>`).join('')
@@ -3061,26 +3106,43 @@ function exportDashboardCSV(){
   const fatA = osA.reduce((s,o) => s + (o.total||0), 0);
   const compA = state.compras.filter(c => c.dataPedido >= aDe && c.dataPedido <= aAte);
   const gastosA = compA.reduce((s,c) => s + (c.valorTotal||0), 0);
-  const NL = '\n';
-  let csv = '"Relatório Gerencial MobitOS"' + NL;
-  csv += `"Período: ${formatDate(aDe)} a ${formatDate(aAte)}"` + NL + NL;
-  csv += '"INDICADORES"' + NL;
-  csv += `"Faturamento","${formatCurrency(fatA)}"` + NL;
-  csv += `"Total de OS","${osA.length}"` + NL;
-  csv += `"OS Concluídas","${osA.filter(o=>['Concluído','Entregue'].includes(o.status)).length}"` + NL;
-  csv += `"Gastos com Peças","${formatCurrency(gastosA)}"` + NL;
-  csv += `"Lucro Estimado","${formatCurrency(fatA - gastosA)}"` + NL + NL;
-  csv += '"OS DO PERÍODO"' + NL;
-  csv += '"Nº OS","Cliente","Aparelho","Status","Total","Data Entrada"' + NL;
+
+  const aoa = [
+    ['Relatório Gerencial MobitOS'],
+    [`Período: ${formatDate(aDe)} a ${formatDate(aAte)}`],
+    [],
+    ['INDICADORES'],
+    ['Faturamento', fatA],
+    ['Total de OS', osA.length],
+    ['OS Concluídas', osA.filter(o=>['Concluído','Entregue'].includes(o.status)).length],
+    ['Gastos com Peças', gastosA],
+    ['Lucro Estimado', fatA - gastosA],
+    [],
+    ['OS DO PERÍODO'],
+    ['Nº OS','Cliente','Aparelho','Status','Total','Data Entrada'],
+  ];
   osA.forEach(o => {
-    csv += `"#${String(o.numero).padStart(4,'0')}","${o.clienteNome||''}","${o.aparelho||''}","${o.status}","${(o.total||0).toFixed(2)}","${formatDate(o.dataEntrada)}"` + NL;
+    aoa.push([`#${String(o.numero).padStart(4,'0')}`, o.clienteNome||'', o.aparelho||'', o.status, o.total||0, formatDate(o.dataEntrada)]);
   });
-  const bom = '\uFEFF';
-  const blob = new Blob([bom+csv], {type:'text/csv;charset=utf-8;'});
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement('a'); a.href=url; a.download=`relatorio-mobit-${aDe}.csv`;
-  document.body.appendChild(a); a.click(); document.body.removeChild(a); URL.revokeObjectURL(url);
-  showToast('Relatório CSV exportado com sucesso.');
+
+  const ws = XLSX.utils.aoa_to_sheet(aoa);
+  ws['!cols'] = [
+    { wch:18 }, { wch:22 }, { wch:22 }, { wch:16 }, { wch:14 }, { wch:14 }
+  ];
+  // Formata como moeda as células de valor no bloco de indicadores
+  ['B5','B8','B9'].forEach(ref => { if(ws[ref]) ws[ref].z = '#,##0.00'; });
+  const headerRow = 11; // linha "Nº OS", 0-indexed = 11
+  for(let r = headerRow+1; r < aoa.length; r++){
+    const ref = XLSX.utils.encode_cell({ r, c:4 });
+    if(ws[ref]) ws[ref].z = '#,##0.00';
+  }
+  if(osA.length){
+    ws['!autofilter'] = { ref: XLSX.utils.encode_range({ s:{r:headerRow,c:0}, e:{r:headerRow+osA.length,c:5} }) };
+  }
+  ws['!views'] = [{ state:'frozen', ySplit: headerRow+1 }];
+
+  downloadXLSX(ws, `relatorio-mobit-${aDe}.xlsx`, 'Relatório');
+  showToast('Relatório exportado com sucesso.');
 }
 
 function stockPill(item){
@@ -3297,7 +3359,41 @@ document.addEventListener('click', e => {
       }
     }
   });
+
+  // Fechar dropdowns de aparelhos extras ao clicar fora
+  document.querySelectorAll('.ae-ac-wrap').forEach(wrap => {
+    if(!wrap.contains(e.target)){
+      wrap.querySelector('.ae-ac-list').classList.remove('open');
+    }
+  });
 });
+
+function aeAcFilter(input){
+  const wrap = input.closest('.ae-ac-wrap');
+  const list = wrap.querySelector('.ae-ac-list');
+  const q = input.value.toLowerCase().trim();
+
+  const filtered = q ? MODELOS.filter(m => m.toLowerCase().includes(q)) : MODELOS;
+  const samsung = filtered.filter(m => m.startsWith('Samsung'));
+  const apple   = filtered.filter(m => m.startsWith('iPhone'));
+
+  let html = '';
+  if(samsung.length) html += `<div class="ac-group">Samsung</div>` + samsung.map(m => `<div class="ac-item" onmousedown="aeAcSelect(this,'${m.replace(/'/g,"&#39;")}')">${m}</div>`).join('');
+  if(apple.length)   html += `<div class="ac-group">Apple</div>`   + apple.map(m => `<div class="ac-item" onmousedown="aeAcSelect(this,'${m.replace(/'/g,"&#39;")}')">${m}</div>`).join('');
+  html += `<div class="ac-item ac-item-outro" onmousedown="aeAcSelect(this,null)">✏ Usar "${input.value || '...'}" como está</div>`;
+
+  list.innerHTML = html;
+  list.classList.add('open');
+}
+
+function aeAcSelect(el, modelo){
+  const wrap = el.closest('.ae-ac-wrap');
+  const input = wrap.querySelector('.ae-modelo');
+  const list  = wrap.querySelector('.ae-ac-list');
+  if(modelo) input.value = modelo;
+  list.classList.remove('open');
+  atualizarResumoExtra(input);
+}
 
 function openOSModal(osId){
   // reset form
@@ -3330,7 +3426,10 @@ function openOSModal(osId){
   document.getElementById('checklist-error').style.display = 'none';
   document.getElementById('os-diagnostico').value = '';
   document.getElementById('os-mao-obra').value = '';
-  document.getElementById('os-mao-obra-wrap').style.display = 'block';
+  document.getElementById('os-logistica-pecas').value = '';
+  document.getElementById('os-logistica-equipamento').value = '';
+  document.getElementById('os-horas-servico').value = '';
+  document.getElementById('os-custo-horas').value = '';
   document.getElementById('os-status').value = 'Aberto';
   document.getElementById('os-data-entrada').value = todayISO();
   document.getElementById('os-data-prevista').value = '';
@@ -3341,6 +3440,7 @@ function openOSModal(osId){
   document.getElementById('aparelhos-extras-list').innerHTML = '';
   document.getElementById('aparelho-principal-resumo').style.display = 'none';
   document.getElementById('aparelho-principal-campos').style.display = 'block';
+  document.getElementById('resumo-toggle-icon').textContent = '▼ recolher';
 
   if(osId){
     const o = state.os.find(x => x.id === osId);
@@ -3377,6 +3477,10 @@ function openOSModal(osId){
     document.getElementById('os-acs-carregador').checked = acs.includes('Carregador');
     document.getElementById('os-diagnostico').value = o.diagnostico || '';
     document.getElementById('os-mao-obra').value = o.maoObra || '';
+    document.getElementById('os-logistica-pecas').value = o.logisticaPecas || '';
+    document.getElementById('os-logistica-equipamento').value = o.logisticaEquipamento || '';
+    document.getElementById('os-horas-servico').value = o.horasServico || '';
+    document.getElementById('os-custo-horas').value = o.custoHoras || '';
     document.getElementById('os-status').value = o.status;
     document.getElementById('os-data-entrada').value = o.dataEntrada;
     document.getElementById('os-data-prevista').value = o.dataPrevista || '';
@@ -3387,7 +3491,6 @@ function openOSModal(osId){
     o.parts.forEach(p => addPartRow(p));
     // Se há peças, mão de obra já foi ocultada pelo addPartRow
     // Se não há peças, garantir que mão de obra aparece
-    if(!o.parts.length) document.getElementById('os-mao-obra-wrap').style.display = 'block';
     if((o.aparelhosExtras || []).length > 0){
       (o.aparelhosExtras || []).forEach(a => addAparelhoExtra(a));
       // Atualiza resumo com dados já preenchidos e colapsa
@@ -3447,9 +3550,6 @@ function openClientModalFromOS(){
 let _partRowCounter = 0;
 
 function addPartRow(existing){
-  // Ocultar mão de obra quando há peças
-  document.getElementById('os-mao-obra-wrap').style.display = 'none';
-  document.getElementById('os-mao-obra').value = '';
   updateOSTotal();
 
   const list   = document.getElementById('os-parts-list');
@@ -3483,8 +3583,6 @@ function addPartRow(existing){
     <button type="button" class="remove-part" onclick="
       this.closest('.part-row').remove();
       updateOSTotal();
-      const rem=document.querySelectorAll('#os-parts-list .part-row').length;
-      document.getElementById('os-mao-obra-wrap').style.display=rem===0?'block':'none';
     ">&times;</button>
   `;
 
@@ -3569,20 +3667,166 @@ function partAcClose(rowId){
   if(list) list.style.display = 'none';
 }
 
+let _aePartRowCounter = 0;
+function addAePartRow(btn, existing){
+  const card = btn.closest('.aparelho-extra-card');
+  const list = card.querySelector('.ae-parts-list');
+  const row  = document.createElement('div');
+  const rowId = 'ae-part-' + (++_aePartRowCounter);
+  row.className = 'part-row';
+  row.id = rowId;
+  row.style.cssText = 'display:flex; gap:8px; align-items:flex-start; margin-bottom:8px; flex-wrap:wrap;';
+
+  function partLabel(s){
+    const cat = s.categoria ? s.categoria + ' · ' : '';
+    const det = s.detalhes  ? ' · ' + s.detalhes  : '';
+    return cat + s.nome + det;
+  }
+
+  row.innerHTML = `
+    <div style="flex:1; min-width:200px; position:relative;">
+      <input type="text" class="part-ac-input"
+        placeholder="Digite para buscar peça..."
+        autocomplete="off"
+        style="width:100%;"
+        oninput="aePartAcFilter(this,'${rowId}')"
+        onfocus="aePartAcFilter(this,'${rowId}')"
+        onblur="setTimeout(()=>aePartAcClose('${rowId}'),200)">
+      <input type="hidden" class="part-stock-id">
+      <div class="part-ac-list ac-dropdown" id="ae-pac-${rowId}" style="display:none; position:absolute; top:100%; left:0; right:0; z-index:200; background:var(--panel); border:1px solid var(--border); border-radius:var(--radius); max-height:220px; overflow-y:auto; box-shadow:0 4px 16px rgba(0,0,0,.35);"></div>
+    </div>
+    <input type="number" class="part-qtd" min="1" step="1" value="${existing ? existing.qtd : 1}" style="width:64px;" oninput="updateOSTotal()">
+    <input type="number" class="part-preco" min="0" step="0.01" value="${existing ? existing.preco : ''}" placeholder="Preço" style="width:96px;" oninput="updateOSTotal()">
+    <button type="button" class="remove-part" onclick="
+      this.closest('.part-row').remove();
+      updateOSTotal();
+    ">&times;</button>
+  `;
+
+  list.appendChild(row);
+
+  if(existing && existing.stockId){
+    const s = state.stock.find(x => x.id === existing.stockId);
+    if(s){
+      row.querySelector('.part-ac-input').value = partLabel(s);
+      row.querySelector('.part-stock-id').value = s.id;
+      row.querySelector('.part-preco').value = existing.preco;
+    }
+  }
+
+  updateOSTotal();
+}
+
+function aePartAcFilter(input, rowId){
+  const q    = input.value.trim().toLowerCase();
+  const list = document.getElementById('ae-pac-' + rowId);
+  const row  = document.getElementById(rowId);
+
+  const hiddenId = row.querySelector('.part-stock-id').value;
+  if(hiddenId){
+    const sel = state.stock.find(s => s.id === hiddenId);
+    const expectedLabel = sel ? (sel.categoria ? sel.categoria + ' · ' : '') + sel.nome + (sel.detalhes ? ' · ' + sel.detalhes : '') : '';
+    if(input.value !== expectedLabel){
+      row.querySelector('.part-stock-id').value = '';
+      row.querySelector('.part-preco').value = '';
+      updateOSTotal();
+    }
+  }
+
+  const sorted = [...state.stock].sort((a,b) => {
+    const ca = a.categoria || '', cb = b.categoria || '';
+    return ca.localeCompare(cb) || a.nome.localeCompare(b.nome);
+  });
+
+  const filtered = q
+    ? sorted.filter(s =>
+        (s.categoria||'').toLowerCase().includes(q) ||
+        s.nome.toLowerCase().includes(q) ||
+        (s.detalhes||'').toLowerCase().includes(q) ||
+        (s.codigo||'').toLowerCase().includes(q)
+      )
+    : sorted;
+
+  if(!filtered.length){ list.style.display='none'; return; }
+
+  list.innerHTML = filtered.map(s => {
+    const cat = s.categoria
+      ? `<span style="font-size:10px;font-weight:700;color:var(--accent);background:rgba(45,160,224,0.12);border-radius:3px;padding:1px 5px;margin-right:5px;">${escapeHtml(s.categoria)}</span>`
+      : '';
+    const det = s.detalhes
+      ? `<span style="font-size:11px;color:var(--text-dim);margin-left:5px;">${escapeHtml(s.detalhes)}</span>`
+      : '';
+    const qtd = `<span style="font-size:11px;color:${s.quantidade<=s.minimo?'var(--red)':'var(--text-faint)'};margin-left:auto;white-space:nowrap;">${s.quantidade} disp.</span>`;
+    const label = (s.categoria ? s.categoria + ' · ' : '') + s.nome + (s.detalhes ? ' · ' + s.detalhes : '');
+    return `<div class="ac-item" style="display:flex;align-items:center;gap:4px;"
+      onmousedown="aePartAcSelect('${rowId}','${s.id}','${label.replace(/'/g,"\\'")}','${s.venda}')">
+      ${cat}<strong>${escapeHtml(s.nome)}</strong>${det}${qtd}
+    </div>`;
+  }).join('');
+
+  list.style.display = 'block';
+}
+
+function aePartAcSelect(rowId, stockId, label, preco){
+  const row = document.getElementById(rowId);
+  row.querySelector('.part-ac-input').value = label;
+  row.querySelector('.part-stock-id').value = stockId;
+  const precoInput = row.querySelector('.part-preco');
+  if(!precoInput.value) precoInput.value = preco;
+  document.getElementById('ae-pac-' + rowId).style.display = 'none';
+  updateOSTotal();
+}
+
+function aePartAcClose(rowId){
+  const list = document.getElementById('ae-pac-' + rowId);
+  if(list) list.style.display = 'none';
+}
+
 function onPartSelectChange(select){
   // mantido por compatibilidade
   updateOSTotal();
 }
 
+// Recalcula o custo das horas de serviço com base na taxa de hora técnica
+// configurada (padrão R$30,00). O campo continua editável — se o usuário
+// digitar um valor manual depois, ele só é sobrescrito se as horas mudarem de novo.
+function calcCustoHoras(){
+  const horas = parseFloat(document.getElementById('os-horas-servico').value) || 0;
+  const custo = horas * (state.valorHoraTecnica || 30);
+  document.getElementById('os-custo-horas').value = custo ? custo.toFixed(2) : '';
+}
+
 function updateOSTotal(){
   let total = 0;
+
+  // Peças do aparelho principal
+  let sub1 = 0;
   document.querySelectorAll('#os-parts-list .part-row').forEach(row => {
     const qtd = parseFloat(row.querySelector('.part-qtd').value) || 0;
     const preco = parseFloat(row.querySelector('.part-preco').value) || 0;
-    total += qtd * preco;
+    sub1 += qtd * preco;
   });
   const maoObra = parseFloat(document.getElementById('os-mao-obra').value) || 0;
-  total += maoObra;
+  sub1 += maoObra;
+  total += sub1;
+  const sub1El = document.getElementById('os-subtotal-display');
+  if(sub1El) sub1El.textContent = formatCurrency(sub1);
+
+  // Peças e mão de obra dos aparelhos extras
+  document.querySelectorAll('.aparelho-extra-card').forEach(card => {
+    let sub = 0;
+    card.querySelectorAll('.ae-parts-list .part-row').forEach(row => {
+      const qtd = parseFloat(row.querySelector('.part-qtd').value) || 0;
+      const preco = parseFloat(row.querySelector('.part-preco').value) || 0;
+      sub += qtd * preco;
+    });
+    const aeMao = parseFloat(card.querySelector('.ae-mao-obra')?.value) || 0;
+    sub += aeMao;
+    const subtotalEl = card.querySelector('.ae-subtotal');
+    if(subtotalEl) subtotalEl.textContent = formatCurrency(sub);
+    total += sub;
+  });
+
   document.getElementById('os-total-display').textContent = formatCurrency(total);
 }
 
@@ -3660,7 +3904,22 @@ async function saveOS(){
       card.querySelector('.ae-acs-chip').checked    ? 'Chip'      : '',
       card.querySelector('.ae-acs-carregador').checked ? 'Carregador' : ''
     ].filter(Boolean).join(', ');
-    if(modelo) aparelhosExtras.push({ modelo, imei, defeito, senha, acessorios });
+    if(modelo) aparelhosExtras.push({
+      modelo, imei, defeito, senha, acessorios,
+      parts: (() => {
+        const ps = [];
+        card.querySelectorAll('.ae-parts-list .part-row').forEach(row => {
+          const stockId = row.querySelector('.part-stock-id')?.value || '';
+          if(!stockId) return;
+          const qtd = parseFloat(row.querySelector('.part-qtd').value) || 0;
+          const preco = parseFloat(row.querySelector('.part-preco').value) || 0;
+          const stockItem = state.stock.find(s => s.id === stockId);
+          ps.push({ stockId, nome: stockItem ? stockItem.nome : 'Item removido', qtd, preco });
+        });
+        return ps;
+      })(),
+      maoObra: parseFloat(card.querySelector('.ae-mao-obra')?.value) || 0
+    });
   });
 
   // Collect parts
@@ -3675,7 +3934,15 @@ async function saveOS(){
   });
 
   const maoObra = parseFloat(document.getElementById('os-mao-obra').value) || 0;
-  const total = parts.reduce((sum,p) => sum + p.qtd * p.preco, 0) + maoObra;
+  const extrasTotal = aparelhosExtras.reduce((sum, a) => {
+    const partsSum = (a.parts || []).reduce((s, p) => s + p.qtd * p.preco, 0);
+    return sum + partsSum + (a.maoObra || 0);
+  }, 0);
+  const total = parts.reduce((sum,p) => sum + p.qtd * p.preco, 0) + maoObra + extrasTotal;
+  const logisticaPecas = parseFloat(document.getElementById('os-logistica-pecas').value) || 0;
+  const logisticaEquipamento = parseFloat(document.getElementById('os-logistica-equipamento').value) || 0;
+  const horasServico = parseFloat(document.getElementById('os-horas-servico').value) || 0;
+  const custoHoras = parseFloat(document.getElementById('os-custo-horas').value) || 0;
 
   const id = document.getElementById('os-id').value;
   const status = document.getElementById('os-status').value;
@@ -3707,6 +3974,10 @@ async function saveOS(){
     parts,
     mao_obra: maoObra,
     total,
+    logistica_pecas: logisticaPecas,
+    logistica_equipamento: logisticaEquipamento,
+    horas_servico: horasServico,
+    custo_horas: custoHoras,
     status,
     pagamento: document.getElementById('os-pagamento').value,
     garantia: document.getElementById('os-garantia').value,
@@ -3751,6 +4022,7 @@ async function saveOS(){
         acessorios: payload.acessorios,
         diagnostico: payload.diagnostico,
         aparelhosExtras, parts, maoObra, total, status,
+        logisticaPecas, logisticaEquipamento, horasServico, custoHoras,
         pagamento: payload.pagamento, garantia: payload.garantia,
         dataEntrada, dataPrevista, observacoes: payload.observacoes,
         historico: state.history[id] || []
@@ -3779,6 +4051,7 @@ async function saveOS(){
         acessorios: payload.acessorios,
         diagnostico: payload.diagnostico,
         aparelhosExtras, parts, maoObra, total, status,
+        logisticaPecas, logisticaEquipamento, horasServico, custoHoras,
         pagamento: payload.pagamento, garantia: payload.garantia,
         dataEntrada, dataPrevista, observacoes: payload.observacoes,
         historico: state.history[newId] || []
@@ -3798,20 +4071,22 @@ async function saveOS(){
 
 /* ---------- Aparelhos extras ---------- */
 function toggleAparelhoPrincipal(){
-  const campos = document.getElementById('aparelho-principal-campos');
-  const icon   = document.getElementById('resumo-toggle-icon');
-  const aberto = campos.style.display !== 'none';
-  campos.style.display = aberto ? 'none' : 'block';
+  const campos  = document.getElementById('aparelho-principal-campos');
+  const resumo  = document.getElementById('aparelho-principal-resumo');
+  const icon    = document.getElementById('resumo-toggle-icon');
+  const aberto  = campos.style.display !== 'none';
+  campos.style.display  = aberto ? 'none' : 'block';
+  resumo.style.display  = aberto ? 'flex' : 'none';
   icon.textContent = aberto ? '▶ expandir' : '▼ recolher';
 }
 
 function colapsarAparelhoPrincipal(){
-  const nome   = document.getElementById('ac-aparelho-input').value.trim() || '(sem modelo)';
+  const nome    = document.getElementById('ac-aparelho-input').value.trim() || '(sem modelo)';
   const defeito = document.getElementById('os-defeito').value.trim();
   document.getElementById('resumo-aparelho-nome').textContent = nome;
   document.getElementById('resumo-aparelho-defeito').textContent = defeito ? '— ' + (defeito.length > 40 ? defeito.slice(0,40)+'…' : defeito) : '';
   document.getElementById('resumo-toggle-icon').textContent = '▶ expandir';
-  document.getElementById('aparelho-principal-resumo').style.display = 'block';
+  document.getElementById('aparelho-principal-resumo').style.display = 'flex';
   document.getElementById('aparelho-principal-campos').style.display = 'none';
 }
 
@@ -3883,9 +4158,14 @@ function addAparelhoExtra(existing){
       <div class="field-row">
         <div class="field">
           <label>Marca / Modelo</label>
-          <input type="text" class="ae-modelo" placeholder="Ex: iPhone 13, Galaxy A54..."
-            value="${existing ? escapeHtml(existing.modelo) : ''}"
-            oninput="atualizarResumoExtra(this)">
+          <div class="ac-wrap ae-ac-wrap" style="position:relative;">
+            <input type="text" class="ae-modelo ac-input" placeholder="Ex: iPhone 13, Galaxy A54..."
+              value="${existing ? escapeHtml(existing.modelo) : ''}"
+              oninput="aeAcFilter(this); atualizarResumoExtra(this)"
+              onfocus="aeAcFilter(this)"
+              onblur="setTimeout(()=>{ const l=this.closest('.ae-ac-wrap').querySelector('.ae-ac-list'); if(l) l.classList.remove('open'); },150)">
+            <div class="ac-dropdown ae-ac-list"></div>
+          </div>
         </div>
         <div class="field">
           <label>IMEI / Nº de série</label>
@@ -3923,6 +4203,24 @@ function addAparelhoExtra(existing){
           </div>
         </div>
       </div>
+
+      <!-- Peças deste aparelho -->
+      <div class="ae-parts-section" style="border-top:1px solid var(--border); padding:10px 16px 2px;">
+        <label style="font-size:12px; font-weight:700; color:var(--text-dim); text-transform:uppercase; letter-spacing:0.05em;">Peças utilizadas</label>
+        <div class="ae-parts-list parts-list" style="margin-top:8px;"></div>
+        <div style="display:flex; gap:10px; align-items:center; margin-top:6px; flex-wrap:wrap;">
+          <button type="button" class="btn btn-sm ae-add-part-btn" onclick="addAePartRow(this)" style="font-size:12px;">+ Peça do estoque</button>
+          <div style="display:flex; align-items:center; gap:6px;">
+            <label style="font-weight:400; font-size:13px; white-space:nowrap; margin:0;">Mão de obra R$</label>
+            <input type="number" class="ae-mao-obra" placeholder="0,00" min="0" step="0.01"
+              style="width:90px; font-size:13px; padding:6px 8px;"
+              oninput="updateOSTotal()">
+          </div>
+        </div>
+        <div style="text-align:right; font-size:13px; font-weight:600; color:var(--accent); margin-top:6px; padding-bottom:10px;">
+          Subtotal: <span class="ae-subtotal">R$ 0,00</span>
+        </div>
+      </div>
     </div>
   `;
 
@@ -3944,6 +4242,15 @@ function addAparelhoExtra(existing){
       resumoAnt.style.display = 'flex';
       if(iconAnt) iconAnt.textContent = '▶ expandir';
     }
+  }
+
+  // Preencher peças existentes ao editar
+  if(existing && existing.parts && existing.parts.length){
+    existing.parts.forEach(p => addAePartRow(card.querySelector('.ae-add-part-btn'), p));
+  }
+  if(existing && existing.maoObra){
+    card.querySelector('.ae-mao-obra').value = existing.maoObra;
+    updateOSTotal();
   }
 
   // Se for carregamento de edição com dados existentes, já colapsa
@@ -4284,21 +4591,6 @@ function viewOS(osId){
           </div>
         </div>
 
-        ${(o.aparelhosExtras && o.aparelhosExtras.length) ? `
-        <div class="section-title">Aparelhos adicionais (${o.aparelhosExtras.length})</div>
-        ${o.aparelhosExtras.map((a,i) => `
-          <div class="card" style="margin-bottom:10px; border-left:3px solid var(--accent);">
-            <div class="kv-list">
-              <div class="kv-row"><span class="kv-label">Aparelho ${i+2}</span><span class="kv-value">${escapeHtml(a.modelo)}</span></div>
-              ${a.imei ? `<div class="kv-row"><span class="kv-label">IMEI / Série</span><span class="kv-value mono">${escapeHtml(a.imei)}</span></div>` : ''}
-              ${a.defeito ? `<div class="kv-row"><span class="kv-label">Defeito</span><span class="kv-value">${escapeHtml(a.defeito)}</span></div>` : ''}
-              ${a.senha ? `<div class="kv-row"><span class="kv-label">Senha</span><span class="kv-value mono">${escapeHtml(a.senha)}</span></div>` : ''}
-              ${a.acessorios ? `<div class="kv-row"><span class="kv-label">Acessórios</span><span class="kv-value">${escapeHtml(a.acessorios)}</span></div>` : ''}
-            </div>
-          </div>
-        `).join('')}
-        ` : ''}
-
         ${o.checklist ? `
         <div class="section-title">Checklist de recebimento</div>
         <div class="card" style="margin-bottom:16px;">
@@ -4330,15 +4622,40 @@ function viewOS(osId){
         ` : ''}
 
         <div class="section-title">Peças e serviços</div>
-        <div class="table-wrap" style="margin-bottom:16px;">
-          <table>
-            <thead><tr><th>Item</th><th>Qtd.</th><th>Preço</th><th>Subtotal</th></tr></thead>
-            <tbody>${partsRows}</tbody>
-            <tfoot>
-              <tr><td colspan="3" style="text-align:right; font-weight:600;">Mão de obra</td><td class="mono">${formatCurrency(o.maoObra)}</td></tr>
-              <tr><td colspan="3" style="text-align:right; font-weight:700;">Total</td><td class="mono" style="font-weight:700; color:var(--accent);">${formatCurrency(o.total)}</td></tr>
-            </tfoot>
-          </table>
+        <div class="card" style="margin-bottom:10px; border-left:3px solid var(--accent-soft, var(--accent));">
+          <div style="font-size:12px; font-weight:700; color:var(--accent); margin-bottom:8px;">Aparelho 1 — ${escapeHtml(o.aparelho)}</div>
+          <div class="table-wrap" style="border:none; margin-bottom:0;">
+            <table>
+              <thead><tr><th>Item</th><th>Qtd.</th><th>Preço</th><th>Subtotal</th></tr></thead>
+              <tbody>${partsRows}</tbody>
+              <tfoot>
+                ${o.maoObra ? `<tr><td colspan="3" style="text-align:right; font-weight:600;">Mão de obra</td><td class="mono">${formatCurrency(o.maoObra)}</td></tr>` : ''}
+                <tr><td colspan="3" style="text-align:right; font-weight:700;">Subtotal</td><td class="mono" style="font-weight:700; color:var(--accent);">${formatCurrency((o.parts||[]).reduce((s,p)=>s+p.qtd*p.preco,0)+(o.maoObra||0))}</td></tr>
+              </tfoot>
+            </table>
+          </div>
+        </div>
+        ${(o.aparelhosExtras && o.aparelhosExtras.length) ? o.aparelhosExtras.map((a,i) => {
+          const aSub = (a.parts||[]).reduce((s,p)=>s+p.qtd*p.preco,0) + (a.maoObra||0);
+          return `<div class="card" style="margin-bottom:10px; border-left:3px solid var(--accent);">
+            <div style="font-size:12px; font-weight:700; color:var(--accent); margin-bottom:8px;">Aparelho ${i+2} — ${escapeHtml(a.modelo)}</div>
+            ${(a.parts && a.parts.length) || a.maoObra ? `
+            <div class="table-wrap" style="border:none; margin-bottom:0;">
+              <table>
+                <thead><tr><th>Item</th><th>Qtd.</th><th>Preço</th><th>Subtotal</th></tr></thead>
+                <tbody>
+                  ${(a.parts||[]).map(p=>`<tr><td>${escapeHtml(p.nome)}</td><td class="mono">${p.qtd}</td><td class="mono">${formatCurrency(p.preco)}</td><td class="mono">${formatCurrency(p.qtd*p.preco)}</td></tr>`).join('')}
+                  ${a.maoObra ? `<tr><td colspan="3" style="text-align:right; font-weight:600;">Mão de obra</td><td class="mono">${formatCurrency(a.maoObra)}</td></tr>` : ''}
+                </tbody>
+                <tfoot>
+                  <tr><td colspan="3" style="text-align:right; font-weight:700;">Subtotal</td><td class="mono" style="font-weight:700; color:var(--accent);">${formatCurrency(aSub)}</td></tr>
+                </tfoot>
+              </table>
+            </div>` : '<p style="color:var(--text-faint); font-size:13px;">Nenhuma peça ou mão de obra.</p>'}
+          </div>`;
+        }).join('') : ''}
+        <div style="text-align:right; font-weight:700; font-size:15px; color:var(--accent); padding:8px 0 4px;">
+          Total geral: ${formatCurrency(o.total)}
         </div>
 
         ${o.observacoes ? `
@@ -4609,70 +4926,65 @@ function printOS(){
     ` : ''}
   </div>
 
-  ${(o.aparelhosExtras && o.aparelhosExtras.length) ? `
-  <div style="margin-bottom:6pt;">
-    <div style="font-size:10pt; font-weight:700; color:#0094d4; border-bottom:1pt solid #0094d4; padding-bottom:3pt; margin-bottom:5pt; text-transform:uppercase; letter-spacing:0.5px;">Aparelhos adicionais</div>
-    <table style="width:100%; border-collapse:collapse; font-size:9.5pt;">
-      <thead>
-        <tr style="background:#f0f0f0;">
-          <th style="border:0.5pt solid #aaa; padding:3pt 6pt; text-align:left;">#</th>
-          <th style="border:0.5pt solid #aaa; padding:3pt 6pt; text-align:left;">Modelo</th>
-          <th style="border:0.5pt solid #aaa; padding:3pt 6pt; text-align:left;">IMEI / Série</th>
-          <th style="border:0.5pt solid #aaa; padding:3pt 6pt; text-align:left;">Defeito relatado</th>
-          <th style="border:0.5pt solid #aaa; padding:3pt 6pt; text-align:left;">Senha</th>
-          <th style="border:0.5pt solid #aaa; padding:3pt 6pt; text-align:left;">Acessórios</th>
-        </tr>
-      </thead>
-      <tbody>
-        ${o.aparelhosExtras.map((a,i) => `
-          <tr>
-            <td style="border:0.5pt solid #aaa; padding:3pt 6pt; text-align:center; color:#0094d4; font-weight:700;">${i+2}</td>
-            <td style="border:0.5pt solid #aaa; padding:3pt 6pt;">${escapeHtml(a.modelo)}</td>
-            <td style="border:0.5pt solid #aaa; padding:3pt 6pt; font-family:monospace;">${escapeHtml(a.imei||'—')}</td>
-            <td style="border:0.5pt solid #aaa; padding:3pt 6pt;">${escapeHtml(a.defeito||'—')}</td>
-            <td style="border:0.5pt solid #aaa; padding:3pt 6pt; font-family:monospace;">${escapeHtml(a.senha||'—')}</td>
-            <td style="border:0.5pt solid #aaa; padding:3pt 6pt;">${escapeHtml(a.acessorios||'—')}</td>
-          </tr>
-        `).join('')}
-      </tbody>
-    </table>
-  </div>
-  ` : ''}
-
   <hr class="p-hr">
 
-  <!-- CHECKLIST -->
+  ${!(o.aparelhosExtras && o.aparelhosExtras.length) ? `
+  <!-- CHECKLIST — apenas quando há 1 aparelho -->
   <div class="p-cl-title">LISTA DE CHECAGEM (CHECK LIST)</div>
   <div class="p-cl-sub">Os itens abaixo estão em condições de utilização?</div>
-
   <div class="p-cl-grid">
     <div class="p-cl-col">
       <table>${CL_LEFT.map(clRow).join('')}</table>
     </div>
     <div class="p-cl-col">
       <table>${CL_RIGHT.map(clRow).join('')}
-        ${['Capa','Chip','Carregador'].map(acs => { const m=acsList.includes(acs); return `<tr><td class="p-cl-label">${acs}</td><td class="p-cl-opts"><span class="p-cb${m?' p-cb-sim':''}">${m?'✔':''}</span>Sim&nbsp;&nbsp;<span class="p-cb${!m?' p-cb-nao':''}">${!m?'✔':''}</span>Não</td></tr>`; }).join('')}
+        ${['Capa','Chip','Carregador'].map(acs => { const m=acsList.includes(acs); return '<tr><td class="p-cl-label">'+acs+'</td><td class="p-cl-opts"><span class="p-cb'+(m?' p-cb-sim':'')+'">'+(m?'✔':'')+'</span>Sim&nbsp;&nbsp;<span class="p-cb'+(!m?' p-cb-nao':'')+'">'+((!m)?'✔':'')+'</span>Não</td></tr>'; }).join('')}
       </table>
     </div>
   </div>
-
   <hr class="p-hr-thin">
+  ` : ''}
 
   <!-- OBSERVAÇÕES -->
   <div class="p-section-label">Observações sobre o aparelho:</div>
   <div class="p-text-area">${escapeHtml(o.defeito||'')}${o.diagnostico ? '<br><br>Diagnóstico: '+escapeHtml(o.diagnostico) : ''}</div>
 
-  <!-- MANUTENÇÃO REALIZADA -->
+  <!-- MANUTENÇÃO REALIZADA — todos os aparelhos em ordem -->
   <div class="p-section-label">Manutenção Realizada:</div>
   <div class="p-text-area" style="min-height:40pt;">
-    ${o.parts.length || o.maoObra ? `
-    <table class="p-parts-table">
-      <thead><tr><th>Item / Serviço</th><th style="text-align:center">Qtd.</th><th style="text-align:right">Preço unit.</th><th style="text-align:right">Subtotal</th></tr></thead>
-      <tbody>
-        ${partsRows}
-        ${o.maoObra ? `<tr><td>Mão de obra</td><td style="text-align:center">—</td><td style="text-align:right">${formatCurrency(o.maoObra)}</td><td style="text-align:right">${formatCurrency(o.maoObra)}</td></tr>` : ''}
-      </tbody>
-    </table>` : ''}
+    ${(() => {
+      const temExtras = o.aparelhosExtras && o.aparelhosExtras.length;
+      const sub1 = (o.parts||[]).reduce((s,p)=>s+p.qtd*p.preco,0) + (o.maoObra||0);
+      const bloco1 = (o.parts.length || o.maoObra) ? `
+        ${temExtras ? '<div style="font-size:8.5pt; font-weight:700; color:#0094d4; border-bottom:0.5pt solid #0094d4; padding-bottom:2pt; margin-bottom:4pt;">Aparelho 1: '+escapeHtml(o.aparelho)+'</div>' : ''}
+        <table class="p-parts-table">
+          <thead><tr><th>Item / Serviço</th><th style="text-align:center">Qtd.</th><th style="text-align:right">Preço unit.</th><th style="text-align:right">Subtotal</th></tr></thead>
+          <tbody>
+            ${partsRows}
+            ${o.maoObra ? '<tr><td>Mão de obra</td><td style="text-align:center">—</td><td style="text-align:right">'+formatCurrency(o.maoObra)+'</td><td style="text-align:right">'+formatCurrency(o.maoObra)+'</td></tr>' : ''}
+          </tbody>
+          ${temExtras ? '<tfoot><tr class="p-total-row"><td colspan="3" style="text-align:right;">Subtotal Aparelho 1</td><td style="text-align:right; color:#0094d4;">'+formatCurrency(sub1)+'</td></tr></tfoot>' : ''}
+        </table>` : '';
+
+      const blocosExtras = temExtras ? o.aparelhosExtras.map((a,i) => {
+        const aSub = (a.parts||[]).reduce((s,p)=>s+p.qtd*p.preco,0) + (a.maoObra||0);
+        return `
+        <div style="margin-top:8pt;">
+          <div style="font-size:8.5pt; font-weight:700; color:#0094d4; border-bottom:0.5pt solid #0094d4; padding-bottom:2pt; margin-bottom:4pt;">Aparelho ${i+2}: ${escapeHtml(a.modelo)}${a.imei ? ' &nbsp;|&nbsp; IMEI: '+escapeHtml(a.imei) : ''}${a.defeito ? ' &nbsp;|&nbsp; Defeito: '+escapeHtml(a.defeito) : ''}</div>
+          ${(a.parts && a.parts.length) || a.maoObra ? `
+          <table class="p-parts-table">
+            <thead><tr><th>Item / Serviço</th><th style="text-align:center">Qtd.</th><th style="text-align:right">Preço unit.</th><th style="text-align:right">Subtotal</th></tr></thead>
+            <tbody>
+              ${(a.parts||[]).map(p=>'<tr><td>'+escapeHtml(p.nome)+'</td><td style="text-align:center">'+p.qtd+'</td><td style="text-align:right">'+formatCurrency(p.preco)+'</td><td style="text-align:right">'+formatCurrency(p.qtd*p.preco)+'</td></tr>').join('')}
+              ${a.maoObra ? '<tr><td>Mão de obra</td><td style="text-align:center">—</td><td style="text-align:right">'+formatCurrency(a.maoObra)+'</td><td style="text-align:right">'+formatCurrency(a.maoObra)+'</td></tr>' : ''}
+            </tbody>
+            <tfoot><tr class="p-total-row"><td colspan="3" style="text-align:right;">Subtotal Aparelho ${i+2}</td><td style="text-align:right; color:#0094d4;">${formatCurrency(aSub)}</td></tr></tfoot>
+          </table>` : '<p style="font-size:8.5pt; color:#888;">Nenhuma peça registrada.</p>'}
+        </div>`;
+      }).join('') : '';
+
+      return bloco1 + blocosExtras;
+    })()}
   </div>
 
   <!-- VALOR -->
@@ -5082,27 +5394,82 @@ function switchDataTab(tab){
   document.getElementById('tab-import-btn').style.color  = tab==='import' ? 'var(--text)' : 'var(--text-dim)';
 }
 
-/* ---- EXPORTAR CSV ---- */
-function toCSV(rows, cols){
-  const NL = '\n';
-  const header = cols.map(c => '"' + c.label + '"').join(',');
-  const body   = rows.map(r =>
-    cols.map(c => {
-      const v = c.fn ? c.fn(r) : (r[c.key] ?? '');
-      return '"' + String(v).replace(/"/g, '""') + '"';
-    }).join(',')
-  ).join(NL);
-  return header + NL + body;
+/* ---- EXPORTAR XLSX ---- */
+// Gera uma planilha real (colunas de verdade, largura ajustada, cabeçalho
+// congelado e filtro automático) em vez de texto CSV — isso evita o problema
+// de tudo cair numa única coluna quando o Excel (localização BR) usa ";"
+// como separador de lista padrão em vez de ",".
+function toWorksheet(rows, cols){
+  const header = cols.map(c => c.label);
+  const data = rows.map(r => cols.map(c => {
+    const raw = c.fn ? c.fn(r) : (r[c.key] ?? '');
+    if(c.type === 'number'){
+      // Célula vazia proposital (ex: valor de OS que só aparece na linha do
+      // aparelho principal) continua vazia, em vez de virar "0".
+      if(raw === '' || raw === null || raw === undefined) return '';
+      return (typeof raw === 'number') ? raw : (parseFloat(raw) || 0);
+    }
+    return raw ?? '';
+  }));
+
+  const ws = XLSX.utils.aoa_to_sheet([header, ...data]);
+
+  // Largura de coluna baseada no maior conteúdo
+  ws['!cols'] = cols.map((c, i) => {
+    const maxLen = Math.max(
+      c.label.length,
+      ...data.map(row => String(row[i] ?? '').length)
+    );
+    return { wch: Math.min(Math.max(maxLen + 2, 10), 45) };
+  });
+
+  // Cabeçalho fixo (congelado) e filtro automático, como numa planilha profissional
+  if(data.length){
+    ws['!autofilter'] = { ref: XLSX.utils.encode_range({ s:{r:0,c:0}, e:{r:data.length,c:cols.length-1} }) };
+  }
+  ws['!views'] = [{ state:'frozen', ySplit:1 }];
+
+  // Formatação numérica (moeda) nas colunas marcadas como number
+  cols.forEach((c, i) => {
+    if(c.type === 'number'){
+      for(let r=1; r<=data.length; r++){
+        const ref = XLSX.utils.encode_cell({ r, c:i });
+        if(ws[ref]) ws[ref].z = c.fmt || '#,##0.00';
+      }
+    }
+  });
+
+  return ws;
 }
 
-function downloadCSV(csv, filename){
-  const bom  = '﻿'; // BOM para Excel reconhecer UTF-8
-  const blob = new Blob([bom + csv], { type:'text/csv;charset=utf-8;' });
-  const url  = URL.createObjectURL(blob);
-  const a    = document.createElement('a');
-  a.href = url; a.download = filename;
-  document.body.appendChild(a); a.click();
-  document.body.removeChild(a); URL.revokeObjectURL(url);
+function downloadXLSX(ws, filename, sheetName){
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, sheetName || 'Dados');
+  XLSX.writeFile(wb, filename);
+}
+
+// Estima o custo de uma peça usada numa OS: busca o custo atual no estoque
+// pelo stockId; se a peça já foi removida do estoque, aplica a regra de
+// precificação de forma inversa (venda = 2x custo, ou R$150 fixo p/ custo <= R$75)
+// como aproximação — nesse caso o valor é uma estimativa, não o custo real histórico.
+function custoPecaOS(part){
+  const stockItem = state.stock.find(s => s.id === part.stockId);
+  const custoUnit = stockItem ? (stockItem.custo || 0) : (part.preco || 0) / 2;
+  return custoUnit * (part.qtd || 0);
+}
+function custoPecasOS(o){
+  return (o.parts || []).reduce((sum, p) => sum + custoPecaOS(p), 0);
+}
+
+// Imposto sobre o valor bruto da OS: taxa de cartão/adquirente (2,9%) + imposto (3,65%)
+const TAXA_IMPOSTO_OS = (2.9 + 3.65) / 100;
+function impostoOS(o){
+  return (o.total || 0) * TAXA_IMPOSTO_OS;
+}
+
+// Custo total = peças + logística das peças + custo das horas de serviço + logística do equipamento
+function custoTotalOS(o){
+  return custoPecasOS(o) + (o.logisticaPecas||0) + (o.custoHoras||0) + (o.logisticaEquipamento||0);
 }
 
 function exportCSV(tipo){
@@ -5118,27 +5485,70 @@ function exportCSV(tipo){
 
     if(!dados.length){ showToast('Nenhuma OS encontrada com esses filtros.', true); return; }
 
+    // Quebra cada OS em uma linha por aparelho (principal + extras). Todos os
+    // dados da OS (Nº OS, cliente, datas etc.) se repetem em toda linha. Os
+    // custos que são só da OS como um todo (logística de peças, horas de
+    // serviço, logística do equipamento) são rateados proporcionalmente ao
+    // valor (peças + mão de obra) de cada aparelho, assim como o imposto —
+    // a soma das linhas de uma mesma OS bate exatamente com o total da OS.
+    const linhas = [];
+    dados.forEach(o => {
+      const dispositivos = [
+        { modelo:o.aparelho||'', imei:o.imei||'', defeito:o.defeito||'', parts:o.parts||[], maoObra:o.maoObra||0 },
+        ...(o.aparelhosExtras||[]).map(ae => ({
+          modelo:ae.modelo||'', imei:ae.imei||'', defeito:ae.defeito||'',
+          parts:ae.parts||[], maoObra:ae.maoObra||0
+        }))
+      ];
+      const totalOS = o.total || 0;
+      const shareIgual = 1 / dispositivos.length; // logística/horas: dividido igualmente entre os aparelhos
+      dispositivos.forEach(d => {
+        const subtotalBruto = (d.parts||[]).reduce((s,p) => s + p.qtd*p.preco, 0) + (d.maoObra||0);
+        const share = totalOS > 0 ? (subtotalBruto / totalOS) : shareIgual; // imposto/lucro: proporcional ao valor do aparelho
+        linhas.push({ os:o, device:d, subtotalBruto, share, shareIgual });
+      });
+    });
+
+    const custoOperacionalOS = o => (o.logisticaPecas||0) + (o.custoHoras||0) + (o.logisticaEquipamento||0);
+    const impostoDevice = r => r.subtotalBruto * TAXA_IMPOSTO_OS;
+    // Custo Total agora soma peças + custos operacionais rateados + o imposto
+    const custoTotalDevice = r => custoPecasOS(r.device) + custoOperacionalOS(r.os) * r.shareIgual + impostoDevice(r);
+    const lucroDevice = r => r.subtotalBruto - custoTotalDevice(r);
+
     const cols = [
-      { label:'Nº OS',          fn: o => String(o.numero).padStart(4,'0') },
-      { label:'Cliente',        key:'clienteNome' },
-      { label:'Telefone',       key:'clienteTelefone' },
-      { label:'Chamado',        key:'chamado' },
-      { label:'Aparelho',       key:'aparelho' },
-      { label:'IMEI',           key:'imei' },
-      { label:'Defeito',        key:'defeito' },
-      { label:'Diagnóstico',    key:'diagnostico' },
-      { label:'Status',         key:'status' },
-      { label:'Forma Pgto',     key:'pagamento' },
-      { label:'Garantia (dias)',key:'garantia' },
-      { label:'Mão de Obra',    fn: o => (o.maoObra||0).toFixed(2) },
-      { label:'Total (R$)',     fn: o => (o.total||0).toFixed(2) },
-      { label:'Data Entrada',   fn: o => formatDate(o.dataEntrada) },
-      { label:'Data Prevista',  fn: o => formatDate(o.dataPrevista) },
-      { label:'Observações',    key:'observacoes' },
+      { label:'Nº OS',          fn: r => String(r.os.numero).padStart(4,'0') },
+      { label:'Cliente',        fn: r => r.os.clienteNome },
+      { label:'Telefone',       fn: r => r.os.clienteTelefone },
+      { label:'Chamado',        fn: r => r.os.chamado },
+      { label:'Aparelho',       fn: r => r.device.modelo },
+      { label:'IMEI',           fn: r => r.device.imei },
+      { label:'Defeito',        fn: r => r.device.defeito },
+      { label:'Peças Utilizadas', fn: r => (r.device.parts||[]).map(p => `${p.nome} x${p.qtd}`).join(', ') },
+      { label:'Diagnóstico',    fn: r => r.os.diagnostico },
+      { label:'Status',         fn: r => r.os.status },
+      { label:'Forma Pgto',     fn: r => r.os.pagamento },
+      { label:'Garantia (dias)',fn: r => r.os.garantia, type:'number', fmt:'0' },
+      { label:'Valor Total do Reparo (aparelho) (R$)', fn: r => r.subtotalBruto, type:'number' },
+      { label:'Mão de Obra (aparelho)', fn: r => r.device.maoObra||0, type:'number' },
+      { label:'Custo Peças (aparelho) (R$)', fn: r => custoPecasOS(r.device), type:'number' },
+      { label:'Logística Peças (aparelho) (R$)', fn: r => (r.os.logisticaPecas||0) * r.shareIgual, type:'number' },
+      { label:'Horas de Serviço (aparelho)', fn: r => (r.os.horasServico||0) * r.shareIgual, type:'number', fmt:'0.00' },
+      { label:'Custo Horas (aparelho) (R$)', fn: r => (r.os.custoHoras||0) * r.shareIgual, type:'number' },
+      { label:'Logística Equipamento (aparelho) (R$)', fn: r => (r.os.logisticaEquipamento||0) * r.shareIgual, type:'number' },
+      { label:'Imposto (aparelho) (R$)', fn: r => impostoDevice(r), type:'number' },
+      { label:'Custo Total (aparelho) (R$)', fn: r => custoTotalDevice(r), type:'number' },
+      { label:'Lucro (aparelho) (R$)', fn: r => lucroDevice(r), type:'number' },
+      { label:'Margem (aparelho) (%)', fn: r => {
+          const bruto = r.subtotalBruto;
+          return bruto > 0 ? lucroDevice(r) / bruto : 0;
+        }, type:'number', fmt:'0.0%' },
+      { label:'Data Entrada',   fn: r => formatDate(r.os.dataEntrada) },
+      { label:'Data Prevista',  fn: r => formatDate(r.os.dataPrevista) },
+      { label:'Observações',    fn: r => r.os.observacoes },
     ];
     const suffix = statusFiltro ? `-${statusFiltro.replace(/\s/g,'-')}` : '-todos';
-    downloadCSV(toCSV(dados, cols), `mobit-os${suffix}-${todayISO()}.csv`);
-    showToast(`${dados.length} OS exportadas com sucesso.`);
+    downloadXLSX(toWorksheet(linhas, cols), `mobit-os${suffix}-${todayISO()}.xlsx`, 'Ordens de Serviço');
+    showToast(`${dados.length} OS exportadas (${linhas.length} linhas de aparelho).`);
   }
 
   if(tipo === 'clientes'){
@@ -5152,7 +5562,7 @@ function exportCSV(tipo){
       { label:'Endereço',   key:'endereco' },
       { label:'Obs.',       key:'observacoes' },
     ];
-    downloadCSV(toCSV(state.clients, cols), `mobit-clientes-${todayISO()}.csv`);
+    downloadXLSX(toWorksheet(state.clients, cols), `mobit-clientes-${todayISO()}.xlsx`, 'Clientes');
     showToast(`${state.clients.length} clientes exportados.`);
   }
 
@@ -5172,42 +5582,38 @@ function exportCSV(tipo){
       { label:'Nome',        key:'nome' },
       { label:'Item',        key:'categoria' },
       { label:'Compatível',  key:'compativel' },
-      { label:'Qtd Atual',   key:'quantidade' },
-      { label:'Qtd Mínima',  key:'minimo' },
+      { label:'Qtd Atual',   key:'quantidade', type:'number', fmt:'0' },
+      { label:'Qtd Mínima',  key:'minimo', type:'number', fmt:'0' },
       { label:'Localização', key:'local' },
-      { label:'Custo (R$)',  fn: s => (s.custo||0).toFixed(2) },
-      { label:'Venda (R$)',  fn: s => (s.venda||0).toFixed(2) },
+      { label:'Custo (R$)',  fn: s => s.custo||0, type:'number' },
+      { label:'Venda (R$)',  fn: s => s.venda||0, type:'number' },
       { label:'Fornecedor',  key:'fornecedor' },
       { label:'Nº Pedido',   key:'pedido' },
       { label:'Data Pedido', key:'dataPedido' },
     ];
-    downloadCSV(toCSV(dados, cols), `mobit-estoque-${todayISO()}.csv`);
+    downloadXLSX(toWorksheet(dados, cols), `mobit-estoque-${todayISO()}.xlsx`, 'Estoque');
     showToast(`${dados.length} itens exportados.`);
   }
 }
 
 /* ---- TEMPLATES ---- */
 function downloadTemplate(tipo){
-  const NL = '\n';
-  let csv = '';
+  let cols, exemplo;
   if(tipo === 'clientes'){
-    csv  = ['"Nome"','"Telefone"','"Email"','"CPF/CNPJ"','"Endere\u00e7o"','"Obs."'].join(',') + NL;
-    csv += ['"Maria Exemplo"','"(11) 99999-0000"','"maria@email.com"','"123.456.789-00"','"Rua das Flores, 10"','""'].join(',') + NL;
+    cols   = ['Nome','Telefone','Email','CPF/CNPJ','Endereço','Obs.'];
+    exemplo = ['Maria Exemplo','(11) 99999-0000','maria@email.com','123.456.789-00','Rua das Flores, 10',''];
   }
   if(tipo === 'estoque'){
-    csv  = ['"C\u00f3digo"','"Nome"','"Categoria"','"Compat\u00edvel"','"Qtd Atual"','"Qtd M\u00ednima"','"Localiza\u00e7\u00e3o"','"Custo (R$)"','"Venda (R$)"'].join(',') + NL;
-    csv += ['"P001"','"Tela iPhone 13"','"Display"','"iPhone 13"','"5"','"2"','"Gaveta A1"','"150.00"','"280.00"'].join(',') + NL;
+    cols   = ['Código','Nome','Categoria','Compatível','Qtd Atual','Qtd Mínima','Localização','Custo (R$)','Venda (R$)'];
+    exemplo = ['P001','Tela iPhone 13','Display','iPhone 13',5,2,'Gaveta A1',150.00,280.00];
   }
-  const bom  = '\uFEFF';
-  const blob = new Blob([bom + csv], { type:'text/csv;charset=utf-8;' });
-  const url  = URL.createObjectURL(blob);
-  const a    = document.createElement('a');
-  a.href = url; a.download = 'modelo-' + tipo + '.csv';
-  document.body.appendChild(a); a.click();
-  document.body.removeChild(a); URL.revokeObjectURL(url);
+  const ws = XLSX.utils.aoa_to_sheet([cols, exemplo]);
+  ws['!cols'] = cols.map((c,i) => ({ wch: Math.max(c.length+2, String(exemplo[i]).length+2, 12) }));
+  ws['!views'] = [{ state:'frozen', ySplit:1 }];
+  downloadXLSX(ws, 'modelo-' + tipo + '.xlsx', 'Modelo');
 }
 
-/* ---- IMPORTAR CSV ---- */
+/* ---- IMPORTAR EXCEL ---- */
 let _importRows = [];
 let _importFile = null;
 
@@ -5215,8 +5621,8 @@ function handleFileDrop(e){
   e.preventDefault();
   document.getElementById('imp-dropzone').style.borderColor = 'var(--border)';
   const file = e.dataTransfer.files[0];
-  if(file && file.name.endsWith('.csv')) processImportFile(file);
-  else showToast('Envie um arquivo .csv', true);
+  if(file && /\.(xlsx|xls|csv)$/i.test(file.name)) processImportFile(file);
+  else showToast('Envie um arquivo .xlsx, .xls ou .csv', true);
 }
 
 function onImportFileSelect(e){
@@ -5228,18 +5634,38 @@ function onImportFileSelect(e){
 function processImportFile(file){
   _importFile = file;
   document.getElementById('imp-filename').textContent = file.name;
+  const isCSV = /\.csv$/i.test(file.name);
   const reader = new FileReader();
+
   reader.onload = e => {
     try {
-      const text = e.target.result.replace(/^\uFEFF/,''); // remover BOM
-      const lines = text.split(/\r?\n/).filter(l => l.trim());
-      const header = parseCSVLine(lines[0]);
-      _importRows  = lines.slice(1).map(l => {
-        const vals = parseCSVLine(l);
-        const obj  = {};
-        header.forEach((h,i) => obj[h.trim()] = (vals[i]||'').trim());
-        return obj;
-      }).filter(r => Object.values(r).some(v => v));
+      let header, rows;
+
+      if(isCSV){
+        // Compatibilidade com arquivos .csv antigos
+        const text = e.target.result.replace(/^\uFEFF/,'');
+        const lines = text.split(/\r?\n/).filter(l => l.trim());
+        header = parseCSVLine(lines[0]).map(h => h.trim());
+        rows = lines.slice(1).map(l => {
+          const vals = parseCSVLine(l);
+          const obj  = {};
+          header.forEach((h,i) => obj[h] = (vals[i]||'').trim());
+          return obj;
+        });
+      } else {
+        // .xlsx / .xls via SheetJS
+        const wb = XLSX.read(e.target.result, { type:'array' });
+        const ws = wb.Sheets[wb.SheetNames[0]];
+        const aoa = XLSX.utils.sheet_to_json(ws, { header:1, defval:'', raw:true });
+        header = (aoa[0] || []).map(h => String(h).trim());
+        rows = aoa.slice(1).map(line => {
+          const obj = {};
+          header.forEach((h,i) => obj[h] = line[i] !== undefined ? line[i] : '');
+          return obj;
+        });
+      }
+
+      _importRows = rows.filter(r => Object.values(r).some(v => v !== '' && v !== null && v !== undefined));
 
       const preview = document.getElementById('imp-preview');
       preview.style.display = 'block';
@@ -5252,7 +5678,9 @@ function processImportFile(file){
       document.getElementById('imp-error').style.display = 'block';
     }
   };
-  reader.readAsText(file, 'UTF-8');
+
+  if(isCSV) reader.readAsText(file, 'UTF-8');
+  else reader.readAsArrayBuffer(file);
 }
 
 function parseCSVLine(line){
@@ -5267,7 +5695,7 @@ function parseCSVLine(line){
   return result;
 }
 
-async function importCSV(){
+async function importData(){
   const tipo = document.getElementById('imp-tipo').value;
   const err  = document.getElementById('imp-error');
   const btn  = document.getElementById('btn-importar');
@@ -5281,9 +5709,9 @@ async function importCSV(){
       for(const r of _importRows){
         if(!r['Nome']) continue;
         const id = 'c' + Date.now() + Math.random().toString(36).slice(2,6);
-        const row = { id, nome:r['Nome']||'', telefone:r['Telefone']||'',
-          email:r['Email']||'', cpfcnpj:r['CPF/CNPJ']||'',
-          endereco:r['Endereço']||r['Endereco']||'', observacoes:r['Obs.']||'' };
+        const row = { id, nome:String(r['Nome']||''), telefone:String(r['Telefone']||''),
+          email:String(r['Email']||''), cpfcnpj:String(r['CPF/CNPJ']||''),
+          endereco:String(r['Endereço']||r['Endereco']||''), observacoes:String(r['Obs.']||'') };
         await sbPost('clientes', row);
         state.clients.push(row);
         ok++;
@@ -5295,10 +5723,10 @@ async function importCSV(){
       for(const r of _importRows){
         if(!r['Nome']) continue;
         const id = 'p' + Date.now() + Math.random().toString(36).slice(2,6);
-        const row = { id, codigo:r['Código']||r['Codigo']||'', nome:r['Nome']||'',
-          categoria:r['Categoria']||'', compativel:r['Compatível']||r['Compativel']||'',
+        const row = { id, codigo:String(r['Código']||r['Codigo']||''), nome:String(r['Nome']||''),
+          categoria:String(r['Categoria']||''), compativel:String(r['Compatível']||r['Compativel']||''),
           quantidade:parseInt(r['Qtd Atual'])||0, minimo:parseInt(r['Qtd Mínima'])||0,
-          local:r['Localização']||r['Localizacao']||'',
+          local:String(r['Localização']||r['Localizacao']||''),
           custo:parseFloat(r['Custo (R$)'])||0, venda:parseFloat(r['Venda (R$)'])||0 };
         await sbPost('estoque', row);
         state.stock.push(row);
@@ -6090,7 +6518,7 @@ async function salvarNFCNN(){
   showToast(`NF ${nf} associada a ${ok} pedido(s).`);
 }
 
-/* ---- Exportar CSV de compras ---- */
+/* ---- Exportar Excel de compras ---- */
 function exportComprasCSV(){
   const forn   = document.getElementById('compra-filter-forn')?.value || '';
   const status = document.getElementById('compra-filter-status')?.value || '';
@@ -6105,48 +6533,59 @@ function exportComprasCSV(){
 
   if(!list.length){ showToast('Nenhuma compra para exportar.', true); return; }
 
-  const NL = '\n';
   const fornNomes = { CNN:'CNN Oriental', SKYTECH:'Skytech' };
-  let csv = ['"Fornecedor"','"Data Pedido"','"Nº Pedido"','"Nº NF"','"Data NF"',
-    '"Código"','"Item"','"Qtd"','"P.Unit (R$)"','"Total Item (R$)"',
-    '"Total Pedido (R$)"','"Status"','"Data Pagamento"'].join(',') + NL;
+  const header = ['Fornecedor','Data Pedido','Nº Pedido','Nº NF','Data NF',
+    'Código','Item','Qtd','P.Unit (R$)','Total Item (R$)',
+    'Total Pedido (R$)','Status','Data Pagamento'];
+  const rows = [];
 
   list.forEach(c => {
     if(c.itens.length){
       c.itens.forEach((it, idx) => {
-        csv += [
-          `"${fornNomes[c.fornecedor]||c.fornecedor}"`,
-          `"${formatDate(c.dataPedido)||''}"`,
-          `"${c.numeroPedido||''}"`,
-          `"${c.numeroNF||''}"`,
-          `"${formatDate(c.dataNF)||''}"`,
-          `"${it.codigo||''}"`,
-          `"${it.nome||''}"`,
-          `"${it.qtd}"`,
-          `"${(it.precoUnit||0).toFixed(2)}"`,
-          `"${(it.total||0).toFixed(2)}"`,
-          idx===0 ? `"${c.valorTotal.toFixed(2)}"` : '""',
-          idx===0 ? `"${c.status}"` : '""',
-          idx===0 ? `"${formatDate(c.dataPagamento)||''}"` : '""'
-        ].join(',') + NL;
+        rows.push([
+          fornNomes[c.fornecedor]||c.fornecedor,
+          formatDate(c.dataPedido)||'',
+          c.numeroPedido||'',
+          c.numeroNF||'',
+          formatDate(c.dataNF)||'',
+          it.codigo||'',
+          it.nome||'',
+          it.qtd||0,
+          it.precoUnit||0,
+          it.total||0,
+          idx===0 ? c.valorTotal : '',
+          idx===0 ? c.status : '',
+          idx===0 ? (formatDate(c.dataPagamento)||'') : ''
+        ]);
       });
     } else {
-      csv += [`"${fornNomes[c.fornecedor]||c.fornecedor}"`,
-        `"${formatDate(c.dataPedido)||''}"`,`"${c.numeroPedido||''}"`,
-        `"${c.numeroNF||''}"`,`"${formatDate(c.dataNF)||''}"`,
-        '""','""','""','""','""',
-        `"${c.valorTotal.toFixed(2)}"`,`"${c.status}"`,
-        `"${formatDate(c.dataPagamento)||''}"`].join(',') + NL;
+      rows.push([
+        fornNomes[c.fornecedor]||c.fornecedor,
+        formatDate(c.dataPedido)||'', c.numeroPedido||'',
+        c.numeroNF||'', formatDate(c.dataNF)||'',
+        '','','','','',
+        c.valorTotal, c.status, formatDate(c.dataPagamento)||''
+      ]);
     }
   });
 
-  const bom  = '\uFEFF';
-  const blob = new Blob([bom + csv], { type:'text/csv;charset=utf-8;' });
-  const url  = URL.createObjectURL(blob);
-  const a    = document.createElement('a');
-  a.href = url; a.download = 'mobit-compras-' + todayISO() + '.csv';
-  document.body.appendChild(a); a.click();
-  document.body.removeChild(a); URL.revokeObjectURL(url);
+  const ws = XLSX.utils.aoa_to_sheet([header, ...rows]);
+  ws['!cols'] = [
+    { wch:16 }, { wch:13 }, { wch:14 }, { wch:12 }, { wch:12 },
+    { wch:12 }, { wch:26 }, { wch:8 }, { wch:12 }, { wch:14 },
+    { wch:14 }, { wch:14 }, { wch:14 }
+  ];
+  // Colunas monetárias: P.Unit, Total Item, Total Pedido (índices 8, 9, 10)
+  [8,9,10].forEach(colIdx => {
+    for(let r=1; r<=rows.length; r++){
+      const ref = XLSX.utils.encode_cell({ r, c:colIdx });
+      if(ws[ref] && typeof ws[ref].v === 'number') ws[ref].z = '#,##0.00';
+    }
+  });
+  ws['!autofilter'] = { ref: XLSX.utils.encode_range({ s:{r:0,c:0}, e:{r:rows.length,c:header.length-1} }) };
+  ws['!views'] = [{ state:'frozen', ySplit:1 }];
+
+  downloadXLSX(ws, 'mobit-compras-' + todayISO() + '.xlsx', 'Compras');
   showToast(list.length + ' compra(s) exportada(s).');
 }
 
