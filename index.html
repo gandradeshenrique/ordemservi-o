@@ -5461,6 +5461,34 @@ function custoPecasOS(o){
   return (o.parts || []).reduce((sum, p) => sum + custoPecaOS(p), 0);
 }
 
+// Normaliza a categoria do estoque (minúsculas, sem acento) pra comparar com segurança
+function normalizeCategoria(s){
+  return (s || '').toString().trim().toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+}
+const CATEGORIAS_ACESSORIO = ['capa', 'pelicula', 'carregador'];
+
+// Custo de uma categoria específica (Capa/Película/Carregador) dentro das
+// peças de um aparelho, buscando a categoria no cadastro de Estoque.
+function custoPorCategoriaOS(device, categoriaAlvo){
+  return (device.parts || []).reduce((sum, p) => {
+    const stockItem = state.stock.find(s => s.id === p.stockId);
+    const cat = normalizeCategoria(stockItem ? stockItem.categoria : '');
+    if(cat !== categoriaAlvo) return sum;
+    return sum + custoPecaOS(p);
+  }, 0);
+}
+
+// Custo só das peças de reparo (exclui Capa/Película/Carregador, que já têm
+// coluna própria — assim não conta o mesmo valor duas vezes na planilha).
+function custoPecasReparoOS(device){
+  return (device.parts || []).reduce((sum, p) => {
+    const stockItem = state.stock.find(s => s.id === p.stockId);
+    const cat = normalizeCategoria(stockItem ? stockItem.categoria : '');
+    if(CATEGORIAS_ACESSORIO.includes(cat)) return sum;
+    return sum + custoPecaOS(p);
+  }, 0);
+}
+
 // Imposto sobre o valor bruto da OS: taxa de cartão/adquirente (2,9%) + imposto (3,65%)
 const TAXA_IMPOSTO_OS = (2.9 + 3.65) / 100;
 function impostoOS(o){
@@ -5530,7 +5558,10 @@ function exportCSV(tipo){
       { label:'Garantia (dias)',fn: r => r.os.garantia, type:'number', fmt:'0' },
       { label:'Valor Total do Reparo (aparelho) (R$)', fn: r => r.subtotalBruto, type:'number' },
       { label:'Mão de Obra (aparelho)', fn: r => r.device.maoObra||0, type:'number' },
-      { label:'Custo Peças (aparelho) (R$)', fn: r => custoPecasOS(r.device), type:'number' },
+      { label:'Custo Peças (aparelho) (R$)', fn: r => custoPecasReparoOS(r.device), type:'number' },
+      { label:'Capa (R$)',       fn: r => custoPorCategoriaOS(r.device, 'capa'), type:'number' },
+      { label:'Película (R$)',   fn: r => custoPorCategoriaOS(r.device, 'pelicula'), type:'number' },
+      { label:'Carregador (R$)', fn: r => custoPorCategoriaOS(r.device, 'carregador'), type:'number' },
       { label:'Logística Peças (aparelho) (R$)', fn: r => (r.os.logisticaPecas||0) * r.shareIgual, type:'number' },
       { label:'Horas de Serviço (aparelho)', fn: r => (r.os.horasServico||0) * r.shareIgual, type:'number', fmt:'0.00' },
       { label:'Custo Horas (aparelho) (R$)', fn: r => (r.os.custoHoras||0) * r.shareIgual, type:'number' },
