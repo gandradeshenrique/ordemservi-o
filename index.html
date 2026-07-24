@@ -2640,8 +2640,15 @@ function renderDashboard(){
   const lucroB  = fatB - gastosB;
 
   // Média Margem (margem de lucro média do período)
-  const margemA = fatA ? (lucroA / fatA) * 100 : 0;
-  const margemB = fatB ? (lucroB / fatB) * 100 : 0;
+  // Usa o custo real por OS (peças efetivamente usadas + custos operacionais + imposto),
+  // igual ao cálculo da exportação por aparelho — e não o total de compras do período,
+  // que não corresponde ao custo das peças realmente aplicadas nas OS do período.
+  const custoRealA = osA.reduce((s,o) => s + custoTotalOS(o) + impostoOS(o), 0);
+  const custoRealB = osB.reduce((s,o) => s + custoTotalOS(o) + impostoOS(o), 0);
+  const lucroRealA = fatA - custoRealA;
+  const lucroRealB = fatB - custoRealB;
+  const margemA = fatA ? (lucroRealA / fatA) * 100 : 0;
+  const margemB = fatB ? (lucroRealB / fatB) * 100 : 0;
 
   function delta(a, b){
     if(!b) return '';
