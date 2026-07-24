@@ -3540,8 +3540,7 @@ function onOSClientChange(){
   // Mostrar campos PJ e ocultar checklist se for pessoa jurídica
   const isPJ = getTipoPessoa(c.cpfcnpj) === 'PJ';
   pjFields.style.display = isPJ ? 'block' : 'none';
-  const clWrap = document.getElementById('os-checklist-wrap');
-  if(clWrap) clWrap.style.display = isPJ ? 'none' : 'block';
+  atualizarVisibilidadeChecklist();
 }
 
 
@@ -3870,12 +3869,12 @@ async function saveOS(){
     return;
   }
 
-  // Validar checklist (pular para clientes PJ)
+  // Validar checklist (pular para clientes PJ ou quando há mais de 1 aparelho)
   const clWrapEl = document.getElementById('os-checklist-wrap');
-  const isPJSelected = clWrapEl && clWrapEl.style.display === 'none';
+  const checklistOculto = clWrapEl && clWrapEl.style.display === 'none';
   const checklist = {};
   let clIncompleto = false;
-  if(!isPJSelected){
+  if(!checklistOculto){
     const clNames = ['cl-liga','cl-carrega','cl-display','cl-touch','cl-vidro','cl-tampa','cl-camtraseira','cl-camfrontal','cl-faceid','cl-biometria','cl-microfone','cl-altofalante','cl-auricular','cl-sinal','cl-wifi','cl-bluetooth','cl-sensor','cl-gaveta','cl-power','cl-volume'];
     clNames.forEach(n => {
       const checked = document.querySelector(`input[name="${n}"]:checked`);
@@ -4086,6 +4085,15 @@ function toggleAparelhoPrincipal(){
   icon.textContent = aberto ? '▶ expandir' : '▼ recolher';
 }
 
+function atualizarVisibilidadeChecklist(){
+  const clienteId = document.getElementById('os-cliente-id').value;
+  const cliente = clienteId ? state.clients.find(c => c.id === clienteId) : null;
+  const isPJ = cliente ? getTipoPessoa(cliente.cpfcnpj) === 'PJ' : false;
+  const temMultiplosAparelhos = document.getElementById('aparelhos-extras-list').children.length > 0;
+  const clWrap = document.getElementById('os-checklist-wrap');
+  if(clWrap) clWrap.style.display = (isPJ || temMultiplosAparelhos) ? 'none' : 'block';
+}
+
 function colapsarAparelhoPrincipal(){
   const nome    = document.getElementById('ac-aparelho-input').value.trim() || '(sem modelo)';
   const defeito = document.getElementById('os-defeito').value.trim();
@@ -4147,7 +4155,7 @@ function addAparelhoExtra(existing){
       <span class="ae-numero-label" style="font-size:12px; font-weight:700; color:var(--accent); text-transform:uppercase; letter-spacing:0.05em;">Aparelho ${num}</span>
       <div style="display:flex; align-items:center; gap:12px;">
         <span class="ae-toggle-icon" style="font-size:12px; color:var(--text-faint); cursor:pointer;" onclick="toggleAparelhoExtra(this)">▼ recolher</span>
-        <button type="button" onclick="this.closest('.aparelho-extra-card').remove(); reindexarAparelhosExtras();"
+        <button type="button" onclick="this.closest('.aparelho-extra-card').remove(); reindexarAparelhosExtras(); atualizarVisibilidadeChecklist();"
           style="background:none;border:none;color:var(--text-faint);font-size:18px;cursor:pointer;line-height:1;padding:0 2px;">&times;</button>
       </div>
     </div>
@@ -4271,6 +4279,8 @@ function addAparelhoExtra(existing){
     resumo.querySelector('.ae-resumo-defeito').textContent = def ? '— ' + (def.length > 40 ? def.slice(0,40)+'…' : def) : '';
     if(icon) icon.textContent = '▶ expandir';
   }
+
+  atualizarVisibilidadeChecklist();
 }
 
 function atualizarResumoExtra(input){
