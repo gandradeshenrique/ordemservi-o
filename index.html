@@ -2752,7 +2752,7 @@ function renderDashboard(){
   const critico = state.stock.filter(s=>s.quantidade<=s.minimo).slice(0,8);
   document.getElementById('dash-estoque-critico').innerHTML = critico.length
     ? critico.map(s => `<tr>
-        <td style="padding:7px 10px;">${escapeHtml(s.nome)}${s.detalhes?'<span style="font-size:11px;color:var(--text-faint);margin-left:4px;">'+escapeHtml(s.detalhes)+'</span>':''}</td>
+        <td style="padding:7px 10px;">${s.categoria?escapeHtml(s.categoria)+' - ':''}${escapeHtml(s.nome)}${s.detalhes?' - <span style="font-size:11px;color:var(--text-faint);">'+escapeHtml(s.detalhes)+'</span>':''}</td>
         <td style="padding:7px 10px;text-align:center;color:${s.quantidade===0?'#dc3545':'#f59e0b'};font-weight:700;">${s.quantidade}</td>
         <td style="padding:7px 10px;text-align:center;color:var(--text-dim);">${s.minimo}</td>
       </tr>`).join('')
