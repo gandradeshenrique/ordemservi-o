@@ -2697,8 +2697,9 @@ function renderDashboard(){
   const pecasMap = {};
   osA.forEach(o => {
     (o.parts || []).forEach(p => {
-      const nome = p.nome || 'Sem nome';
-      pecasMap[nome] = (pecasMap[nome] || 0) + (p.qtd || 1);
+      const stockItem = state.stock.find(s => s.id === p.stockId);
+      const item = (stockItem && stockItem.categoria) || 'Sem categoria';
+      pecasMap[item] = (pecasMap[item] || 0) + (p.qtd || 1);
     });
   });
   const pecasOrdenadas = Object.entries(pecasMap).sort((a,b) => b[1]-a[1]).slice(0,8);
