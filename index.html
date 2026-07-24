@@ -1308,10 +1308,7 @@
       </div>
     </div>
 
-  </div>
-</div>
-
-<!-- ===================== COTAÇÃO ===================== -->
+    <!-- ===================== COTAÇÃO ===================== -->
     <div class="page" id="page-cotacao">
       <div class="page-header">
         <div>
@@ -1322,8 +1319,6 @@
       </div>
 
       <div style="display:grid; grid-template-columns:1fr 1fr; gap:16px; margin-bottom:16px;" id="cotacao-layout">
-
-        <!-- Coluna esquerda: montar lista -->
         <div class="card" style="padding:16px;">
           <div style="font-size:13px; font-weight:700; margin-bottom:12px; color:var(--text);">📋 Lista de peças para cotar</div>
           <div style="display:flex; gap:8px; margin-bottom:10px;">
@@ -1343,7 +1338,6 @@
           </div>
         </div>
 
-        <!-- Coluna direita: resultado -->
         <div class="card" style="padding:16px;" id="cotacao-resultado-card">
           <div style="font-size:13px; font-weight:700; margin-bottom:12px; color:var(--text);">📊 Resultado da cotação</div>
           <div id="cotacao-status-msg" style="color:var(--text-faint); font-size:13px; text-align:center; padding:20px 0;">
@@ -1351,10 +1345,8 @@
           </div>
           <div id="cotacao-resultado-body" style="display:none;"></div>
         </div>
-
       </div>
 
-      <!-- Histórico de cotações -->
       <div class="card" style="padding:16px;">
         <div style="font-size:13px; font-weight:700; margin-bottom:12px; color:var(--text);">🕐 Cotações recentes</div>
         <div id="cotacao-historico-body">
@@ -1362,6 +1354,9 @@
         </div>
       </div>
     </div>
+
+  </div>
+</div>
 
 <!-- ===================== MODAL: NOVA/EDITAR OS ===================== -->
 <div class="modal-overlay" id="os-modal-overlay">
