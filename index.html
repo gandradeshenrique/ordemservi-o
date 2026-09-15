@@ -1397,22 +1397,33 @@
       <div class="card" style="padding:16px; margin-bottom:16px;">
         <div style="display:grid; grid-template-columns:1fr 1fr; gap:20px;" id="imei-layout">
           <div>
-            <div style="font-size:13px; font-weight:700; margin-bottom:10px; color:var(--text);">📷 Foto da etiqueta</div>
+            <div style="font-size:13px; font-weight:700; margin-bottom:10px; color:var(--text);">📷 Câmera</div>
             <input type="file" id="imei-photo-input" accept="image/*" capture="environment" style="display:none;" onchange="onFotoImeiSelecionada(event)">
             <div id="imei-photo-frame" style="position:relative; width:100%; aspect-ratio:4/3; background:#0b0d10; border-radius:8px; overflow:hidden; display:flex; align-items:center; justify-content:center; border:1px solid var(--border);">
+              <video id="imei-live-video" muted playsinline autoplay style="display:none; width:100%; height:100%; object-fit:cover;"></video>
               <img id="imei-photo-preview" style="display:none; width:100%; height:100%; object-fit:contain;">
               <div id="imei-photo-placeholder" style="color:#c7ccd4; font-size:13px; text-align:center; padding:0 20px;">
                 Nenhuma foto ainda.<br><br>
-                <button class="btn btn-primary" onclick="dispararFotoImei()">📷 Tirar foto da etiqueta</button>
+                <button class="btn btn-primary" onclick="ligarCameraAoVivoImei()">📷 Ligar câmera ao vivo (beta)</button><br><br>
+                <a href="#" onclick="dispararFotoImei(); return false;" style="color:var(--accent); text-decoration:none; font-size:12px;">ou tirar uma foto pela câmera nativa do celular</a>
               </div>
             </div>
-            <div style="display:flex; align-items:center; gap:14px; margin-top:8px; flex-wrap:wrap;">
-              <button class="btn btn-ghost btn-sm" id="imei-btn-retake" onclick="dispararFotoImei()" style="display:none;">Tirar outra foto</button>
+
+            <!-- controles do modo câmera ao vivo (beta): sem reabrir app nativo a cada foto -->
+            <div id="imei-live-controls" style="display:none; align-items:center; gap:8px; margin-top:8px; flex-wrap:wrap;">
+              <button class="btn btn-primary" id="imei-btn-live-shot" onclick="tirarFotoAoVivoImei()">📸 Tirar foto</button>
+              <button class="btn btn-ghost btn-sm" onclick="desligarCameraAoVivoImei()">Desligar câmera</button>
+            </div>
+
+            <!-- controles do modo foto nativa (fallback, um toque por foto) -->
+            <div id="imei-native-controls" style="display:none; align-items:center; gap:14px; margin-top:8px; flex-wrap:wrap;">
+              <button class="btn btn-ghost btn-sm" id="imei-btn-retake" onclick="dispararFotoImei()">Tirar outra foto</button>
               <label style="display:flex; align-items:center; gap:6px; font-size:12px; color:var(--text-faint); cursor:pointer;">
                 <input type="checkbox" id="imei-continuo-toggle" checked onchange="_imeiContinuo = this.checked">
                 Reabrir a câmera sozinha após cada foto
               </label>
             </div>
+
             <div id="imei-ocr-status" style="margin-top:8px; min-height:18px; font-size:12.5px; color:var(--text-faint);">Tire uma foto nítida do texto "IMEI:" impresso na etiqueta.</div>
             <div id="imei-feed" style="margin-top:6px; font-family:var(--mono); font-size:11.5px; line-height:1.7; min-height:18px;"></div>
             <details style="margin-top:10px;">
@@ -1429,7 +1440,7 @@
               <button class="btn btn-primary" onclick="adicionarImeiManual()">+ Adicionar</button>
             </div>
             <div class="hint" style="margin-top:10px; line-height:1.6;">
-              A foto é tirada pela câmera nativa do celular (foco e zoom automáticos, mais confiável do que uma câmera embutida na página). Com "reabrir a câmera sozinha" ligado, é só ir fotografando etiqueta após etiqueta — cada foto entra numa fila e é lida (OCR) em segundo plano.
+              "Câmera ao vivo (beta)" pede acesso à câmera uma vez só e cada toque em "Tirar foto" já captura, sem abrir nenhum app separado — o jeito mais rápido, mas só funciona em alguns navegadores (Chrome/Android, por ex.). Se não aparecer ou o foco não ficar bom, use "tirar foto pela câmera nativa": aí o app de câmera do celular abre a cada foto, com o melhor autofoco possível. Em ambos os modos, cada foto entra numa fila e é lida (OCR) em segundo plano, sem travar a próxima captura.
               IMEI com 15 dígitos e ainda não coletado entra direto na lista; caso duvidoso (dígitos a mais/a menos, ou nada reconhecido) também entra, marcado com ⚠ pra conferir depois na tabela — assim nenhum aparelho fica de fora da captura em lote.
               Aparelhos com dois chips têm dois IMEIs impressos na etiqueta — o app considera só o primeiro (IMEI 1); não é preciso fotografar o segundo.
               Se preferir, digite o IMEI manualmente aqui a qualquer momento.
@@ -2704,6 +2715,7 @@ function showLoadingOverlay(show){
    NAVEGAÇÃO
    ========================================================= */
 function goToPage(page){
+  if(page !== 'imei' && typeof desligarCameraAoVivoImei === 'function') desligarCameraAoVivoImei();
   document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
   document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
   document.getElementById('page-' + page).classList.add('active');
@@ -7313,15 +7325,30 @@ function _imeiUpdateDiagPanel(){
     'Último texto bruto do OCR: ' + _imeiDiag.ultimoTextoOcr;
 }
 
-/* ---------- captura contínua de fotos (câmera nativa do celular) ----------
-   Modo padrão: a câmera reabre sozinha logo após cada foto, e cada foto vira
-   um item numa fila processada uma a uma pelo OCR em segundo plano — assim
-   dá pra fotografar a etiqueta seguinte sem esperar o OCR da anterior
-   terminar, o que importa muito num lote de centenas de aparelhos.
-   IMEIs com 15 dígitos e ainda não coletados entram direto na lista; casos
-   ambíguos (dígitos fora do padrão, ou nada reconhecido) também entram,
-   sinalizados (⚠), pra não perder o aparelho da fila — a conferência final
-   fica pra tabela/CSV, não trava a captura. */
+/* ---------- captura de fotos ----------
+   Dois modos, pra otimizar o tempo no lote de centenas de aparelhos:
+
+   1) Câmera ao vivo (beta): pede acesso à câmera UMA vez (getUserMedia) e
+      cada toque em "Tirar foto" usa a ImageCapture API (track.takePhoto())
+      pra tirar uma foto cheia, com o mesmo ciclo de autofoco de um app de
+      câmera nativo — sem abrir nenhum app/diálogo separado. Não depende de
+      gesto novo do navegador a cada foto, então é o modo mais rápido; só
+      funciona em navegadores com suporte a ImageCapture (Chrome/Android,
+      por ex. — não no Safari/iOS).
+
+   2) Foto nativa (fallback): abre o app de câmera do celular via
+      <input type=file capture="environment">, o que garante o melhor
+      autofoco possível em qualquer navegador, mas por segurança do
+      navegador só reabre sozinho quando o navegador permite (nem todos
+      permitem dar novo "click()" programático depois do "change" do input,
+      mesmo chamado na mesma função) — nesse caso é preciso tocar em
+      "Tirar outra foto" a cada etiqueta.
+
+   Em ambos, cada foto vira um item numa fila processada uma a uma pelo OCR
+   em segundo plano, sem travar a captura da próxima. IMEIs com 15 dígitos
+   e ainda não coletados entram direto na lista; casos ambíguos (dígitos
+   fora do padrão, ou nada reconhecido) também entram, sinalizados (⚠), pra
+   não perder o aparelho da fila — a conferência final fica pra tabela/CSV. */
 let _imeiContinuo = true;
 let _imeiQueue = [];       // canvases pendentes de OCR
 let _imeiQueueSeq = 0;
@@ -7329,8 +7356,94 @@ let _imeiProcessing = false;
 let _imeiFailCount = 0;    // fotos em que nada foi reconhecido (sessão atual)
 let _imeiFeed = [];        // últimos resultados, pra feedback rápido em captura contínua
 let _imeiLastPreviewUrl = null;
+let _imeiLiveStream = null;
+let _imeiLiveTrack = null;
+let _imeiImageCapture = null;
+
+function _imeiLiveSuportada(){
+  return !!(navigator.mediaDevices && navigator.mediaDevices.getUserMedia && window.ImageCapture);
+}
+
+async function ligarCameraAoVivoImei(){
+  if(_imeiLiveStream) return;
+  if(!_imeiLiveSuportada()){
+    showToast('Este navegador não suporta câmera ao vivo — use a foto nativa abaixo.', true);
+    return;
+  }
+  try{
+    const stream = await navigator.mediaDevices.getUserMedia({
+      video: { facingMode: { ideal: 'environment' }, width: { ideal: 1920 }, height: { ideal: 1080 } }
+    });
+    _imeiLiveStream = stream;
+    _imeiLiveTrack = stream.getVideoTracks()[0];
+    try{
+      const caps = _imeiLiveTrack.getCapabilities ? _imeiLiveTrack.getCapabilities() : {};
+      if(caps.focusMode && caps.focusMode.includes('continuous')){
+        await _imeiLiveTrack.applyConstraints({ advanced: [{ focusMode: 'continuous' }] });
+      }
+    }catch(e){ /* nem todo navegador/câmera deixa controlar o foco — segue sem isso */ }
+    _imeiImageCapture = new ImageCapture(_imeiLiveTrack);
+
+    const video = document.getElementById('imei-live-video');
+    if(video){ video.srcObject = stream; video.style.display = 'block'; }
+    document.getElementById('imei-photo-preview').style.display = 'none';
+    document.getElementById('imei-photo-placeholder').style.display = 'none';
+    document.getElementById('imei-live-controls').style.display = 'flex';
+    document.getElementById('imei-native-controls').style.display = 'none';
+  }catch(err){
+    _imeiDiag.ultimoErro = (err && err.message) ? err.message : String(err);
+    _imeiUpdateDiagPanel();
+    showToast('Não foi possível acessar a câmera (permissão negada ou indisponível).', true);
+  }
+}
+
+function desligarCameraAoVivoImei(){
+  if(_imeiLiveStream) _imeiLiveStream.getTracks().forEach(t => t.stop());
+  _imeiLiveStream = null;
+  _imeiLiveTrack = null;
+  _imeiImageCapture = null;
+  const video = document.getElementById('imei-live-video');
+  if(video){ video.style.display = 'none'; video.srcObject = null; }
+  const liveControls = document.getElementById('imei-live-controls');
+  if(liveControls) liveControls.style.display = 'none';
+  if(!_imeiLastPreviewUrl){
+    document.getElementById('imei-photo-placeholder').style.display = 'block';
+  }
+}
+
+async function tirarFotoAoVivoImei(){
+  if(!_imeiImageCapture) return;
+  const seq = ++_imeiQueueSeq;
+  try{
+    const blob = await _imeiImageCapture.takePhoto();
+    const canvas = await _imeiFileParaCanvas(blob);
+    _imeiDiag.resolucao = canvas.width + 'x' + canvas.height;
+    _imeiQueue.push({ seq, canvas });
+    _imeiRefreshStatusLine();
+    _imeiProcessQueue();
+  }catch(err){
+    // alguns navegadores/câmeras falham no takePhoto — usa o quadro atual
+    // do preview de vídeo como alternativa, em vez de perder a foto
+    const video = document.getElementById('imei-live-video');
+    if(video && video.videoWidth){
+      const canvas = document.createElement('canvas');
+      canvas.width = video.videoWidth;
+      canvas.height = video.videoHeight;
+      canvas.getContext('2d').drawImage(video, 0, 0, canvas.width, canvas.height);
+      _imeiDiag.resolucao = canvas.width + 'x' + canvas.height;
+      _imeiQueue.push({ seq, canvas });
+      _imeiRefreshStatusLine();
+      _imeiProcessQueue();
+    } else {
+      _imeiDiag.ultimoErro = (err && err.message) ? err.message : String(err);
+      _imeiUpdateDiagPanel();
+      _imeiPushFeed(seq, 'erro', 'Foto #' + seq + ': falha ao capturar da câmera ao vivo.');
+    }
+  }
+}
 
 function dispararFotoImei(){
+  if(_imeiLiveStream) desligarCameraAoVivoImei();
   const input = document.getElementById('imei-photo-input');
   if(input) input.click();
 }
@@ -7359,12 +7472,16 @@ function _imeiFileParaCanvas(file){
 function _imeiSetPreview(url){
   const preview = document.getElementById('imei-photo-preview');
   const placeholder = document.getElementById('imei-photo-placeholder');
-  const retakeBtn = document.getElementById('imei-btn-retake');
+  const video = document.getElementById('imei-live-video');
+  const liveControls = document.getElementById('imei-live-controls');
+  const nativeControls = document.getElementById('imei-native-controls');
   if(_imeiLastPreviewUrl) URL.revokeObjectURL(_imeiLastPreviewUrl);
   _imeiLastPreviewUrl = url;
+  if(video) video.style.display = 'none'; // foto nativa: sem preview ao vivo por trás
   if(preview){ preview.src = url; preview.style.display = 'block'; }
   if(placeholder) placeholder.style.display = 'none';
-  if(retakeBtn) retakeBtn.style.display = 'inline-flex';
+  if(liveControls) liveControls.style.display = 'none';
+  if(nativeControls) nativeControls.style.display = 'flex';
 }
 
 function _imeiRefreshStatusLine(){
@@ -7544,6 +7661,12 @@ function exportarImeiCSV(){
     showToast('Não foi possível gerar o CSV neste navegador.', true);
   }
 }
+
+document.addEventListener('visibilitychange', () => {
+  // libera a câmera ao vivo ao esconder a aba (evita bateria/câmera presa em
+  // segundo plano); o usuário liga de novo ao voltar
+  if(document.hidden && _imeiLiveStream) desligarCameraAoVivoImei();
+});
 
 </script>
 
