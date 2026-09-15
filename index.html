@@ -901,7 +901,7 @@
 </style>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/html5-qrcode/2.3.8/html5-qrcode.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@zxing/library@0.20.0/umd/index.min.js"></script>
 </head>
 <body>
 
@@ -1395,7 +1395,8 @@
           <div>
             <div style="font-size:13px; font-weight:700; margin-bottom:10px; color:var(--text);">📷 Câmera</div>
             <div id="imei-viewfinder" style="position:relative; width:100%; aspect-ratio:4/3; background:#0b0d10; border-radius:8px; overflow:hidden; display:flex; align-items:center; justify-content:center; border:1px solid var(--border);">
-              <div id="imei-reader" style="width:100%; height:100%;"></div>
+              <video id="imei-video" muted playsinline autoplay style="width:100%; height:100%; object-fit:cover;"></video>
+              <div id="imei-vf-guide" style="position:absolute; left:7%; right:7%; top:32%; bottom:32%; border:2px dashed rgba(255,255,255,0.55); border-radius:6px; pointer-events:none;"></div>
               <div id="imei-vf-placeholder" style="position:absolute; color:#c7ccd4; font-size:13px; text-align:center; padding:0 20px;">
                 Câmera desligada.<br><br>
                 <button class="btn btn-primary" id="imei-btn-start" onclick="iniciarLeituraImei()">Ligar câmera</button>
@@ -7096,7 +7097,9 @@ function verCotacaoHistorico(idx){
 
 /* =========================================================
    MÓDULO: COLETOR DE IMEI
-   Leitura de código de barras via câmera (html5-qrcode).
+   Leitura de código de barras via câmera (ZXing — @zxing/library),
+   com TRY_HARDER ativado para leitura confiável de código de barras
+   1D (Code128/ITF/Codabar), que a maioria das etiquetas de IMEI usa.
    Lote avulso, sem vínculo com cliente/OS e sem gravação no
    Supabase — persiste só localmente (localStorage) como
    rascunho da sessão, e é exportado em CSV.
@@ -7106,7 +7109,7 @@ const IMEI_STORAGE_KEY = 'mobitos_imei_collector_v1';
 let _imeiRecords = [];        // {id, imei, nota, ts, sinalizado, duplicados}
 let _imeiByValue = new Map(); // imei -> record.id
 let _imeiTarget = 850;
-let _imeiHtml5Qrcode = null;
+let _imeiZxingReader = null;
 let _imeiScanning = false;
 let _imeiLastText = '';
 let _imeiLastAt = 0;
@@ -7355,82 +7358,93 @@ function _imeiHandleDecodedText(rawText){
   _imeiAddRecord(result.imei, { sinalizado:false });
 }
 
-function _imeiOnScanFailure(){ /* dispara continuamente sem código visível — ignorar */ }
-
 function _imeiShowPlaceholder(html){
   const el = document.getElementById('imei-vf-placeholder');
   if(el){ el.style.display = 'flex'; el.innerHTML = html; }
+}
+
+function _imeiGetReader(){
+  if(_imeiZxingReader) return _imeiZxingReader;
+  const hints = new Map();
+  hints.set(ZXing.DecodeHintType.POSSIBLE_FORMATS, [
+    ZXing.BarcodeFormat.CODE_128,
+    ZXing.BarcodeFormat.CODE_39,
+    ZXing.BarcodeFormat.CODABAR,
+    ZXing.BarcodeFormat.ITF,
+    ZXing.BarcodeFormat.EAN_13,
+    ZXing.BarcodeFormat.EAN_8,
+    ZXing.BarcodeFormat.UPC_A,
+    ZXing.BarcodeFormat.UPC_E,
+    ZXing.BarcodeFormat.DATA_MATRIX,
+    ZXing.BarcodeFormat.QR_CODE
+  ]);
+  hints.set(ZXing.DecodeHintType.TRY_HARDER, true); // essencial p/ código de barras 1D — a lib anterior forçava isso como "false"
+  _imeiZxingReader = new ZXing.BrowserMultiFormatReader(hints, 200);
+  return _imeiZxingReader;
+}
+
+function _imeiVideoConstraints(deviceId){
+  const base = { width: { ideal: 1920 }, height: { ideal: 1080 } };
+  if(deviceId) base.deviceId = { exact: deviceId };
+  else base.facingMode = { ideal: 'environment' };
+  return { video: base };
+}
+
+function _imeiDecodeCallback(result){
+  if(result) _imeiHandleDecodedText(result.getText());
+  // erros (NotFoundException) disparam continuamente sem código visível — ignorar
 }
 
 function iniciarLeituraImei(){
   _imeiEnsureAudio();
   if(_imeiScanning) return;
 
-  if(!_imeiHtml5Qrcode){
-    try{
-      _imeiHtml5Qrcode = new Html5Qrcode('imei-reader', {
-        formatsToSupport: [
-          Html5QrcodeSupportedFormats.CODE_128,
-          Html5QrcodeSupportedFormats.CODE_39,
-          Html5QrcodeSupportedFormats.CODABAR,
-          Html5QrcodeSupportedFormats.ITF,
-          Html5QrcodeSupportedFormats.EAN_13,
-          Html5QrcodeSupportedFormats.DATA_MATRIX,
-          Html5QrcodeSupportedFormats.QR_CODE
-        ],
-        verbose: false
-      });
-    }catch(e){
-      _imeiShowPlaceholder('Não foi possível iniciar o leitor neste navegador.<br>Use o campo manual ao lado.');
-      return;
-    }
+  if(typeof ZXing === 'undefined'){
+    _imeiShowPlaceholder('Não foi possível carregar o leitor de código de barras (falha ao baixar a biblioteca). Verifique a conexão e recarregue a página.<br><br>Use o campo manual ao lado enquanto isso.');
+    return;
   }
 
+  const reader = _imeiGetReader();
   const placeholder = document.getElementById('imei-vf-placeholder');
   if(placeholder) placeholder.style.display = 'none';
 
-  Html5Qrcode.getCameras().then(cameras => {
-    _imeiPopulateCameraSelect(cameras);
-    const preferida = cameras.find(c => /back|traseira|rear|environment/i.test(c.label));
-    const cameraId = (preferida || cameras[cameras.length - 1] || cameras[0] || {}).id;
-    return _imeiHtml5Qrcode.start(cameraId || { facingMode: 'environment' }, { fps: 12 }, _imeiHandleDecodedText, _imeiOnScanFailure);
-  }).catch(() => {
-    return _imeiHtml5Qrcode.start({ facingMode: 'environment' }, { fps: 12 }, _imeiHandleDecodedText, _imeiOnScanFailure);
-  }).then(() => {
+  reader.decodeFromConstraints(_imeiVideoConstraints(null), 'imei-video', _imeiDecodeCallback).then(() => {
     _imeiScanning = true;
     document.getElementById('imei-btn-stop').style.display = 'inline-flex';
     _imeiSetStatus(null, 'Pronto para escanear.');
+    // só depois de conceder permissão os rótulos das câmeras vêm preenchidos
+    reader.listVideoInputDevices().then(_imeiPopulateCameraSelect).catch(() => {});
   }).catch(() => {
     _imeiShowPlaceholder('Não foi possível acessar a câmera (permissão negada ou indisponível).<br><br><button class="btn btn-primary" onclick="iniciarLeituraImei()">Tentar novamente</button><br><br>Use o campo manual ao lado enquanto isso.');
   });
 }
 
 function pararLeituraImei(){
-  if(!_imeiHtml5Qrcode || !_imeiScanning) return;
-  _imeiHtml5Qrcode.stop().then(() => {
-    try{ _imeiHtml5Qrcode.clear(); }catch(e){}
-    _imeiScanning = false;
-    document.getElementById('imei-btn-stop').style.display = 'none';
-    _imeiShowPlaceholder('Câmera desligada.<br><br><button class="btn btn-primary" onclick="iniciarLeituraImei()">Ligar câmera</button>');
-  }).catch(() => {});
+  if(!_imeiZxingReader || !_imeiScanning) return;
+  try{ _imeiZxingReader.reset(); }catch(e){}
+  _imeiScanning = false;
+  document.getElementById('imei-btn-stop').style.display = 'none';
+  _imeiShowPlaceholder('Câmera desligada.<br><br><button class="btn btn-primary" onclick="iniciarLeituraImei()">Ligar câmera</button>');
 }
 
-function _imeiPopulateCameraSelect(cameras){
+function _imeiPopulateCameraSelect(devices){
   const sel = document.getElementById('imei-cam-select');
   if(!sel) return;
-  if(!cameras || cameras.length < 2){ sel.style.display = 'none'; return; }
-  sel.innerHTML = cameras.map(c => `<option value="${c.id}">${escapeHtml(c.label || 'Câmera')}</option>`).join('');
+  if(!devices || devices.length < 2){ sel.style.display = 'none'; return; }
+  sel.innerHTML = devices.map(d => `<option value="${d.deviceId}">${escapeHtml(d.label || 'Câmera')}</option>`).join('');
   sel.style.display = 'inline-block';
 }
 
 function trocarCameraImei(){
   const sel = document.getElementById('imei-cam-select');
-  if(!_imeiHtml5Qrcode || !_imeiScanning || !sel) return;
-  _imeiHtml5Qrcode.stop().then(() => {
-    try{ _imeiHtml5Qrcode.clear(); }catch(e){}
-    _imeiScanning = false;
-    return _imeiHtml5Qrcode.start(sel.value, { fps: 12 }, _imeiHandleDecodedText, _imeiOnScanFailure);
-  }).then(() => { _imeiScanning = true; }).catch(() => {});
+  if(!_imeiZxingReader || !_imeiScanning || !sel || !sel.value) return;
+  try{ _imeiZxingReader.reset(); }catch(e){}
+  _imeiScanning = false;
+  _imeiZxingReader.decodeFromConstraints(_imeiVideoConstraints(sel.value), 'imei-video', _imeiDecodeCallback).then(() => {
+    _imeiScanning = true;
+  }).catch(() => {
+    _imeiShowPlaceholder('Não foi possível trocar de câmera.<br><br><button class="btn btn-primary" onclick="iniciarLeituraImei()">Ligar câmera</button>');
+  });
 }
 
 /* ---------- entrada manual ---------- */
@@ -7487,9 +7501,9 @@ function exportarImeiCSV(){
 }
 
 document.addEventListener('visibilitychange', () => {
-  if(!_imeiHtml5Qrcode || !_imeiScanning) return;
-  if(document.hidden){ try{ _imeiHtml5Qrcode.pause(true); }catch(e){} }
-  else { try{ _imeiHtml5Qrcode.resume(); }catch(e){} }
+  // a lib não suporta pausar/retomar o stream: ao esconder a aba, desliga a câmera de vez
+  // (evita bateria/câmera presa em segundo plano); o usuário liga de novo ao voltar.
+  if(document.hidden && _imeiZxingReader && _imeiScanning) pararLeituraImei();
 });
 </script>
 
