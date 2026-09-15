@@ -723,6 +723,7 @@
     input, select, textarea{ min-height:44px; }
     .nav-item{ min-height:46px; }
     #cotacao-layout{ grid-template-columns: 1fr !important; }
+    #imei-layout{ grid-template-columns: 1fr !important; }
     .ac-item{ padding:12px 14px; }
     .kanban-add-btn{ min-height:40px; }
 
@@ -900,6 +901,7 @@
 </style>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html5-qrcode/2.3.8/html5-qrcode.min.js"></script>
 </head>
 <body>
 
@@ -957,6 +959,9 @@
     </button>
     <button class="nav-item" data-page="cotacao" onclick="goToPage('cotacao')">
       <span class="nav-icon">🔍</span> Cotação
+    </button>
+    <button class="nav-item" data-page="imei" onclick="goToPage('imei')">
+      <span class="nav-icon">📷</span> Coletor de IMEI
     </button>
 
     <div class="nav-divider"></div>
@@ -1351,6 +1356,101 @@
         <div style="font-size:13px; font-weight:700; margin-bottom:12px; color:var(--text);">🕐 Cotações recentes</div>
         <div id="cotacao-historico-body">
           <div style="color:var(--text-faint); font-size:13px; text-align:center; padding:12px 0;">Nenhuma cotação realizada nesta sessão.</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ===================== COLETOR DE IMEI ===================== -->
+    <div class="page" id="page-imei">
+      <div class="page-header">
+        <div>
+          <h1>Coletor de IMEI</h1>
+          <p>Leitura por câmera do código de barras da etiqueta, para conferência em lote e exportação</p>
+        </div>
+        <button class="btn btn-primary" onclick="exportarImeiCSV()">⬇ Exportar CSV</button>
+      </div>
+
+      <div class="stats-grid">
+        <div class="stat-card">
+          <div class="stat-label">Coletados</div>
+          <div class="stat-value stat-accent" id="imei-stat-total">0</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-label">Meta</div>
+          <div class="stat-value" id="imei-stat-target">850</div>
+          <div class="stat-sub"><a href="#" onclick="editarMetaImei(event)" style="color:var(--accent); text-decoration:none;">alterar</a></div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-label">Progresso</div>
+          <div class="stat-value stat-green" id="imei-stat-pct">0%</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-label">Duplicados</div>
+          <div class="stat-value stat-red" id="imei-stat-dup">0</div>
+        </div>
+      </div>
+
+      <div class="card" style="padding:16px; margin-bottom:16px;">
+        <div style="display:grid; grid-template-columns:1fr 1fr; gap:20px;" id="imei-layout">
+          <div>
+            <div style="font-size:13px; font-weight:700; margin-bottom:10px; color:var(--text);">📷 Câmera</div>
+            <div id="imei-viewfinder" style="position:relative; width:100%; aspect-ratio:4/3; background:#0b0d10; border-radius:8px; overflow:hidden; display:flex; align-items:center; justify-content:center; border:1px solid var(--border);">
+              <div id="imei-reader" style="width:100%; height:100%;"></div>
+              <div id="imei-vf-placeholder" style="position:absolute; color:#c7ccd4; font-size:13px; text-align:center; padding:0 20px;">
+                Câmera desligada.<br><br>
+                <button class="btn btn-primary" id="imei-btn-start" onclick="iniciarLeituraImei()">Ligar câmera</button>
+              </div>
+              <div id="imei-vf-ring" style="position:absolute; inset:0; border:4px solid transparent; border-radius:8px; pointer-events:none; display:none;"></div>
+            </div>
+            <div id="imei-scan-status" style="margin-top:10px; min-height:18px; font-family:var(--mono); font-size:12.5px; color:var(--text-faint); display:flex; align-items:center; gap:8px;">
+              <span id="imei-scan-dot" style="width:7px; height:7px; border-radius:999px; background:var(--text-faint); flex-shrink:0;"></span>
+              <span id="imei-scan-status-text">Pronto para escanear.</span>
+            </div>
+            <div style="display:flex; gap:8px; margin-top:8px;">
+              <button class="btn btn-ghost btn-sm" id="imei-btn-stop" onclick="pararLeituraImei()" style="display:none;">Desligar câmera</button>
+              <select id="imei-cam-select" onchange="trocarCameraImei()" style="display:none;"></select>
+            </div>
+          </div>
+
+          <div>
+            <div style="font-size:13px; font-weight:700; margin-bottom:10px; color:var(--text);">⌨️ Adicionar manualmente</div>
+            <div style="display:flex; gap:8px;">
+              <input type="text" id="imei-manual-input" placeholder="Digitar IMEI (se a leitura falhar)" inputmode="numeric"
+                style="flex:1;" onkeydown="if(event.key==='Enter') adicionarImeiManual()">
+              <button class="btn btn-primary" onclick="adicionarImeiManual()">+ Adicionar</button>
+            </div>
+            <div class="hint" style="margin-top:10px; line-height:1.6;">
+              Aponte a câmera para o código de barras da etiqueta traseira. A maioria usa um código de barras comum (Code 128), não um QR Code — o leitor já procura por esse formato automaticamente.
+              Quando o IMEI tiver 15 dígitos ele é adicionado sozinho; se vier incompleto ou ilegível, o texto lido cai no campo acima para conferência.
+              Aparelhos com dois chips têm dois IMEIs — escaneie as duas etiquetas normalmente, cada uma vira uma linha (use a observação pra marcar "IMEI 2").
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="card" style="padding:16px;">
+        <div class="toolbar" style="margin-bottom:12px;">
+          <div class="search">
+            <span class="search-icon">&#128269;</span>
+            <input type="text" id="imei-filter" placeholder="Filtrar por IMEI ou observação..." oninput="renderImeiTable()">
+          </div>
+          <button class="btn btn-ghost" id="imei-btn-clear" onclick="limparImeiLista()">Limpar tudo</button>
+        </div>
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>#</th>
+                <th>IMEI</th>
+                <th>Observação</th>
+                <th>Horário</th>
+                <th></th>
+              </tr>
+            </thead>
+            <tbody id="imei-table-body">
+              <tr class="empty-row"><td colspan="5">Nenhum IMEI coletado ainda.</td></tr>
+            </tbody>
+          </table>
         </div>
       </div>
     </div>
@@ -2606,6 +2706,7 @@ function goToPage(page){
   if(page === 'compras') renderComprasTable();
   if(page === 'kanban') renderKanban();
   if(page === 'cotacao') initCotacaoPage();
+  if(page === 'imei') initImeiPage();
 }
 
 /* =========================================================
@@ -6992,6 +7093,404 @@ function verCotacaoHistorico(idx){
   if(resultadoBody) resultadoBody.style.display = 'block';
   window.scrollTo({ top: 0, behavior: 'smooth' });
 }
+
+/* =========================================================
+   MÓDULO: COLETOR DE IMEI
+   Leitura de código de barras via câmera (html5-qrcode).
+   Lote avulso, sem vínculo com cliente/OS e sem gravação no
+   Supabase — persiste só localmente (localStorage) como
+   rascunho da sessão, e é exportado em CSV.
+   ========================================================= */
+
+const IMEI_STORAGE_KEY = 'mobitos_imei_collector_v1';
+let _imeiRecords = [];        // {id, imei, nota, ts, sinalizado, duplicados}
+let _imeiByValue = new Map(); // imei -> record.id
+let _imeiTarget = 850;
+let _imeiHtml5Qrcode = null;
+let _imeiScanning = false;
+let _imeiLastText = '';
+let _imeiLastAt = 0;
+const IMEI_COOLDOWN_MS = 900;
+const IMEI_REPEAT_SUPPRESS_MS = 2500;
+let _imeiAudioCtx = null;
+
+function _imeiLoadState(){
+  try{
+    const raw = localStorage.getItem(IMEI_STORAGE_KEY);
+    if(!raw) return;
+    const parsed = JSON.parse(raw);
+    if(parsed && Array.isArray(parsed.records)){
+      _imeiRecords = parsed.records;
+      _imeiByValue = new Map();
+      _imeiRecords.forEach(r => _imeiByValue.set(r.imei, r.id));
+    }
+    if(parsed && typeof parsed.target === 'number' && parsed.target > 0){
+      _imeiTarget = parsed.target;
+    }
+  }catch(e){ /* localStorage indisponível — segue só em memória */ }
+}
+function _imeiSaveState(){
+  try{
+    localStorage.setItem(IMEI_STORAGE_KEY, JSON.stringify({ records: _imeiRecords, target: _imeiTarget }));
+  }catch(e){ /* ignora falha de storage */ }
+}
+
+function initImeiPage(){
+  _imeiLoadState();
+  renderImeiStats();
+  renderImeiTable();
+}
+
+/* ---------- feedback sonoro ---------- */
+function _imeiEnsureAudio(){
+  if(!_imeiAudioCtx){
+    try{ _imeiAudioCtx = new (window.AudioContext || window.webkitAudioContext)(); }catch(e){}
+  }
+  return _imeiAudioCtx;
+}
+function _imeiBeep(freq, durMs, delayMs){
+  const ctx = _imeiEnsureAudio();
+  if(!ctx) return;
+  setTimeout(() => {
+    try{
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.frequency.value = freq;
+      osc.type = 'sine';
+      gain.gain.setValueAtTime(0.0001, ctx.currentTime);
+      gain.gain.exponentialRampToValueAtTime(0.15, ctx.currentTime + 0.01);
+      gain.gain.exponentialRampToValueAtTime(0.0001, ctx.currentTime + durMs/1000);
+      osc.connect(gain).connect(ctx.destination);
+      osc.start();
+      osc.stop(ctx.currentTime + durMs/1000 + 0.02);
+    }catch(e){}
+  }, delayMs || 0);
+}
+function _imeiFeedback(kind){
+  if(kind === 'ok') _imeiBeep(880, 90, 0);
+  else if(kind === 'dup'){ _imeiBeep(520, 70, 0); _imeiBeep(520, 70, 130); }
+  else if(kind === 'bad') _imeiBeep(220, 160, 0);
+}
+
+/* ---------- extração/validação do IMEI ---------- */
+function _imeiClassify(rawText){
+  const cleaned = (rawText || '').trim();
+  const matches = cleaned.match(/\d{13,17}/g) || [];
+  let candidate = null;
+  matches.forEach(m => {
+    if(!candidate || Math.abs(m.length - 15) < Math.abs(candidate.length - 15)) candidate = m;
+  });
+  if(!candidate) return { ok:false, imei:null, raw:cleaned };
+  return { ok: candidate.length === 15, imei: candidate, raw: cleaned };
+}
+
+/* ---------- estatísticas e tabela ---------- */
+function renderImeiStats(){
+  const total = _imeiRecords.length;
+  const dup = _imeiRecords.reduce((n, r) => n + (r.duplicados || 0), 0);
+  const pct = _imeiTarget > 0 ? Math.min(100, Math.round((total / _imeiTarget) * 100)) : 0;
+  const elTotal = document.getElementById('imei-stat-total');
+  const elTarget = document.getElementById('imei-stat-target');
+  const elPct = document.getElementById('imei-stat-pct');
+  const elDup = document.getElementById('imei-stat-dup');
+  if(elTotal) elTotal.textContent = total;
+  if(elTarget) elTarget.textContent = _imeiTarget;
+  if(elPct) elPct.textContent = pct + '%';
+  if(elDup) elDup.textContent = dup;
+}
+
+function _imeiFmtHora(ts){
+  const d = new Date(ts);
+  const p = n => String(n).padStart(2, '0');
+  return p(d.getHours()) + ':' + p(d.getMinutes()) + ':' + p(d.getSeconds());
+}
+
+function renderImeiTable(){
+  const body = document.getElementById('imei-table-body');
+  if(!body) return;
+  const q = (document.getElementById('imei-filter')?.value || '').toLowerCase().trim();
+
+  let list = [..._imeiRecords].reverse();
+  if(q){
+    list = list.filter(r => r.imei.toLowerCase().includes(q) || (r.nota || '').toLowerCase().includes(q));
+  }
+
+  if(list.length === 0){
+    body.innerHTML = `<tr class="empty-row"><td colspan="5">${_imeiRecords.length === 0 ? 'Nenhum IMEI coletado ainda.' : 'Nenhum resultado para esse filtro.'}</td></tr>`;
+    return;
+  }
+
+  body.innerHTML = list.map((r, i) => `
+    <tr data-imei-id="${r.id}">
+      <td class="mono">${_imeiRecords.indexOf(r) + 1}</td>
+      <td class="mono" style="${r.sinalizado ? 'color:var(--yellow);' : ''}">${escapeHtml(r.imei)}${r.sinalizado ? ' ⚠' : ''}</td>
+      <td>
+        <input type="text" value="${escapeHtml(r.nota || '')}" placeholder="modelo, IMEI 2..."
+          style="width:100%; padding:6px 8px; font-size:12.5px; background:var(--panel-2);"
+          onchange="editarNotaImei('${r.id}', this.value)">
+      </td>
+      <td class="mono">${_imeiFmtHora(r.ts)}</td>
+      <td>
+        <button class="btn btn-ghost btn-sm" onclick="removerImei('${r.id}')">&times;</button>
+      </td>
+    </tr>
+  `).join('');
+}
+
+/* ---------- operações sobre a lista ---------- */
+function _imeiAddRecord(imei, opts){
+  opts = opts || {};
+  const id = 'imei' + Date.now() + Math.random().toString(36).slice(2, 7);
+  _imeiRecords.push({ id, imei, nota: opts.nota || '', ts: Date.now(), sinalizado: !!opts.sinalizado, duplicados: 0 });
+  _imeiByValue.set(imei, id);
+  _imeiSaveState();
+  renderImeiStats();
+  renderImeiTable();
+}
+
+function removerImei(id){
+  const idx = _imeiRecords.findIndex(r => r.id === id);
+  if(idx === -1) return;
+  if(!confirm('Remover este IMEI da lista?')) return;
+  const removed = _imeiRecords[idx];
+  _imeiRecords.splice(idx, 1);
+  if(_imeiByValue.get(removed.imei) === id) _imeiByValue.delete(removed.imei);
+  _imeiSaveState();
+  renderImeiStats();
+  renderImeiTable();
+  showToast('IMEI removido: ' + removed.imei);
+}
+
+function editarNotaImei(id, valor){
+  const r = _imeiRecords.find(x => x.id === id);
+  if(!r) return;
+  r.nota = valor;
+  _imeiSaveState();
+}
+
+function _imeiMarkDuplicate(imei){
+  const id = _imeiByValue.get(imei);
+  const r = _imeiRecords.find(x => x.id === id);
+  if(r){
+    r.duplicados = (r.duplicados || 0) + 1;
+    _imeiSaveState();
+    renderImeiStats();
+  }
+}
+
+function editarMetaImei(ev){
+  if(ev) ev.preventDefault();
+  const val = prompt('Nova meta de aparelhos:', _imeiTarget);
+  if(val === null) return;
+  const n = parseInt(val, 10);
+  if(!n || n <= 0){ showToast('Informe um número válido.', true); return; }
+  _imeiTarget = n;
+  _imeiSaveState();
+  renderImeiStats();
+}
+
+function limparImeiLista(){
+  if(_imeiRecords.length === 0) return;
+  if(!confirm('Limpar todos os ' + _imeiRecords.length + ' IMEIs coletados nesta lista? Essa ação não pode ser desfeita.')) return;
+  _imeiRecords = [];
+  _imeiByValue.clear();
+  _imeiSaveState();
+  renderImeiStats();
+  renderImeiTable();
+  showToast('Lista de IMEIs limpa.');
+}
+
+/* ---------- leitura por câmera ---------- */
+function _imeiSetStatus(kind, text){
+  const dot = document.getElementById('imei-scan-dot');
+  const txt = document.getElementById('imei-scan-status-text');
+  const ring = document.getElementById('imei-vf-ring');
+  const colors = { ok:'var(--green)', dup:'var(--yellow)', bad:'var(--red)' };
+  if(txt) txt.textContent = text;
+  if(dot) dot.style.background = kind ? colors[kind] : 'var(--text-faint)';
+  if(txt) txt.style.color = kind ? colors[kind] : 'var(--text-faint)';
+  if(ring){
+    if(kind){
+      ring.style.display = 'block';
+      ring.style.borderColor = colors[kind];
+      clearTimeout(_imeiSetStatus._t);
+      _imeiSetStatus._t = setTimeout(() => { ring.style.display = 'none'; }, 500);
+    } else {
+      ring.style.display = 'none';
+    }
+  }
+}
+
+function _imeiHandleDecodedText(rawText){
+  const now = Date.now();
+  if(rawText === _imeiLastText && (now - _imeiLastAt) < IMEI_REPEAT_SUPPRESS_MS) return;
+  if((now - _imeiLastAt) < IMEI_COOLDOWN_MS) return;
+  _imeiLastText = rawText;
+  _imeiLastAt = now;
+
+  const result = _imeiClassify(rawText);
+
+  if(!result.imei){
+    _imeiFeedback('bad');
+    _imeiSetStatus('bad', 'Não reconhecido como IMEI — revise no campo manual.');
+    document.getElementById('imei-manual-input').value = result.raw.replace(/\D/g, '').slice(0, 17);
+    document.getElementById('imei-manual-input').focus();
+    return;
+  }
+  if(_imeiByValue.has(result.imei)){
+    _imeiFeedback('dup');
+    _imeiSetStatus('dup', 'Já coletado: ' + result.imei);
+    _imeiMarkDuplicate(result.imei);
+    return;
+  }
+  if(!result.ok){
+    _imeiFeedback('bad');
+    _imeiSetStatus('bad', 'Lido com ' + result.imei.length + ' dígitos (esperado 15) — confira e confirme.');
+    document.getElementById('imei-manual-input').value = result.imei;
+    document.getElementById('imei-manual-input').focus();
+    return;
+  }
+  _imeiFeedback('ok');
+  _imeiSetStatus('ok', 'Adicionado: ' + result.imei);
+  _imeiAddRecord(result.imei, { sinalizado:false });
+}
+
+function _imeiOnScanFailure(){ /* dispara continuamente sem código visível — ignorar */ }
+
+function _imeiShowPlaceholder(html){
+  const el = document.getElementById('imei-vf-placeholder');
+  if(el){ el.style.display = 'flex'; el.innerHTML = html; }
+}
+
+function iniciarLeituraImei(){
+  _imeiEnsureAudio();
+  if(_imeiScanning) return;
+
+  if(!_imeiHtml5Qrcode){
+    try{
+      _imeiHtml5Qrcode = new Html5Qrcode('imei-reader', {
+        formatsToSupport: [
+          Html5QrcodeSupportedFormats.CODE_128,
+          Html5QrcodeSupportedFormats.CODE_39,
+          Html5QrcodeSupportedFormats.CODABAR,
+          Html5QrcodeSupportedFormats.ITF,
+          Html5QrcodeSupportedFormats.EAN_13,
+          Html5QrcodeSupportedFormats.DATA_MATRIX,
+          Html5QrcodeSupportedFormats.QR_CODE
+        ],
+        verbose: false
+      });
+    }catch(e){
+      _imeiShowPlaceholder('Não foi possível iniciar o leitor neste navegador.<br>Use o campo manual ao lado.');
+      return;
+    }
+  }
+
+  const placeholder = document.getElementById('imei-vf-placeholder');
+  if(placeholder) placeholder.style.display = 'none';
+
+  Html5Qrcode.getCameras().then(cameras => {
+    _imeiPopulateCameraSelect(cameras);
+    const preferida = cameras.find(c => /back|traseira|rear|environment/i.test(c.label));
+    const cameraId = (preferida || cameras[cameras.length - 1] || cameras[0] || {}).id;
+    return _imeiHtml5Qrcode.start(cameraId || { facingMode: 'environment' }, { fps: 12 }, _imeiHandleDecodedText, _imeiOnScanFailure);
+  }).catch(() => {
+    return _imeiHtml5Qrcode.start({ facingMode: 'environment' }, { fps: 12 }, _imeiHandleDecodedText, _imeiOnScanFailure);
+  }).then(() => {
+    _imeiScanning = true;
+    document.getElementById('imei-btn-stop').style.display = 'inline-flex';
+    _imeiSetStatus(null, 'Pronto para escanear.');
+  }).catch(() => {
+    _imeiShowPlaceholder('Não foi possível acessar a câmera (permissão negada ou indisponível).<br><br><button class="btn btn-primary" onclick="iniciarLeituraImei()">Tentar novamente</button><br><br>Use o campo manual ao lado enquanto isso.');
+  });
+}
+
+function pararLeituraImei(){
+  if(!_imeiHtml5Qrcode || !_imeiScanning) return;
+  _imeiHtml5Qrcode.stop().then(() => {
+    try{ _imeiHtml5Qrcode.clear(); }catch(e){}
+    _imeiScanning = false;
+    document.getElementById('imei-btn-stop').style.display = 'none';
+    _imeiShowPlaceholder('Câmera desligada.<br><br><button class="btn btn-primary" onclick="iniciarLeituraImei()">Ligar câmera</button>');
+  }).catch(() => {});
+}
+
+function _imeiPopulateCameraSelect(cameras){
+  const sel = document.getElementById('imei-cam-select');
+  if(!sel) return;
+  if(!cameras || cameras.length < 2){ sel.style.display = 'none'; return; }
+  sel.innerHTML = cameras.map(c => `<option value="${c.id}">${escapeHtml(c.label || 'Câmera')}</option>`).join('');
+  sel.style.display = 'inline-block';
+}
+
+function trocarCameraImei(){
+  const sel = document.getElementById('imei-cam-select');
+  if(!_imeiHtml5Qrcode || !_imeiScanning || !sel) return;
+  _imeiHtml5Qrcode.stop().then(() => {
+    try{ _imeiHtml5Qrcode.clear(); }catch(e){}
+    _imeiScanning = false;
+    return _imeiHtml5Qrcode.start(sel.value, { fps: 12 }, _imeiHandleDecodedText, _imeiOnScanFailure);
+  }).then(() => { _imeiScanning = true; }).catch(() => {});
+}
+
+/* ---------- entrada manual ---------- */
+function adicionarImeiManual(){
+  const input = document.getElementById('imei-manual-input');
+  const raw = input.value.trim();
+  if(!raw) return;
+  const digits = raw.replace(/\D/g, '');
+  if(digits.length < 8){
+    showToast('Digite um IMEI válido (14–15 dígitos).', true);
+    return;
+  }
+  if(_imeiByValue.has(digits)){
+    showToast('Esse IMEI já está na lista.', true);
+    _imeiMarkDuplicate(digits);
+    input.value = '';
+    return;
+  }
+  _imeiAddRecord(digits, { sinalizado: digits.length !== 15 });
+  input.value = '';
+  _imeiSetStatus('ok', 'Adicionado manualmente: ' + digits);
+}
+
+/* ---------- exportação CSV ---------- */
+function exportarImeiCSV(){
+  if(_imeiRecords.length === 0){
+    showToast('Nada para exportar ainda.', true);
+    return;
+  }
+  const linhas = ['IMEI;Observacao;DataHora'];
+  _imeiRecords.forEach(r => {
+    const dt = new Date(r.ts).toLocaleString('pt-BR');
+    const nota = (r.nota || '').replace(/;/g, ',');
+    linhas.push(r.imei + ';' + nota + ';' + dt);
+  });
+  const csv = '﻿' + linhas.join('\r\n');
+  const stamp = new Date().toISOString().slice(0, 16).replace(/[-:T]/g, '');
+  const filename = 'imeis_' + stamp + '.csv';
+
+  try{
+    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    setTimeout(() => URL.revokeObjectURL(url), 2000);
+    showToast('CSV exportado: ' + filename);
+  }catch(err){
+    showToast('Não foi possível gerar o CSV neste navegador.', true);
+  }
+}
+
+document.addEventListener('visibilitychange', () => {
+  if(!_imeiHtml5Qrcode || !_imeiScanning) return;
+  if(document.hidden){ try{ _imeiHtml5Qrcode.pause(true); }catch(e){} }
+  else { try{ _imeiHtml5Qrcode.resume(); }catch(e){} }
+});
 </script>
 
 </body>
