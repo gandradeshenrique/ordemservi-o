@@ -902,6 +902,7 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@zxing/library@0.20.0/umd/index.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/tesseract.js/5.1.1/tesseract.min.js"></script>
 </head>
 <body>
 
@@ -1421,9 +1422,19 @@
               <button class="btn btn-primary" onclick="adicionarImeiManual()">+ Adicionar</button>
             </div>
             <div class="hint" style="margin-top:10px; line-height:1.6;">
-              Aponte a câmera para o código de barras da etiqueta traseira. A maioria usa um código de barras comum (Code 128), não um QR Code — o leitor já procura por esse formato automaticamente.
+              Aponte a câmera para o código gráfico da etiqueta traseira (código de barras ou Data Matrix — o leitor procura os dois formatos automaticamente, além de QR Code).
               Quando o IMEI tiver 15 dígitos ele é adicionado sozinho; se vier incompleto ou ilegível, o texto lido cai no campo acima para conferência.
-              Aparelhos com dois chips têm dois IMEIs — escaneie as duas etiquetas normalmente, cada uma vira uma linha (use a observação pra marcar "IMEI 2").
+              Aparelhos com dois chips têm dois IMEIs impressos na etiqueta — o leitor considera só o primeiro (IMEI 1); não é preciso capturar o segundo.
+            </div>
+
+            <div style="margin-top:14px; padding-top:14px; border-top:1px solid var(--border);">
+              <div style="font-size:13px; font-weight:700; margin-bottom:8px; color:var(--text);">🔎 Ler texto da etiqueta (OCR)</div>
+              <button class="btn" id="imei-btn-ocr" onclick="lerEtiquetaOcr()" style="width:100%;" disabled>Tirar foto e ler texto</button>
+              <div class="hint" style="margin-top:6px;">
+                Alternativa para quando o código gráfico não é lido (reflexo, foco, etiqueta danificada): fotografa o quadro atual da câmera e tenta reconhecer o primeiro "IMEI: ..." impresso (ignora o segundo, se houver).
+                Mais lento (alguns segundos, e baixa ~15MB na primeira vez) e pode errar algum dígito — o número reconhecido cai no campo manual acima pra você conferir e confirmar. Precisa da câmera ligada.
+              </div>
+              <div id="imei-ocr-status" style="margin-top:8px; font-size:12.5px; color:var(--text-faint); display:none;"></div>
             </div>
           </div>
         </div>
@@ -7411,6 +7422,8 @@ function iniciarLeituraImei(){
   reader.decodeFromConstraints(_imeiVideoConstraints(null), 'imei-video', _imeiDecodeCallback).then(() => {
     _imeiScanning = true;
     document.getElementById('imei-btn-stop').style.display = 'inline-flex';
+    const ocrBtn = document.getElementById('imei-btn-ocr');
+    if(ocrBtn) ocrBtn.disabled = false;
     _imeiSetStatus(null, 'Pronto para escanear.');
     // só depois de conceder permissão os rótulos das câmeras vêm preenchidos
     reader.listVideoInputDevices().then(_imeiPopulateCameraSelect).catch(() => {});
@@ -7424,6 +7437,8 @@ function pararLeituraImei(){
   try{ _imeiZxingReader.reset(); }catch(e){}
   _imeiScanning = false;
   document.getElementById('imei-btn-stop').style.display = 'none';
+  const ocrBtn = document.getElementById('imei-btn-ocr');
+  if(ocrBtn) ocrBtn.disabled = true;
   _imeiShowPlaceholder('Câmera desligada.<br><br><button class="btn btn-primary" onclick="iniciarLeituraImei()">Ligar câmera</button>');
 }
 
@@ -7445,6 +7460,80 @@ function trocarCameraImei(){
   }).catch(() => {
     _imeiShowPlaceholder('Não foi possível trocar de câmera.<br><br><button class="btn btn-primary" onclick="iniciarLeituraImei()">Ligar câmera</button>');
   });
+}
+
+/* ---------- OCR (fallback p/ etiquetas onde o código gráfico não lê) ---------- */
+let _imeiOcrWorker = null;
+let _imeiOcrBusy = false;
+
+async function _imeiGetOcrWorker(){
+  if(_imeiOcrWorker) return _imeiOcrWorker;
+  _imeiOcrWorker = await Tesseract.createWorker('eng');
+  return _imeiOcrWorker;
+}
+
+function _imeiCaptureFrameCanvas(){
+  const video = document.getElementById('imei-video');
+  if(!video || !video.videoWidth) return null;
+  const canvas = document.createElement('canvas');
+  canvas.width = video.videoWidth;
+  canvas.height = video.videoHeight;
+  canvas.getContext('2d').drawImage(video, 0, 0, canvas.width, canvas.height);
+  return canvas;
+}
+
+function _imeiExtractFirstCandidateFromText(text){
+  // Só o primeiro IMEI da etiqueta (IMEI 1) — em aparelhos dual chip, o segundo é ignorado de propósito.
+  const reLabeled = /IMEI\s*1?\s*[:\-]?\s*(\d[\d\s]{12,20}\d)/i;
+  const labeled = reLabeled.exec(text);
+  if(labeled){
+    const digits = labeled[1].replace(/\D/g, '');
+    if(digits.length >= 14 && digits.length <= 16) return digits;
+  }
+  const loose = text.match(/\d{14,16}/);
+  return loose ? loose[0] : null;
+}
+
+async function lerEtiquetaOcr(){
+  if(_imeiOcrBusy) return;
+  if(!_imeiScanning){
+    showToast('Ligue a câmera e aponte para a etiqueta antes de usar o OCR.', true);
+    return;
+  }
+  if(typeof Tesseract === 'undefined'){
+    showToast('Não foi possível carregar o leitor de texto. Verifique a conexão e recarregue a página.', true);
+    return;
+  }
+  const canvas = _imeiCaptureFrameCanvas();
+  if(!canvas){
+    showToast('Não foi possível capturar a imagem da câmera.', true);
+    return;
+  }
+
+  _imeiOcrBusy = true;
+  const btn = document.getElementById('imei-btn-ocr');
+  const statusEl = document.getElementById('imei-ocr-status');
+  if(btn) btn.disabled = true;
+  if(statusEl){ statusEl.style.display = 'block'; statusEl.textContent = 'Lendo texto da etiqueta... (pode levar alguns segundos, mais na primeira vez)'; }
+
+  try{
+    const worker = await _imeiGetOcrWorker();
+    const { data } = await worker.recognize(canvas);
+    const found = _imeiExtractFirstCandidateFromText(data.text || '');
+
+    if(!found){
+      statusEl.textContent = 'Nenhum IMEI reconhecido nessa foto. Tente reaproximar, melhorar a luz/foco ou usar o campo manual acima.';
+    } else {
+      statusEl.textContent = 'IMEI reconhecido: ' + found + ' — confira no campo manual acima e clique em "Adicionar".';
+      const manualInput = document.getElementById('imei-manual-input');
+      if(manualInput){ manualInput.value = found; manualInput.focus(); manualInput.select(); }
+    }
+  }catch(err){
+    statusEl.textContent = 'Falha ao processar a imagem. Se for a primeira vez, confira a conexão (o OCR baixa os arquivos de reconhecimento na primeira execução) e tente de novo.';
+  }finally{
+    _imeiOcrBusy = false;
+    if(btn) btn.disabled = !_imeiScanning;
+  }
 }
 
 /* ---------- entrada manual ---------- */
