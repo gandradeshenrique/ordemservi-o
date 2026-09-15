@@ -1388,6 +1388,10 @@
           <div class="stat-label">Duplicados</div>
           <div class="stat-value stat-red" id="imei-stat-dup">0</div>
         </div>
+        <div class="stat-card">
+          <div class="stat-label">Falhas OCR</div>
+          <div class="stat-value stat-red" id="imei-stat-fail">0</div>
+        </div>
       </div>
 
       <div class="card" style="padding:16px; margin-bottom:16px;">
@@ -1402,10 +1406,15 @@
                 <button class="btn btn-primary" onclick="dispararFotoImei()">📷 Tirar foto da etiqueta</button>
               </div>
             </div>
-            <div style="display:flex; gap:8px; margin-top:8px;">
+            <div style="display:flex; align-items:center; gap:14px; margin-top:8px; flex-wrap:wrap;">
               <button class="btn btn-ghost btn-sm" id="imei-btn-retake" onclick="dispararFotoImei()" style="display:none;">Tirar outra foto</button>
+              <label style="display:flex; align-items:center; gap:6px; font-size:12px; color:var(--text-faint); cursor:pointer;">
+                <input type="checkbox" id="imei-continuo-toggle" checked onchange="_imeiContinuo = this.checked">
+                Reabrir a câmera sozinha após cada foto
+              </label>
             </div>
             <div id="imei-ocr-status" style="margin-top:8px; min-height:18px; font-size:12.5px; color:var(--text-faint);">Tire uma foto nítida do texto "IMEI:" impresso na etiqueta.</div>
+            <div id="imei-feed" style="margin-top:6px; font-family:var(--mono); font-size:11.5px; line-height:1.7; min-height:18px;"></div>
             <details style="margin-top:10px;">
               <summary style="cursor:pointer; font-size:11.5px; color:var(--text-faint);">Diagnóstico (mostrar se a leitura não funcionar)</summary>
               <div id="imei-diag" style="margin-top:6px; font-family:var(--mono); font-size:11px; color:var(--text-faint); line-height:1.7; white-space:pre-wrap; word-break:break-word;">—</div>
@@ -1420,9 +1429,10 @@
               <button class="btn btn-primary" onclick="adicionarImeiManual()">+ Adicionar</button>
             </div>
             <div class="hint" style="margin-top:10px; line-height:1.6;">
-              A foto é tirada pela câmera nativa do celular (foco e zoom automáticos, mais confiável do que a câmera embutida na página). Depois de tirar a foto, o app lê o texto sozinho (OCR) e preenche o campo acima com o primeiro IMEI encontrado — confira e clique em "Adicionar".
+              A foto é tirada pela câmera nativa do celular (foco e zoom automáticos, mais confiável do que uma câmera embutida na página). Com "reabrir a câmera sozinha" ligado, é só ir fotografando etiqueta após etiqueta — cada foto entra numa fila e é lida (OCR) em segundo plano.
+              IMEI com 15 dígitos e ainda não coletado entra direto na lista; caso duvidoso (dígitos a mais/a menos, ou nada reconhecido) também entra, marcado com ⚠ pra conferir depois na tabela — assim nenhum aparelho fica de fora da captura em lote.
               Aparelhos com dois chips têm dois IMEIs impressos na etiqueta — o app considera só o primeiro (IMEI 1); não é preciso fotografar o segundo.
-              Se a foto não for reconhecida (reflexo, foco, etiqueta danificada), digite o IMEI manualmente aqui.
+              Se preferir, digite o IMEI manualmente aqui a qualquer momento.
             </div>
           </div>
         </div>
@@ -7182,10 +7192,12 @@ function renderImeiStats(){
   const elTarget = document.getElementById('imei-stat-target');
   const elPct = document.getElementById('imei-stat-pct');
   const elDup = document.getElementById('imei-stat-dup');
+  const elFail = document.getElementById('imei-stat-fail');
   if(elTotal) elTotal.textContent = total;
   if(elTarget) elTarget.textContent = _imeiTarget;
   if(elPct) elPct.textContent = pct + '%';
   if(elDup) elDup.textContent = dup;
+  if(elFail) elFail.textContent = _imeiFailCount;
 }
 
 function _imeiFmtHora(ts){
@@ -7301,7 +7313,23 @@ function _imeiUpdateDiagPanel(){
     'Último texto bruto do OCR: ' + _imeiDiag.ultimoTextoOcr;
 }
 
-/* ---------- captura de foto (câmera nativa do celular) ---------- */
+/* ---------- captura contínua de fotos (câmera nativa do celular) ----------
+   Modo padrão: a câmera reabre sozinha logo após cada foto, e cada foto vira
+   um item numa fila processada uma a uma pelo OCR em segundo plano — assim
+   dá pra fotografar a etiqueta seguinte sem esperar o OCR da anterior
+   terminar, o que importa muito num lote de centenas de aparelhos.
+   IMEIs com 15 dígitos e ainda não coletados entram direto na lista; casos
+   ambíguos (dígitos fora do padrão, ou nada reconhecido) também entram,
+   sinalizados (⚠), pra não perder o aparelho da fila — a conferência final
+   fica pra tabela/CSV, não trava a captura. */
+let _imeiContinuo = true;
+let _imeiQueue = [];       // canvases pendentes de OCR
+let _imeiQueueSeq = 0;
+let _imeiProcessing = false;
+let _imeiFailCount = 0;    // fotos em que nada foi reconhecido (sessão atual)
+let _imeiFeed = [];        // últimos resultados, pra feedback rápido em captura contínua
+let _imeiLastPreviewUrl = null;
+
 function dispararFotoImei(){
   const input = document.getElementById('imei-photo-input');
   if(input) input.click();
@@ -7328,33 +7356,63 @@ function _imeiFileParaCanvas(file){
   });
 }
 
-async function onFotoImeiSelecionada(ev){
-  const file = ev.target.files && ev.target.files[0];
-  ev.target.value = ''; // permite selecionar a mesma foto de novo depois
-  if(!file) return;
-
+function _imeiSetPreview(url){
   const preview = document.getElementById('imei-photo-preview');
   const placeholder = document.getElementById('imei-photo-placeholder');
   const retakeBtn = document.getElementById('imei-btn-retake');
-  const previewUrl = URL.createObjectURL(file);
-  if(preview){ preview.src = previewUrl; preview.style.display = 'block'; }
+  if(_imeiLastPreviewUrl) URL.revokeObjectURL(_imeiLastPreviewUrl);
+  _imeiLastPreviewUrl = url;
+  if(preview){ preview.src = url; preview.style.display = 'block'; }
   if(placeholder) placeholder.style.display = 'none';
   if(retakeBtn) retakeBtn.style.display = 'inline-flex';
+}
+
+function _imeiRefreshStatusLine(){
+  const el = document.getElementById('imei-ocr-status');
+  if(!el) return;
+  const pendentes = _imeiQueue.length + (_imeiProcessing ? 1 : 0);
+  el.textContent = pendentes > 0
+    ? 'Lendo foto(s)... ' + pendentes + ' na fila.'
+    : 'Tire uma foto nítida do texto "IMEI:" impresso na etiqueta.';
+}
+
+function _imeiPushFeed(seq, kind, text){
+  _imeiFeed.unshift({ seq, kind, text });
+  _imeiFeed = _imeiFeed.slice(0, 6);
+  const el = document.getElementById('imei-feed');
+  if(!el) return;
+  const cores = { ok: 'var(--green)', dup: 'var(--yellow)', revisar: 'var(--yellow)', falha: 'var(--red)', erro: 'var(--red)' };
+  el.innerHTML = _imeiFeed.map(f => `<div style="color:${cores[f.kind] || 'var(--text-faint)'};">${escapeHtml(f.text)}</div>`).join('');
+}
+
+async function onFotoImeiSelecionada(ev){
+  const file = ev.target.files && ev.target.files[0];
+  ev.target.value = ''; // permite fotografar de novo (inclusive repetir) em seguida
+  if(!file) return;
+
+  // Reabre a câmera JÁ, antes de qualquer await, pra aproveitar o gesto do
+  // usuário que acabou de tirar a foto — assim a próxima etiqueta pode ser
+  // fotografada enquanto esta ainda está na fila/sendo lida pelo OCR.
+  if(_imeiContinuo) dispararFotoImei();
+
+  const seq = ++_imeiQueueSeq;
+  _imeiSetPreview(URL.createObjectURL(file));
 
   try{
     const canvas = await _imeiFileParaCanvas(file);
     _imeiDiag.resolucao = canvas.width + 'x' + canvas.height;
-    await lerEtiquetaOcr(canvas);
+    _imeiQueue.push({ seq, canvas });
+    _imeiRefreshStatusLine();
+    _imeiProcessQueue();
   }catch(err){
     _imeiDiag.ultimoErro = (err && err.message) ? err.message : String(err);
     _imeiUpdateDiagPanel();
-    showToast('Não foi possível processar a foto.', true);
+    _imeiPushFeed(seq, 'erro', 'Foto #' + seq + ': não foi possível processar a imagem.');
   }
 }
 
 /* ---------- OCR ---------- */
 let _imeiOcrWorker = null;
-let _imeiOcrBusy = false;
 
 async function _imeiGetOcrWorker(){
   if(_imeiOcrWorker) return _imeiOcrWorker;
@@ -7377,21 +7435,44 @@ function _imeiExtractFirstCandidateFromText(text){
   return null;
 }
 
-async function lerEtiquetaOcr(canvas){
-  if(_imeiOcrBusy) return;
+/* ---------- fila de OCR (processa uma foto por vez, em segundo plano) ---------- */
+async function _imeiProcessQueue(){
+  if(_imeiProcessing) return;
+  const job = _imeiQueue.shift();
+  if(!job){ _imeiRefreshStatusLine(); return; }
+  _imeiProcessing = true;
+  _imeiRefreshStatusLine();
+  await _imeiProcessarFotoOcr(job.canvas, job.seq);
+  _imeiProcessing = false;
+  _imeiProcessQueue(); // segue pra próxima da fila, se houver
+}
+
+function _imeiHandleOcrResult(digits, seq){
+  if(!digits){
+    _imeiFailCount++;
+    renderImeiStats();
+    _imeiFeedback('bad');
+    _imeiPushFeed(seq, 'falha', 'Foto #' + seq + ': nenhum IMEI reconhecido — confira/digite manualmente.');
+    return;
+  }
+  if(_imeiByValue.has(digits)){
+    _imeiFeedback('dup');
+    _imeiMarkDuplicate(digits);
+    _imeiPushFeed(seq, 'dup', 'Foto #' + seq + ': já coletado — ' + digits);
+    return;
+  }
+  const sinalizado = digits.length !== 15;
+  _imeiAddRecord(digits, { sinalizado });
+  _imeiFeedback(sinalizado ? 'bad' : 'ok');
+  _imeiPushFeed(seq, sinalizado ? 'revisar' : 'ok',
+    'Foto #' + seq + ': ' + digits + (sinalizado ? ' (⚠ ' + digits.length + ' dígitos — conferir)' : ' — adicionado'));
+}
+
+async function _imeiProcessarFotoOcr(canvas, seq){
   if(typeof Tesseract === 'undefined'){
     showToast('Não foi possível carregar o leitor de texto. Verifique a conexão e recarregue a página.', true);
     return;
   }
-  if(!canvas){
-    showToast('Não foi possível processar a foto.', true);
-    return;
-  }
-
-  _imeiOcrBusy = true;
-  const statusEl = document.getElementById('imei-ocr-status');
-  if(statusEl){ statusEl.style.display = 'block'; statusEl.textContent = 'Lendo texto da etiqueta... (pode levar alguns segundos, mais na primeira vez)'; }
-
   try{
     const worker = await _imeiGetOcrWorker();
     const { data } = await worker.recognize(canvas);
@@ -7399,22 +7480,14 @@ async function lerEtiquetaOcr(canvas){
     _imeiDiag.tentativas++;
     _imeiDiag.ultimoTextoOcr = JSON.stringify((data.text || '(vazio)').slice(0, 300));
     _imeiUpdateDiagPanel();
-
-    if(!found){
-      _imeiFeedback('bad');
-      statusEl.textContent = 'Nenhum IMEI reconhecido nessa foto. Tente tirar de novo com melhor luz/foco ou usar o campo manual acima.';
-    } else {
-      _imeiFeedback('ok');
-      statusEl.textContent = 'IMEI reconhecido: ' + found + ' — confira no campo manual acima e clique em "Adicionar".';
-      const manualInput = document.getElementById('imei-manual-input');
-      if(manualInput){ manualInput.value = found; manualInput.focus(); manualInput.select(); }
-    }
+    _imeiHandleOcrResult(found, seq);
   }catch(err){
-    statusEl.textContent = 'Falha ao processar a imagem. Se for a primeira vez, confira a conexão (o OCR baixa os arquivos de reconhecimento na primeira execução) e tente de novo.';
     _imeiDiag.ultimoErro = (err && err.message) ? err.message : String(err);
     _imeiUpdateDiagPanel();
+    _imeiFeedback('bad');
+    _imeiPushFeed(seq, 'erro', 'Foto #' + seq + ': falha ao processar (confira a conexão).');
   }finally{
-    _imeiOcrBusy = false;
+    _imeiRefreshStatusLine();
   }
 }
 
