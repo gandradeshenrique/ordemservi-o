@@ -901,7 +901,6 @@
 </style>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/@zxing/library@0.20.0/umd/index.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/tesseract.js/5.1.1/tesseract.min.js"></script>
 </head>
 <body>
@@ -1366,7 +1365,7 @@
       <div class="page-header">
         <div>
           <h1>Coletor de IMEI</h1>
-          <p>Leitura por câmera do código de barras da etiqueta, para conferência em lote e exportação</p>
+          <p>Leitura por foto (OCR) do texto da etiqueta, para conferência em lote e exportação</p>
         </div>
         <button class="btn btn-primary" onclick="exportarImeiCSV()">⬇ Exportar CSV</button>
       </div>
@@ -1394,24 +1393,19 @@
       <div class="card" style="padding:16px; margin-bottom:16px;">
         <div style="display:grid; grid-template-columns:1fr 1fr; gap:20px;" id="imei-layout">
           <div>
-            <div style="font-size:13px; font-weight:700; margin-bottom:10px; color:var(--text);">📷 Câmera</div>
-            <div id="imei-viewfinder" style="position:relative; width:100%; aspect-ratio:4/3; background:#0b0d10; border-radius:8px; overflow:hidden; display:flex; align-items:center; justify-content:center; border:1px solid var(--border);">
-              <video id="imei-video" muted playsinline autoplay style="width:100%; height:100%; object-fit:cover;"></video>
-              <div id="imei-vf-guide" style="position:absolute; left:7%; right:7%; top:32%; bottom:32%; border:2px dashed rgba(255,255,255,0.55); border-radius:6px; pointer-events:none;"></div>
-              <div id="imei-vf-placeholder" style="position:absolute; color:#c7ccd4; font-size:13px; text-align:center; padding:0 20px;">
-                Câmera desligada.<br><br>
-                <button class="btn btn-primary" id="imei-btn-start" onclick="iniciarLeituraImei()">Ligar câmera</button>
+            <div style="font-size:13px; font-weight:700; margin-bottom:10px; color:var(--text);">📷 Foto da etiqueta</div>
+            <input type="file" id="imei-photo-input" accept="image/*" capture="environment" style="display:none;" onchange="onFotoImeiSelecionada(event)">
+            <div id="imei-photo-frame" style="position:relative; width:100%; aspect-ratio:4/3; background:#0b0d10; border-radius:8px; overflow:hidden; display:flex; align-items:center; justify-content:center; border:1px solid var(--border);">
+              <img id="imei-photo-preview" style="display:none; width:100%; height:100%; object-fit:contain;">
+              <div id="imei-photo-placeholder" style="color:#c7ccd4; font-size:13px; text-align:center; padding:0 20px;">
+                Nenhuma foto ainda.<br><br>
+                <button class="btn btn-primary" onclick="dispararFotoImei()">📷 Tirar foto da etiqueta</button>
               </div>
-              <div id="imei-vf-ring" style="position:absolute; inset:0; border:4px solid transparent; border-radius:8px; pointer-events:none; display:none;"></div>
-            </div>
-            <div id="imei-scan-status" style="margin-top:10px; min-height:18px; font-family:var(--mono); font-size:12.5px; color:var(--text-faint); display:flex; align-items:center; gap:8px;">
-              <span id="imei-scan-dot" style="width:7px; height:7px; border-radius:999px; background:var(--text-faint); flex-shrink:0;"></span>
-              <span id="imei-scan-status-text">Pronto para escanear.</span>
             </div>
             <div style="display:flex; gap:8px; margin-top:8px;">
-              <button class="btn btn-ghost btn-sm" id="imei-btn-stop" onclick="pararLeituraImei()" style="display:none;">Desligar câmera</button>
-              <select id="imei-cam-select" onchange="trocarCameraImei()" style="display:none;"></select>
+              <button class="btn btn-ghost btn-sm" id="imei-btn-retake" onclick="dispararFotoImei()" style="display:none;">Tirar outra foto</button>
             </div>
+            <div id="imei-ocr-status" style="margin-top:8px; min-height:18px; font-size:12.5px; color:var(--text-faint);">Tire uma foto nítida do texto "IMEI:" impresso na etiqueta.</div>
             <details style="margin-top:10px;">
               <summary style="cursor:pointer; font-size:11.5px; color:var(--text-faint);">Diagnóstico (mostrar se a leitura não funcionar)</summary>
               <div id="imei-diag" style="margin-top:6px; font-family:var(--mono); font-size:11px; color:var(--text-faint); line-height:1.7; white-space:pre-wrap; word-break:break-word;">—</div>
@@ -1426,19 +1420,9 @@
               <button class="btn btn-primary" onclick="adicionarImeiManual()">+ Adicionar</button>
             </div>
             <div class="hint" style="margin-top:10px; line-height:1.6;">
-              Aponte a câmera para o código gráfico da etiqueta traseira (código de barras ou Data Matrix — o leitor procura os dois formatos automaticamente, além de QR Code).
-              Quando o IMEI tiver 15 dígitos ele é adicionado sozinho; se vier incompleto ou ilegível, o texto lido cai no campo acima para conferência.
-              Aparelhos com dois chips têm dois IMEIs impressos na etiqueta — o leitor considera só o primeiro (IMEI 1); não é preciso capturar o segundo.
-            </div>
-
-            <div style="margin-top:14px; padding-top:14px; border-top:1px solid var(--border);">
-              <div style="font-size:13px; font-weight:700; margin-bottom:8px; color:var(--text);">🔎 Ler texto da etiqueta (OCR)</div>
-              <button class="btn" id="imei-btn-ocr" onclick="lerEtiquetaOcr()" style="width:100%;" disabled>Tirar foto e ler texto</button>
-              <div class="hint" style="margin-top:6px;">
-                Alternativa para quando o código gráfico não é lido (reflexo, foco, etiqueta danificada): fotografa o quadro atual da câmera e tenta reconhecer o primeiro "IMEI: ..." impresso (ignora o segundo, se houver).
-                Mais lento (alguns segundos, e baixa ~15MB na primeira vez) e pode errar algum dígito — o número reconhecido cai no campo manual acima pra você conferir e confirmar. Precisa da câmera ligada.
-              </div>
-              <div id="imei-ocr-status" style="margin-top:8px; font-size:12.5px; color:var(--text-faint); display:none;"></div>
+              A foto é tirada pela câmera nativa do celular (foco e zoom automáticos, mais confiável do que a câmera embutida na página). Depois de tirar a foto, o app lê o texto sozinho (OCR) e preenche o campo acima com o primeiro IMEI encontrado — confira e clique em "Adicionar".
+              Aparelhos com dois chips têm dois IMEIs impressos na etiqueta — o app considera só o primeiro (IMEI 1); não é preciso fotografar o segundo.
+              Se a foto não for reconhecida (reflexo, foco, etiqueta danificada), digite o IMEI manualmente aqui.
             </div>
           </div>
         </div>
@@ -7112,9 +7096,14 @@ function verCotacaoHistorico(idx){
 
 /* =========================================================
    MÓDULO: COLETOR DE IMEI
-   Leitura de código de barras via câmera (ZXing — @zxing/library),
-   com TRY_HARDER ativado para leitura confiável de código de barras
-   1D (Code128/ITF/Codabar), que a maioria das etiquetas de IMEI usa.
+   Leitura por OCR (Tesseract.js) do texto "IMEI: ..." impresso na
+   etiqueta. A foto vem da câmera NATIVA do celular (input file com
+   capture="environment"), não de um stream de vídeo ao vivo — isso
+   dá foco/zoom automáticos do app de câmera do aparelho, que é mais
+   confiável do que o autofoco de um <video> embutido na página.
+   A leitura gráfica de código de barras/Data Matrix (ZXing) foi
+   removida por não funcionar de forma confiável nas etiquetas
+   testadas; só o caminho OCR + digitação manual permanece.
    Lote avulso, sem vínculo com cliente/OS e sem gravação no
    Supabase — persiste só localmente (localStorage) como
    rascunho da sessão, e é exportado em CSV.
@@ -7124,12 +7113,6 @@ const IMEI_STORAGE_KEY = 'mobitos_imei_collector_v1';
 let _imeiRecords = [];        // {id, imei, nota, ts, sinalizado, duplicados}
 let _imeiByValue = new Map(); // imei -> record.id
 let _imeiTarget = 850;
-let _imeiZxingReader = null;
-let _imeiScanning = false;
-let _imeiLastText = '';
-let _imeiLastAt = 0;
-const IMEI_COOLDOWN_MS = 900;
-const IMEI_REPEAT_SUPPRESS_MS = 2500;
 let _imeiAudioCtx = null;
 
 function _imeiLoadState(){
@@ -7188,18 +7171,6 @@ function _imeiFeedback(kind){
   if(kind === 'ok') _imeiBeep(880, 90, 0);
   else if(kind === 'dup'){ _imeiBeep(520, 70, 0); _imeiBeep(520, 70, 130); }
   else if(kind === 'bad') _imeiBeep(220, 160, 0);
-}
-
-/* ---------- extração/validação do IMEI ---------- */
-function _imeiClassify(rawText){
-  const cleaned = (rawText || '').trim();
-  const matches = cleaned.match(/\d{13,17}/g) || [];
-  let candidate = null;
-  matches.forEach(m => {
-    if(!candidate || Math.abs(m.length - 15) < Math.abs(candidate.length - 15)) candidate = m;
-  });
-  if(!candidate) return { ok:false, imei:null, raw:cleaned };
-  return { ok: candidate.length === 15, imei: candidate, raw: cleaned };
 }
 
 /* ---------- estatísticas e tabela ---------- */
@@ -7318,181 +7289,70 @@ function limparImeiLista(){
   showToast('Lista de IMEIs limpa.');
 }
 
-/* ---------- leitura por câmera ---------- */
-function _imeiSetStatus(kind, text){
-  const dot = document.getElementById('imei-scan-dot');
-  const txt = document.getElementById('imei-scan-status-text');
-  const ring = document.getElementById('imei-vf-ring');
-  const colors = { ok:'var(--green)', dup:'var(--yellow)', bad:'var(--red)' };
-  if(txt) txt.textContent = text;
-  if(dot) dot.style.background = kind ? colors[kind] : 'var(--text-faint)';
-  if(txt) txt.style.color = kind ? colors[kind] : 'var(--text-faint)';
-  if(ring){
-    if(kind){
-      ring.style.display = 'block';
-      ring.style.borderColor = colors[kind];
-      clearTimeout(_imeiSetStatus._t);
-      _imeiSetStatus._t = setTimeout(() => { ring.style.display = 'none'; }, 500);
-    } else {
-      ring.style.display = 'none';
-    }
-  }
-}
-
-function _imeiHandleDecodedText(rawText){
-  const now = Date.now();
-  if(rawText === _imeiLastText && (now - _imeiLastAt) < IMEI_REPEAT_SUPPRESS_MS) return;
-  if((now - _imeiLastAt) < IMEI_COOLDOWN_MS) return;
-  _imeiLastText = rawText;
-  _imeiLastAt = now;
-
-  const result = _imeiClassify(rawText);
-
-  if(!result.imei){
-    _imeiFeedback('bad');
-    _imeiSetStatus('bad', 'Não reconhecido como IMEI — revise no campo manual.');
-    document.getElementById('imei-manual-input').value = result.raw.replace(/\D/g, '').slice(0, 17);
-    document.getElementById('imei-manual-input').focus();
-    return;
-  }
-  if(_imeiByValue.has(result.imei)){
-    _imeiFeedback('dup');
-    _imeiSetStatus('dup', 'Já coletado: ' + result.imei);
-    _imeiMarkDuplicate(result.imei);
-    return;
-  }
-  if(!result.ok){
-    _imeiFeedback('bad');
-    _imeiSetStatus('bad', 'Lido com ' + result.imei.length + ' dígitos (esperado 15) — confira e confirme.');
-    document.getElementById('imei-manual-input').value = result.imei;
-    document.getElementById('imei-manual-input').focus();
-    return;
-  }
-  _imeiFeedback('ok');
-  _imeiSetStatus('ok', 'Adicionado: ' + result.imei);
-  _imeiAddRecord(result.imei, { sinalizado:false });
-}
-
-function _imeiShowPlaceholder(html){
-  const el = document.getElementById('imei-vf-placeholder');
-  if(el){ el.style.display = 'flex'; el.innerHTML = html; }
-}
-
-function _imeiGetReader(){
-  if(_imeiZxingReader) return _imeiZxingReader;
-  const hints = new Map();
-  hints.set(ZXing.DecodeHintType.POSSIBLE_FORMATS, [
-    ZXing.BarcodeFormat.CODE_128,
-    ZXing.BarcodeFormat.CODE_39,
-    ZXing.BarcodeFormat.CODABAR,
-    ZXing.BarcodeFormat.ITF,
-    ZXing.BarcodeFormat.EAN_13,
-    ZXing.BarcodeFormat.EAN_8,
-    ZXing.BarcodeFormat.UPC_A,
-    ZXing.BarcodeFormat.UPC_E,
-    ZXing.BarcodeFormat.DATA_MATRIX,
-    ZXing.BarcodeFormat.QR_CODE
-  ]);
-  hints.set(ZXing.DecodeHintType.TRY_HARDER, true); // essencial p/ código de barras 1D — a lib anterior forçava isso como "false"
-  _imeiZxingReader = new ZXing.BrowserMultiFormatReader(hints, 200);
-  return _imeiZxingReader;
-}
-
-function _imeiVideoConstraints(deviceId){
-  const base = { width: { ideal: 1920 }, height: { ideal: 1080 } };
-  if(deviceId) base.deviceId = { exact: deviceId };
-  else base.facingMode = { ideal: 'environment' };
-  return { video: base };
-}
-
+/* ---------- diagnóstico ---------- */
 const _imeiDiag = { tentativas: 0, resolucao: '—', ultimoErro: '—', ultimoTextoOcr: '—' };
 function _imeiUpdateDiagPanel(){
   const el = document.getElementById('imei-diag');
   if(!el) return;
   el.textContent =
-    'Resolução da câmera: ' + _imeiDiag.resolucao + '\n' +
-    'Tentativas de leitura do código: ' + _imeiDiag.tentativas + '\n' +
+    'Resolução da foto: ' + _imeiDiag.resolucao + '\n' +
+    'Fotos processadas: ' + _imeiDiag.tentativas + '\n' +
     'Último erro JS capturado: ' + _imeiDiag.ultimoErro + '\n' +
     'Último texto bruto do OCR: ' + _imeiDiag.ultimoTextoOcr;
 }
 
-function _imeiDecodeCallback(result){
-  try{
-    _imeiDiag.tentativas++;
-    if(_imeiDiag.tentativas % 15 === 0) _imeiUpdateDiagPanel(); // não martela o DOM a cada frame
-    const video = document.getElementById('imei-video');
-    if(video && video.videoWidth) _imeiDiag.resolucao = video.videoWidth + 'x' + video.videoHeight;
-    if(result) _imeiHandleDecodedText(result.getText());
-    // erros (NotFoundException) disparam continuamente sem código visível — ignorar
-  }catch(e){
-    // nunca deixar um bug aqui matar o loop de leitura silenciosamente
-    _imeiDiag.ultimoErro = (e && e.message) ? e.message : String(e);
-    _imeiUpdateDiagPanel();
-  }
+/* ---------- captura de foto (câmera nativa do celular) ---------- */
+function dispararFotoImei(){
+  const input = document.getElementById('imei-photo-input');
+  if(input) input.click();
 }
 
-function iniciarLeituraImei(){
-  _imeiEnsureAudio();
-  if(_imeiScanning) return;
+function _imeiFileParaCanvas(file){
+  return new Promise((resolve, reject) => {
+    const img = new Image();
+    const url = URL.createObjectURL(file);
+    img.onload = () => {
+      // limita o maior lado a ~2000px: mantém nitidez suficiente pro OCR
+      // sem deixar o reconhecimento lento demais em fotos de 12+ MP
+      const maxSide = 2000;
+      const scale = Math.min(1, maxSide / Math.max(img.naturalWidth, img.naturalHeight));
+      const canvas = document.createElement('canvas');
+      canvas.width = Math.round(img.naturalWidth * scale);
+      canvas.height = Math.round(img.naturalHeight * scale);
+      canvas.getContext('2d').drawImage(img, 0, 0, canvas.width, canvas.height);
+      URL.revokeObjectURL(url);
+      resolve(canvas);
+    };
+    img.onerror = () => { URL.revokeObjectURL(url); reject(new Error('Não foi possível carregar a foto.')); };
+    img.src = url;
+  });
+}
 
-  if(typeof ZXing === 'undefined'){
-    _imeiShowPlaceholder('Não foi possível carregar o leitor de código de barras (falha ao baixar a biblioteca). Verifique a conexão e recarregue a página.<br><br>Use o campo manual ao lado enquanto isso.');
-    return;
-  }
+async function onFotoImeiSelecionada(ev){
+  const file = ev.target.files && ev.target.files[0];
+  ev.target.value = ''; // permite selecionar a mesma foto de novo depois
+  if(!file) return;
 
-  const reader = _imeiGetReader();
-  const placeholder = document.getElementById('imei-vf-placeholder');
+  const preview = document.getElementById('imei-photo-preview');
+  const placeholder = document.getElementById('imei-photo-placeholder');
+  const retakeBtn = document.getElementById('imei-btn-retake');
+  const previewUrl = URL.createObjectURL(file);
+  if(preview){ preview.src = previewUrl; preview.style.display = 'block'; }
   if(placeholder) placeholder.style.display = 'none';
+  if(retakeBtn) retakeBtn.style.display = 'inline-flex';
 
-  _imeiDiag.tentativas = 0;
-  _imeiDiag.ultimoErro = '—';
-  reader.decodeFromConstraints(_imeiVideoConstraints(null), 'imei-video', _imeiDecodeCallback).then(() => {
-    _imeiScanning = true;
-    document.getElementById('imei-btn-stop').style.display = 'inline-flex';
-    const ocrBtn = document.getElementById('imei-btn-ocr');
-    if(ocrBtn) ocrBtn.disabled = false;
-    _imeiSetStatus(null, 'Pronto para escanear.');
-    _imeiUpdateDiagPanel();
-    // só depois de conceder permissão os rótulos das câmeras vêm preenchidos
-    reader.listVideoInputDevices().then(_imeiPopulateCameraSelect).catch(() => {});
-  }).catch((err) => {
+  try{
+    const canvas = await _imeiFileParaCanvas(file);
+    _imeiDiag.resolucao = canvas.width + 'x' + canvas.height;
+    await lerEtiquetaOcr(canvas);
+  }catch(err){
     _imeiDiag.ultimoErro = (err && err.message) ? err.message : String(err);
     _imeiUpdateDiagPanel();
-    _imeiShowPlaceholder('Não foi possível acessar a câmera (permissão negada ou indisponível).<br><br><button class="btn btn-primary" onclick="iniciarLeituraImei()">Tentar novamente</button><br><br>Use o campo manual ao lado enquanto isso.');
-  });
+    showToast('Não foi possível processar a foto.', true);
+  }
 }
 
-function pararLeituraImei(){
-  if(!_imeiZxingReader || !_imeiScanning) return;
-  try{ _imeiZxingReader.reset(); }catch(e){}
-  _imeiScanning = false;
-  document.getElementById('imei-btn-stop').style.display = 'none';
-  const ocrBtn = document.getElementById('imei-btn-ocr');
-  if(ocrBtn) ocrBtn.disabled = true;
-  _imeiShowPlaceholder('Câmera desligada.<br><br><button class="btn btn-primary" onclick="iniciarLeituraImei()">Ligar câmera</button>');
-}
-
-function _imeiPopulateCameraSelect(devices){
-  const sel = document.getElementById('imei-cam-select');
-  if(!sel) return;
-  if(!devices || devices.length < 2){ sel.style.display = 'none'; return; }
-  sel.innerHTML = devices.map(d => `<option value="${d.deviceId}">${escapeHtml(d.label || 'Câmera')}</option>`).join('');
-  sel.style.display = 'inline-block';
-}
-
-function trocarCameraImei(){
-  const sel = document.getElementById('imei-cam-select');
-  if(!_imeiZxingReader || !_imeiScanning || !sel || !sel.value) return;
-  try{ _imeiZxingReader.reset(); }catch(e){}
-  _imeiScanning = false;
-  _imeiZxingReader.decodeFromConstraints(_imeiVideoConstraints(sel.value), 'imei-video', _imeiDecodeCallback).then(() => {
-    _imeiScanning = true;
-  }).catch(() => {
-    _imeiShowPlaceholder('Não foi possível trocar de câmera.<br><br><button class="btn btn-primary" onclick="iniciarLeituraImei()">Ligar câmera</button>');
-  });
-}
-
-/* ---------- OCR (fallback p/ etiquetas onde o código gráfico não lê) ---------- */
+/* ---------- OCR ---------- */
 let _imeiOcrWorker = null;
 let _imeiOcrBusy = false;
 
@@ -7500,16 +7360,6 @@ async function _imeiGetOcrWorker(){
   if(_imeiOcrWorker) return _imeiOcrWorker;
   _imeiOcrWorker = await Tesseract.createWorker('eng');
   return _imeiOcrWorker;
-}
-
-function _imeiCaptureFrameCanvas(){
-  const video = document.getElementById('imei-video');
-  if(!video || !video.videoWidth) return null;
-  const canvas = document.createElement('canvas');
-  canvas.width = video.videoWidth;
-  canvas.height = video.videoHeight;
-  canvas.getContext('2d').drawImage(video, 0, 0, canvas.width, canvas.height);
-  return canvas;
 }
 
 function _imeiExtractFirstCandidateFromText(text){
@@ -7527,38 +7377,34 @@ function _imeiExtractFirstCandidateFromText(text){
   return null;
 }
 
-async function lerEtiquetaOcr(){
+async function lerEtiquetaOcr(canvas){
   if(_imeiOcrBusy) return;
-  if(!_imeiScanning){
-    showToast('Ligue a câmera e aponte para a etiqueta antes de usar o OCR.', true);
-    return;
-  }
   if(typeof Tesseract === 'undefined'){
     showToast('Não foi possível carregar o leitor de texto. Verifique a conexão e recarregue a página.', true);
     return;
   }
-  const canvas = _imeiCaptureFrameCanvas();
   if(!canvas){
-    showToast('Não foi possível capturar a imagem da câmera.', true);
+    showToast('Não foi possível processar a foto.', true);
     return;
   }
 
   _imeiOcrBusy = true;
-  const btn = document.getElementById('imei-btn-ocr');
   const statusEl = document.getElementById('imei-ocr-status');
-  if(btn) btn.disabled = true;
   if(statusEl){ statusEl.style.display = 'block'; statusEl.textContent = 'Lendo texto da etiqueta... (pode levar alguns segundos, mais na primeira vez)'; }
 
   try{
     const worker = await _imeiGetOcrWorker();
     const { data } = await worker.recognize(canvas);
     const found = _imeiExtractFirstCandidateFromText(data.text || '');
+    _imeiDiag.tentativas++;
     _imeiDiag.ultimoTextoOcr = JSON.stringify((data.text || '(vazio)').slice(0, 300));
     _imeiUpdateDiagPanel();
 
     if(!found){
-      statusEl.textContent = 'Nenhum IMEI reconhecido nessa foto. Tente reaproximar, melhorar a luz/foco ou usar o campo manual acima.';
+      _imeiFeedback('bad');
+      statusEl.textContent = 'Nenhum IMEI reconhecido nessa foto. Tente tirar de novo com melhor luz/foco ou usar o campo manual acima.';
     } else {
+      _imeiFeedback('ok');
       statusEl.textContent = 'IMEI reconhecido: ' + found + ' — confira no campo manual acima e clique em "Adicionar".';
       const manualInput = document.getElementById('imei-manual-input');
       if(manualInput){ manualInput.value = found; manualInput.focus(); manualInput.select(); }
@@ -7569,7 +7415,6 @@ async function lerEtiquetaOcr(){
     _imeiUpdateDiagPanel();
   }finally{
     _imeiOcrBusy = false;
-    if(btn) btn.disabled = !_imeiScanning;
   }
 }
 
@@ -7591,7 +7436,8 @@ function adicionarImeiManual(){
   }
   _imeiAddRecord(digits, { sinalizado: digits.length !== 15 });
   input.value = '';
-  _imeiSetStatus('ok', 'Adicionado manualmente: ' + digits);
+  _imeiFeedback(digits.length === 15 ? 'ok' : 'bad');
+  showToast('IMEI adicionado: ' + digits);
 }
 
 /* ---------- exportação CSV ---------- */
@@ -7626,11 +7472,6 @@ function exportarImeiCSV(){
   }
 }
 
-document.addEventListener('visibilitychange', () => {
-  // a lib não suporta pausar/retomar o stream: ao esconder a aba, desliga a câmera de vez
-  // (evita bateria/câmera presa em segundo plano); o usuário liga de novo ao voltar.
-  if(document.hidden && _imeiZxingReader && _imeiScanning) pararLeituraImei();
-});
 </script>
 
 </body>
