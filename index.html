@@ -1412,6 +1412,10 @@
               <button class="btn btn-ghost btn-sm" id="imei-btn-stop" onclick="pararLeituraImei()" style="display:none;">Desligar câmera</button>
               <select id="imei-cam-select" onchange="trocarCameraImei()" style="display:none;"></select>
             </div>
+            <details style="margin-top:10px;">
+              <summary style="cursor:pointer; font-size:11.5px; color:var(--text-faint);">Diagnóstico (mostrar se a leitura não funcionar)</summary>
+              <div id="imei-diag" style="margin-top:6px; font-family:var(--mono); font-size:11px; color:var(--text-faint); line-height:1.7; white-space:pre-wrap; word-break:break-word;">—</div>
+            </details>
           </div>
 
           <div>
@@ -7401,9 +7405,30 @@ function _imeiVideoConstraints(deviceId){
   return { video: base };
 }
 
+const _imeiDiag = { tentativas: 0, resolucao: '—', ultimoErro: '—', ultimoTextoOcr: '—' };
+function _imeiUpdateDiagPanel(){
+  const el = document.getElementById('imei-diag');
+  if(!el) return;
+  el.textContent =
+    'Resolução da câmera: ' + _imeiDiag.resolucao + '\n' +
+    'Tentativas de leitura do código: ' + _imeiDiag.tentativas + '\n' +
+    'Último erro JS capturado: ' + _imeiDiag.ultimoErro + '\n' +
+    'Último texto bruto do OCR: ' + _imeiDiag.ultimoTextoOcr;
+}
+
 function _imeiDecodeCallback(result){
-  if(result) _imeiHandleDecodedText(result.getText());
-  // erros (NotFoundException) disparam continuamente sem código visível — ignorar
+  try{
+    _imeiDiag.tentativas++;
+    if(_imeiDiag.tentativas % 15 === 0) _imeiUpdateDiagPanel(); // não martela o DOM a cada frame
+    const video = document.getElementById('imei-video');
+    if(video && video.videoWidth) _imeiDiag.resolucao = video.videoWidth + 'x' + video.videoHeight;
+    if(result) _imeiHandleDecodedText(result.getText());
+    // erros (NotFoundException) disparam continuamente sem código visível — ignorar
+  }catch(e){
+    // nunca deixar um bug aqui matar o loop de leitura silenciosamente
+    _imeiDiag.ultimoErro = (e && e.message) ? e.message : String(e);
+    _imeiUpdateDiagPanel();
+  }
 }
 
 function iniciarLeituraImei(){
@@ -7419,15 +7444,20 @@ function iniciarLeituraImei(){
   const placeholder = document.getElementById('imei-vf-placeholder');
   if(placeholder) placeholder.style.display = 'none';
 
+  _imeiDiag.tentativas = 0;
+  _imeiDiag.ultimoErro = '—';
   reader.decodeFromConstraints(_imeiVideoConstraints(null), 'imei-video', _imeiDecodeCallback).then(() => {
     _imeiScanning = true;
     document.getElementById('imei-btn-stop').style.display = 'inline-flex';
     const ocrBtn = document.getElementById('imei-btn-ocr');
     if(ocrBtn) ocrBtn.disabled = false;
     _imeiSetStatus(null, 'Pronto para escanear.');
+    _imeiUpdateDiagPanel();
     // só depois de conceder permissão os rótulos das câmeras vêm preenchidos
     reader.listVideoInputDevices().then(_imeiPopulateCameraSelect).catch(() => {});
-  }).catch(() => {
+  }).catch((err) => {
+    _imeiDiag.ultimoErro = (err && err.message) ? err.message : String(err);
+    _imeiUpdateDiagPanel();
     _imeiShowPlaceholder('Não foi possível acessar a câmera (permissão negada ou indisponível).<br><br><button class="btn btn-primary" onclick="iniciarLeituraImei()">Tentar novamente</button><br><br>Use o campo manual ao lado enquanto isso.');
   });
 }
@@ -7520,6 +7550,8 @@ async function lerEtiquetaOcr(){
     const worker = await _imeiGetOcrWorker();
     const { data } = await worker.recognize(canvas);
     const found = _imeiExtractFirstCandidateFromText(data.text || '');
+    _imeiDiag.ultimoTextoOcr = JSON.stringify((data.text || '(vazio)').slice(0, 300));
+    _imeiUpdateDiagPanel();
 
     if(!found){
       statusEl.textContent = 'Nenhum IMEI reconhecido nessa foto. Tente reaproximar, melhorar a luz/foco ou usar o campo manual acima.';
@@ -7530,6 +7562,8 @@ async function lerEtiquetaOcr(){
     }
   }catch(err){
     statusEl.textContent = 'Falha ao processar a imagem. Se for a primeira vez, confira a conexão (o OCR baixa os arquivos de reconhecimento na primeira execução) e tente de novo.';
+    _imeiDiag.ultimoErro = (err && err.message) ? err.message : String(err);
+    _imeiUpdateDiagPanel();
   }finally{
     _imeiOcrBusy = false;
     if(btn) btn.disabled = !_imeiScanning;
