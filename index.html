@@ -7514,14 +7514,17 @@ function _imeiCaptureFrameCanvas(){
 
 function _imeiExtractFirstCandidateFromText(text){
   // Só o primeiro IMEI da etiqueta (IMEI 1) — em aparelhos dual chip, o segundo é ignorado de propósito.
-  const reLabeled = /IMEI\s*1?\s*[:\-]?\s*(\d[\d\s]{12,20}\d)/i;
-  const labeled = reLabeled.exec(text);
-  if(labeled){
-    const digits = labeled[1].replace(/\D/g, '');
+  // Etiquetas costumam imprimir o IMEI em blocos separados por barra/hífen/ponto (ex: "353335/86/152303/6"),
+  // e o OCR às vezes lê o "I" final de "IMEI" como "|", "1" ou "l" — por isso a extração é tolerante a isso
+  // e não depende de casar a palavra "IMEI" perfeitamente: pega o primeiro bloco de dígitos (com esses
+  // separadores no meio) que, ao remover tudo que não é dígito, resulta em 14–16 dígitos.
+  const re = /(\d[\d \/\-.]{10,28}\d)/g;
+  let m;
+  while((m = re.exec(text))){
+    const digits = m[1].replace(/\D/g, '');
     if(digits.length >= 14 && digits.length <= 16) return digits;
   }
-  const loose = text.match(/\d{14,16}/);
-  return loose ? loose[0] : null;
+  return null;
 }
 
 async function lerEtiquetaOcr(){
