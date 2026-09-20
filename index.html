@@ -934,6 +934,18 @@
   body:has(#os-modal-overlay.open) #toast-wrap{ top:12px; bottom:auto; left:12px; right:12px; }
 }
 </style>
+<style>
+/* Seções de cada aparelho: cada etapa mostra só a sua parte */
+#os-modal-overlay[data-wz="2"] .dv-sec:not([data-sec="cad"]),
+#os-modal-overlay[data-wz="3"] .dv-sec:not([data-sec="rec"]),
+#os-modal-overlay[data-wz="4"] .dv-sec:not([data-sec="banc"]){ display:none !important; }
+#os-modal-overlay:not([data-wz="2"]) #dv-add-wrap{ display:none; }
+.dv-modelo{ font-size:13px; color:var(--text-dim); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+@media (max-width:768px){
+  .ae-checklist-wrap fieldset{ padding:12px 10px !important; min-width:0; }
+  .ae-checklist-wrap fieldset > div[style*="grid-template-columns"]{ grid-template-columns:1fr !important; }
+}
+</style>
 </head>
 <body>
 
@@ -1406,10 +1418,11 @@
     <!-- Etapas da abertura de OS -->
     <div class="wz-steps" id="wz-steps">
       <button type="button" class="wz-step" data-go="1" onclick="wzGo(1)"><span class="wz-num">1</span><span class="wz-lbl">Cliente</span></button>
-      <button type="button" class="wz-step" data-go="2" onclick="wzGo(2)"><span class="wz-num">2</span><span class="wz-lbl">Aparelho</span></button>
-      <button type="button" class="wz-step" data-go="3" onclick="wzGo(3)"><span class="wz-num">3</span><span class="wz-lbl">Diagnóstico</span></button>
-      <button type="button" class="wz-step" data-go="4" onclick="wzGo(4)"><span class="wz-num">4</span><span class="wz-lbl">Custos</span></button>
-      <button type="button" class="wz-step" data-go="5" onclick="wzGo(5)"><span class="wz-num">5</span><span class="wz-lbl">Status</span></button>
+      <button type="button" class="wz-step" data-go="2" onclick="wzGo(2)"><span class="wz-num">2</span><span class="wz-lbl">Aparelhos</span></button>
+      <button type="button" class="wz-step" data-go="3" onclick="wzGo(3)"><span class="wz-num">3</span><span class="wz-lbl">Recebimento</span></button>
+      <button type="button" class="wz-step" data-go="4" onclick="wzGo(4)"><span class="wz-num">4</span><span class="wz-lbl">Bancada</span></button>
+      <button type="button" class="wz-step" data-go="5" onclick="wzGo(5)"><span class="wz-num">5</span><span class="wz-lbl">Custos</span></button>
+      <button type="button" class="wz-step" data-go="6" onclick="wzGo(6)"><span class="wz-num">6</span><span class="wz-lbl">Status</span></button>
     </div>
 
     <fieldset data-step="1">
@@ -1464,15 +1477,15 @@
 
     </fieldset>
 
-    <fieldset data-step="2">
-      <legend>Aparelho</legend>
+    <fieldset data-step="2 3 4" id="dv-fieldset">
+      <legend id="dv-legend">Aparelhos</legend>
 
       <!-- Card do aparelho principal — mesmo visual dos extras -->
       <div id="aparelho-principal-card" style="border:1px solid var(--border); border-radius:var(--radius); overflow:hidden; background:var(--panel-2);">
 
         <!-- Barra de cabeçalho -->
         <div style="display:flex; justify-content:space-between; align-items:center; padding:10px 14px; background:var(--panel-2); border-bottom:1px solid var(--border);">
-          <span style="font-size:12px; font-weight:700; color:var(--accent); text-transform:uppercase; letter-spacing:0.05em;">Aparelho 1</span>
+          <div style="display:flex; align-items:baseline; gap:8px; min-width:0;"><span style="font-size:12px; font-weight:700; color:var(--accent); text-transform:uppercase; letter-spacing:0.05em;">Aparelho 1</span><span class="dv-modelo"></span></div>
           <span id="resumo-toggle-icon" style="font-size:12px; color:var(--text-faint); cursor:pointer;" onclick="toggleAparelhoPrincipal()">▼ recolher</span>
         </div>
 
@@ -1485,6 +1498,7 @@
 
         <!-- Campos completos do aparelho principal -->
         <div id="aparelho-principal-campos" style="padding:14px 16px;">
+<div class="dv-sec" data-sec="cad">
       <div class="field-row">
         <div class="field">
           <label>Marca / Modelo *</label>
@@ -1505,6 +1519,8 @@
         <label>Defeito relatado *</label>
         <textarea id="os-defeito" placeholder="Ex: Tela não acende, caiu na água..."></textarea>
       </div>
+</div><!-- fim cad -->
+<div class="dv-sec" data-sec="rec">
       <!-- CHECKLIST -->
       <div id="os-checklist-wrap">
       <fieldset style="border:1px solid var(--border); border-radius:var(--radius); padding:14px 18px; margin-bottom:4px;">
@@ -1640,6 +1656,12 @@
         </div>
       </div>
 
+</div><!-- fim rec -->
+<div class="dv-sec" data-sec="banc">
+      <div class="field">
+        <label>Diagnóstico técnico</label>
+        <textarea id="os-diagnostico" placeholder="Diagnóstico após análise (pode ser preenchido depois)"></textarea>
+      </div>
       <!-- Peças do aparelho principal -->
       <div class="ae-parts-section" style="border-top:1px solid var(--border); padding:10px 16px 2px;">
         <label style="font-size:12px; font-weight:700; color:var(--text-dim); text-transform:uppercase; letter-spacing:0.05em;">Peças utilizadas</label>
@@ -1658,13 +1680,14 @@
         </div>
       </div>
 
+</div><!-- fim banc -->
       </div><!-- fim #aparelho-principal-campos -->
 
       </div><!-- fim #aparelho-principal-card -->
 
       <!-- APARELHOS EXTRAS -->
       <div id="aparelhos-extras-list" style="display:flex; flex-direction:column; gap:12px; margin-top:12px;"></div>
-      <div style="margin-top:10px;">
+      <div style="margin-top:10px;" id="dv-add-wrap">
         <button type="button" class="btn btn-sm" onclick="wzAddAparelho()" style="border-color:var(--accent); color:var(--accent);">
           ＋ Adicionar aparelho
         </button>
@@ -1672,20 +1695,14 @@
 
     </fieldset>
 
-    <fieldset data-step="3">
-      <legend>Diagnóstico</legend>
-      <div class="field">
-        <label>Diagnóstico técnico</label>
-        <textarea id="os-diagnostico" placeholder="Diagnóstico após análise (pode ser preenchido depois)"></textarea>
-      </div>
-
-      <div class="total-line">
+    <fieldset data-step="4">
+      <div class="total-line" style="margin-top:0;">
         <span>Valor total da OS</span>
         <span class="total-value" id="os-total-display">R$ 0,00</span>
       </div>
     </fieldset>
 
-    <fieldset data-step="4">
+    <fieldset data-step="5">
       <legend>Custos operacionais <span style="font-weight:400; font-size:11px; color:var(--text-dim);">(uso interno — não aparece na OS impressa)</span></legend>
       <div class="field-row">
         <div class="field">
@@ -1709,7 +1726,7 @@
       </div>
     </fieldset>
 
-    <fieldset data-step="5">
+    <fieldset data-step="6">
       <legend>Status e prazos</legend>
       <div class="field-row-3">
         <div class="field">
@@ -2684,6 +2701,9 @@ function statusBadgeClass(status){
 }
 function showToast(msg, isError){
   const wrap = document.getElementById('toast-wrap');
+  // Com o assistente da OS aberto, só o aviso mais recente fica na tela (evita empilhar e cobrir as etapas)
+  const osAberta = document.getElementById('os-modal-overlay');
+  if(osAberta && osAberta.classList.contains('open')) wrap.innerHTML = '';
   const t = document.createElement('div');
   t.className = 'toast' + (isError ? ' toast-danger' : '');
   t.textContent = msg;
@@ -3946,25 +3966,62 @@ function updateOSTotal(){
 }
 
 /* ---------- Wizard de abertura de OS (etapas com salvamento parcial) ---------- */
-const WZ_TOTAL = 5;
+const WZ_TOTAL = 6;
 let wzCurrent = 1, wzDirty = false, wzBusy = false;
 
 function wzOsExiste(){ return !!document.getElementById('os-id').value; }
 
+function wzChecklistOculto(){
+  const w = document.getElementById('os-checklist-wrap');
+  return !!(w && w.style.display === 'none');
+}
+function wzCartoesExtras(){ return [...document.querySelectorAll('#aparelhos-extras-list .aparelho-extra-card')]; }
+
 function wzEstado(){
   const v = id => ((document.getElementById(id) || {}).value || '').trim();
+  const extras = wzCartoesExtras();
   const aparelho = v('os-aparelho') || v('ac-aparelho-input');
-  const clWrap = document.getElementById('os-checklist-wrap');
-  const clOculto = clWrap && clWrap.style.display === 'none';
-  const clRespondidos = document.querySelectorAll('#os-checklist-wrap input[type=radio]:checked').length;
+  const cadOk = !!(aparelho && v('os-imei') && v('os-defeito')) &&
+    extras.every(c => c.querySelector('.ae-modelo').value.trim() && c.querySelector('.ae-imei').value.trim() && c.querySelector('.ae-defeito').value.trim());
+  const oculto = wzChecklistOculto();
+  const clOk = (oculto || document.querySelectorAll('#os-checklist-wrap input[type=radio]:checked').length >= CL_ITEMS.length) &&
+    (oculto || extras.every(c => c.querySelectorAll('.ae-checklist-wrap input[type=radio]:checked').length >= CL_ITEMS.length));
+  const diagOk = !!v('os-diagnostico') && extras.every(c => c.querySelector('.ae-diagnostico').value.trim());
   return {
     1: !!(v('os-cliente-id') && v('os-chamado')),
-    2: !!(aparelho && v('os-imei') && v('os-defeito') && (clOculto || clRespondidos >= 20)),
-    3: !!v('os-diagnostico'),
-    4: !!(parseFloat(v('os-logistica-pecas')) || parseFloat(v('os-logistica-equipamento')) || parseFloat(v('os-horas-servico')) || parseFloat(v('os-custo-horas'))),
-    5: wzOsExiste() && v('os-status') !== 'Aguardando aparelho' && !!v('os-data-prevista')
+    2: cadOk,
+    3: cadOk && clOk,
+    4: diagOk,
+    5: !!(parseFloat(v('os-logistica-pecas')) || parseFloat(v('os-logistica-equipamento')) || parseFloat(v('os-horas-servico')) || parseFloat(v('os-custo-horas'))),
+    6: wzOsExiste() && v('os-status') !== 'Aguardando aparelho' && !!v('os-data-prevista')
   };
 }
+
+function wzRotular(){
+  const main = document.querySelector('#aparelho-principal-card .dv-modelo');
+  if(main) main.textContent = (document.getElementById('ac-aparelho-input').value || '').trim();
+  wzCartoesExtras().forEach(c => {
+    const m = c.querySelector('.dv-modelo');
+    if(m) m.textContent = c.querySelector('.ae-modelo').value.trim();
+  });
+}
+
+// Nas etapas de recebimento e bancada todos os aparelhos ficam abertos
+function wzExpandirAparelhos(){
+  const cp = document.getElementById('aparelho-principal-campos');
+  if(cp){
+    cp.style.display = 'block';
+    document.getElementById('aparelho-principal-resumo').style.display = 'none';
+    document.getElementById('resumo-toggle-icon').textContent = '▼ recolher';
+  }
+  wzCartoesExtras().forEach(c => {
+    c.querySelector('.ae-campos').style.display = 'block';
+    c.querySelector('.ae-resumo').style.display = 'none';
+    const ic = c.querySelector('.ae-toggle-icon'); if(ic) ic.textContent = '▼ recolher';
+  });
+}
+
+const WZ_LEGENDAS = { 2:'Aparelhos', 3:'Recebimento — checklist, acessórios e senha', 4:'Bancada — diagnóstico e peças' };
 
 function wzRefresh(){
   const est = wzEstado();
@@ -3975,13 +4032,18 @@ function wzRefresh(){
     b.classList.toggle('done', !ativo && !!est[n]);
     b.querySelector('.wz-num').textContent = (!ativo && est[n]) ? '✓' : String(n);
   });
+  wzRotular();
 }
 
 function wzShow(n){
   wzCurrent = n;
   document.querySelectorAll('#os-modal-overlay fieldset[data-step]').forEach(f => {
-    f.style.display = (parseInt(f.dataset.step) === n) ? '' : 'none';
+    f.style.display = (f.dataset.step || '').split(' ').includes(String(n)) ? '' : 'none';
   });
+  const ovw = document.getElementById('os-modal-overlay');
+  ovw.dataset.wz = String(n);
+  const lg = document.getElementById('dv-legend'); if(lg && WZ_LEGENDAS[n]) lg.textContent = WZ_LEGENDAS[n];
+  if(n === 3 || n === 4) wzExpandirAparelhos();
   const ultima = n === WZ_TOTAL;
   document.getElementById('wz-btn-back').style.display = n === 1 ? 'none' : '';
   document.getElementById('wz-btn-exit').style.display = ultima ? 'none' : '';
@@ -4007,7 +4069,7 @@ async function wzGo(n){
 function wzBack(){ wzGo(wzCurrent - 1); }
 async function wzNext(){
   const ultima = wzCurrent === WZ_TOTAL;
-  const level = ultima ? 'full' : (wzCurrent >= 2 ? 2 : 1);
+  const level = ultima ? 'full' : (wzCurrent >= 3 ? 3 : wzCurrent);
   const ok = await saveOS({ level, close: ultima });
   if(ok && !ultima) wzShow(wzCurrent + 1);
 }
@@ -4067,6 +4129,11 @@ async function saveOS(opts){
   finally { wzBusy = false; btns.forEach(b => b.disabled = false); }
 }
 
+// Todas as peças da OS (aparelho 1 + aparelhos extras), para baixar/devolver estoque
+function pecasDaOS(partsPrincipal, extras){
+  return [...(partsPrincipal || []), ...(extras || []).flatMap(a => a.parts || [])];
+}
+
 async function _saveOSInner(opts){
   opts = Object.assign({ level:'full', close:true, silent:false }, opts || {});
   const clienteId = document.getElementById('os-cliente-id').value;
@@ -4092,8 +4159,8 @@ async function _saveOSInner(opts){
   let status = document.getElementById('os-status').value;
   const aparelhoCompleto = !!(aparelho && imei && defeito);
   const dispensaAparelho = (status === 'Aguardando aparelho' || status === 'Cancelado');
-  const exigeChecklist = opts.level === 2 || (opts.level === 'full' && !dispensaAparelho);
-  const exigeAparelho = exigeChecklist || opts.level === 'dev';
+  const exigeChecklist = (typeof opts.level === 'number' && opts.level >= 3) || (opts.level === 'full' && !dispensaAparelho);
+  const exigeAparelho = exigeChecklist || opts.level === 2 || opts.level === 'dev';
 
   if(!clienteId){
     showToast('Selecione o cliente da lista.', true);
@@ -4136,10 +4203,22 @@ async function _saveOSInner(opts){
     if(exigeChecklist && clIncompleto){
       document.getElementById('checklist-error').style.display = 'block';
       document.getElementById('checklist-error').scrollIntoView({ behavior:'smooth', block:'center' });
-      showToast('Preencha todos os itens do checklist.', true);
+      showToast(wzCartoesExtras().length ? 'Aparelho 1: preencha todos os itens do checklist.' : 'Preencha todos os itens do checklist.', true);
       return;
     }
     document.getElementById('checklist-error').style.display = 'none';
+    // checklist dos aparelhos extras
+    if(exigeChecklist){
+      const cards = wzCartoesExtras();
+      for(let i = 0; i < cards.length; i++){
+        const respondidos = cards[i].querySelectorAll('.ae-checklist-wrap input[type=radio]:checked').length;
+        if(respondidos < CL_ITEMS.length){
+          cards[i].querySelector('.ae-checklist-wrap').scrollIntoView({ behavior:'smooth', block:'center' });
+          showToast(`Aparelho ${i + 2}: preencha todos os itens do checklist.`, true);
+          return;
+        }
+      }
+    }
   }
 
   const cliente = state.clients.find(c => c.id === clienteId);
@@ -4176,7 +4255,13 @@ async function _saveOSInner(opts){
         });
         return ps;
       })(),
-      maoObra: parseFloat(card.querySelector('.ae-mao-obra')?.value) || 0
+      maoObra: parseFloat(card.querySelector('.ae-mao-obra')?.value) || 0,
+      diagnostico: (card.querySelector('.ae-diagnostico')?.value || '').trim(),
+      checklist: (() => {
+        const ck = {};
+        card.querySelectorAll('.ae-checklist-wrap input[type=radio]:checked').forEach(r => { ck[r.dataset.ck] = r.value; });
+        return ck;
+      })()
     });
   });
 
@@ -4272,8 +4357,8 @@ async function _saveOSInner(opts){
         addHistoryEntry(id, 'Ordem de serviço atualizada.');
       }
 
-      oldParts.forEach(p => adjustStock(p.stockId, p.qtd));
-      parts.forEach(p => adjustStock(p.stockId, -p.qtd));
+      pecasDaOS(oldParts, o.aparelhosExtras).forEach(p => adjustStock(p.stockId, p.qtd));
+      pecasDaOS(parts, aparelhosExtras).forEach(p => adjustStock(p.stockId, -p.qtd));
 
       const payload = osData(id, o.numero, state.history[id] || []);
       await sbPatch('ordens_servico', 'id', id, payload);
@@ -4299,7 +4384,7 @@ async function _saveOSInner(opts){
       const numero = state.nextOSNumber++;
       const newId  = 'os' + Date.now();
 
-      parts.forEach(p => adjustStock(p.stockId, -p.qtd));
+      pecasDaOS(parts, aparelhosExtras).forEach(p => adjustStock(p.stockId, -p.qtd));
       addHistoryEntry(newId, aparelhoCompleto ? 'OS criada. Aparelho recebido.' : 'OS criada. Aguardando chegada do aparelho.');
 
       const payload = osData(newId, numero, state.history[newId] || []);
@@ -4351,12 +4436,13 @@ function toggleAparelhoPrincipal(){
 }
 
 function atualizarVisibilidadeChecklist(){
+  // O checklist só é ocultado para cliente PJ (vale para todos os aparelhos)
   const clienteId = document.getElementById('os-cliente-id').value;
   const cliente = clienteId ? state.clients.find(c => c.id === clienteId) : null;
   const isPJ = cliente ? getTipoPessoa(cliente.cpfcnpj) === 'PJ' : false;
-  const temMultiplosAparelhos = document.getElementById('aparelhos-extras-list').children.length > 0;
   const clWrap = document.getElementById('os-checklist-wrap');
-  if(clWrap) clWrap.style.display = (isPJ || temMultiplosAparelhos) ? 'none' : 'block';
+  if(clWrap) clWrap.style.display = isPJ ? 'none' : 'block';
+  document.querySelectorAll('.ae-checklist-wrap').forEach(w => { w.style.display = isPJ ? 'none' : 'block'; });
 }
 
 function colapsarAparelhoPrincipal(){
@@ -4399,8 +4485,38 @@ function toggleAparelhoExtra(btn){
   }
 }
 
+const CL_ITEMS = [
+  ['cl-liga','Liga?'],
+  ['cl-altofalante','Alto Falante'],
+  ['cl-carrega','Carrega?'],
+  ['cl-auricular','Auricular'],
+  ['cl-display','Display'],
+  ['cl-sinal','Sinal Operadora'],
+  ['cl-touch','Touch'],
+  ['cl-wifi','Wifi'],
+  ['cl-vidro','Vidro'],
+  ['cl-bluetooth','Bluetooth'],
+  ['cl-tampa','Tampa Traseira'],
+  ['cl-sensor','Sensor de Proximidade'],
+  ['cl-camtraseira','Câmera Traseira'],
+  ['cl-gaveta','Gaveta de Chip'],
+  ['cl-camfrontal','Câmera Frontal'],
+  ['cl-power','Botão Power'],
+  ['cl-faceid','Face ID'],
+  ['cl-volume','Botão Volume'],
+  ['cl-biometria','Biometria'],
+  ['cl-microfone','Microfone']
+];
+let _aeUidCounter = 0;
+
 function addAparelhoExtra(existing){
   const list = document.getElementById('aparelhos-extras-list');
+  const uid = 'ae' + (++_aeUidCounter);
+  const clEx = (existing && existing.checklist) ? existing.checklist : {};
+  const clHtml = CL_ITEMS.map(([k,label]) => `<div class="cl-item"><span>${label}</span><div class="cl-opts">
+      <label><input type="radio" name="${uid}-${k}" data-ck="${k}" value="Sim" ${clEx[k]==='Sim'?'checked':''}> Sim</label>
+      <label><input type="radio" name="${uid}-${k}" data-ck="${k}" value="Não" ${clEx[k]==='Não'?'checked':''}> Não</label>
+    </div></div>`).join('');
 
   // Colapsar aparelho principal na primeira vez que adiciona um extra (não ao carregar edição)
   if(!existing && list.children.length === 0){
@@ -4417,7 +4533,7 @@ function addAparelhoExtra(existing){
   card.innerHTML = `
     <!-- Barra de cabeçalho sempre visível -->
     <div style="display:flex; justify-content:space-between; align-items:center; padding:10px 14px; background:var(--panel-2); border-bottom:1px solid var(--border);">
-      <span class="ae-numero-label" style="font-size:12px; font-weight:700; color:var(--accent); text-transform:uppercase; letter-spacing:0.05em;">Aparelho ${num}</span>
+      <div style="display:flex; align-items:baseline; gap:8px; min-width:0;"><span class="ae-numero-label" style="font-size:12px; font-weight:700; color:var(--accent); text-transform:uppercase; letter-spacing:0.05em;">Aparelho ${num}</span><span class="dv-modelo"></span></div>
       <div style="display:flex; align-items:center; gap:12px;">
         <span class="ae-toggle-icon" style="font-size:12px; color:var(--text-faint); cursor:pointer;" onclick="toggleAparelhoExtra(this)">▼ recolher</span>
         <button type="button" onclick="this.closest('.aparelho-extra-card').remove(); reindexarAparelhosExtras(); atualizarVisibilidadeChecklist();"
@@ -4434,6 +4550,7 @@ function addAparelhoExtra(existing){
 
     <!-- Campos completos -->
     <div class="ae-campos" style="padding:14px 16px; display:block;">
+      <div class="dv-sec" data-sec="cad">
       <div class="field-row">
         <div class="field">
           <label>Marca / Modelo *</label>
@@ -4458,6 +4575,8 @@ function addAparelhoExtra(existing){
           style="min-height:52px;"
           oninput="atualizarResumoExtra(this)">${existing ? escapeHtml(existing.defeito||'') : ''}</textarea>
       </div>
+      </div>
+      <div class="dv-sec" data-sec="rec">
       <div class="field-row">
         <div class="field">
           <label>Senha / padrão de desbloqueio</label>
@@ -4483,6 +4602,20 @@ function addAparelhoExtra(existing){
         </div>
       </div>
 
+      <div class="ae-checklist-wrap">
+        <fieldset style="border:1px solid var(--border); border-radius:var(--radius); padding:14px 18px; margin-bottom:4px;">
+          <legend style="font-size:13px; font-weight:600; color:var(--accent); padding:0 6px;">
+            ✔ Lista de Checagem — Os itens abaixo estão em condições de utilização? <span style="color:var(--red);">*</span>
+          </legend>
+          <div style="display:grid; grid-template-columns:1fr 1fr; gap:6px 24px;">${clHtml}</div>
+        </fieldset>
+      </div>
+      </div>
+      <div class="dv-sec" data-sec="banc">
+      <div class="field">
+        <label>Diagnóstico técnico</label>
+        <textarea class="ae-diagnostico" placeholder="Diagnóstico após análise (pode ser preenchido depois)" style="min-height:52px;">${existing ? escapeHtml(existing.diagnostico||'') : ''}</textarea>
+      </div>
       <!-- Peças deste aparelho -->
       <div class="ae-parts-section" style="border-top:1px solid var(--border); padding:10px 16px 2px;">
         <label style="font-size:12px; font-weight:700; color:var(--text-dim); text-transform:uppercase; letter-spacing:0.05em;">Peças utilizadas</label>
@@ -4499,6 +4632,7 @@ function addAparelhoExtra(existing){
         <div style="text-align:right; font-size:13px; font-weight:600; color:var(--accent); margin-top:6px; padding-bottom:10px;">
           Subtotal: <span class="ae-subtotal">R$ 0,00</span>
         </div>
+      </div>
       </div>
     </div>
   `;
@@ -4827,6 +4961,19 @@ function addHistoryEntry(osId, text){
 }
 
 /* ---------- Visualizar OS ---------- */
+// Grade compacta do checklist (usada na visualização dos aparelhos extras)
+function checklistViewHtml(cl){
+  return `<div class="section-title" style="margin-top:8px;">Checklist de recebimento</div>
+    <div style="display:grid; grid-template-columns:1fr 1fr; gap:4px 16px; font-size:12px; margin-bottom:10px;">
+      ${CL_ITEMS.map(([k,label]) => {
+        const v = (cl || {})[k] || '—';
+        const color = v === 'Sim' ? 'var(--green)' : v === 'Não' ? 'var(--red)' : 'var(--text-faint)';
+        return `<div style="display:flex;justify-content:space-between;padding:3px 6px;background:var(--panel-2);border-radius:4px;">
+          <span style="color:var(--text-dim);">${label}</span><span style="font-weight:600;color:${color};">${v}</span></div>`;
+      }).join('')}
+    </div>`;
+}
+
 function viewOS(osId){
   const o = state.os.find(x => x.id === osId);
   if(!o) return;
@@ -4925,7 +5072,9 @@ function viewOS(osId){
               ${a.defeito ? `<div class="kv-row"><span class="kv-label">Defeito</span><span class="kv-value">${escapeHtml(a.defeito)}</span></div>` : ''}
               ${a.senha ? `<div class="kv-row"><span class="kv-label">Senha</span><span class="kv-value mono">${escapeHtml(a.senha)}</span></div>` : ''}
               ${a.acessorios ? `<div class="kv-row"><span class="kv-label">Acessórios</span><span class="kv-value">${escapeHtml(a.acessorios)}</span></div>` : ''}
+              ${a.diagnostico ? `<div class="kv-row"><span class="kv-label">Diagnóstico</span><span class="kv-value">${escapeHtml(a.diagnostico)}</span></div>` : ''}
             </div>
+            ${(a.checklist && Object.keys(a.checklist).length) ? checklistViewHtml(a.checklist) : ''}
             ${(a.parts && a.parts.length) || a.maoObra ? `
             <div class="table-wrap" style="border:none; margin-bottom:0;">
               <table>
@@ -5068,15 +5217,41 @@ function printOS(){
     ['cl-volume','Botão Volume'],
   ];
 
-  function clBox(key){
-    const v = (o.checklist || {})[key];
+  function clBox(key, cl){
+    const v = (cl || o.checklist || {})[key];
     const sim = v === 'Sim';
     const nao = v === 'Não';
     return `<span class="p-cb${sim?' p-cb-sim':''}">${sim?'✔':''}</span>Sim&nbsp;&nbsp;<span class="p-cb${nao?' p-cb-nao':''}">${nao?'✔':''}</span>Não`;
   }
 
-  function clRow(pair){
-    return `<tr><td class="p-cl-label">${pair[1]}</td><td class="p-cl-opts">${clBox(pair[0])}</td></tr>`;
+  function clRow(pair, cl){
+    return `<tr><td class="p-cl-label">${pair[1]}</td><td class="p-cl-opts">${clBox(pair[0], cl)}</td></tr>`;
+  }
+
+  // Bloco do checklist de UM aparelho (mesmo modelo do formulário físico)
+  function clBloco(cl, acsStr, titulo){
+    const acs = acsStr ? acsStr.split(',').map(a => a.trim()).filter(Boolean) : [];
+    return `
+  ${titulo ? '<div style="font-size:8.5pt; font-weight:700; color:#0094d4; border-bottom:0.5pt solid #0094d4; padding-bottom:2pt; margin:5pt 0 4pt;">'+titulo+'</div>' : ''}
+  <div class="p-cl-grid">
+    <div class="p-cl-col">
+      <table>${CL_LEFT.map(x => clRow(x, cl)).join('')}</table>
+    </div>
+    <div class="p-cl-col">
+      <table>${CL_RIGHT.map(x => clRow(x, cl)).join('')}
+        ${['Capa','Chip','Carregador'].map(a => { const m = acs.includes(a); return '<tr><td class="p-cl-label">'+a+'</td><td class="p-cl-opts"><span class="p-cb'+(m?' p-cb-sim':'')+'">'+(m?'✔':'')+'</span>Sim&nbsp;&nbsp;<span class="p-cb'+(!m?' p-cb-nao':'')+'">'+((!m)?'✔':'')+'</span>Não</td></tr>'; }).join('')}
+      </table>
+    </div>
+  </div>`;
+  }
+
+  // Checklist de todos os aparelhos: 1 aparelho = igual ao modelo antigo; vários = 1 bloco por aparelho que tenha checklist
+  function clTodos(){
+    const extras = o.aparelhosExtras || [];
+    if(!extras.length) return clBloco(o.checklist, o.acessorios, '');
+    const devs = [{ cl:o.checklist, acs:o.acessorios, t:'Aparelho 1: '+escapeHtml(o.aparelho) }]
+      .concat(extras.map((a,i) => ({ cl:a.checklist, acs:a.acessorios, t:'Aparelho '+(i+2)+': '+escapeHtml(a.modelo) })));
+    return devs.filter(d => d.cl && Object.keys(d.cl).length).map(d => clBloco(d.cl, d.acs, d.t)).join('');
   }
 
   // Peças / serviços
@@ -5247,22 +5422,12 @@ function printOS(){
 
   <hr class="p-hr">
 
-  ${!(o.aparelhosExtras && o.aparelhosExtras.length) ? `
-  <!-- CHECKLIST — apenas quando há 1 aparelho -->
+  ${(() => { const blocos = clTodos(); return blocos ? `
+  <!-- CHECKLIST — um bloco por aparelho -->
   <div class="p-cl-title">LISTA DE CHECAGEM (CHECK LIST)</div>
   <div class="p-cl-sub">Os itens abaixo estão em condições de utilização?</div>
-  <div class="p-cl-grid">
-    <div class="p-cl-col">
-      <table>${CL_LEFT.map(clRow).join('')}</table>
-    </div>
-    <div class="p-cl-col">
-      <table>${CL_RIGHT.map(clRow).join('')}
-        ${['Capa','Chip','Carregador'].map(acs => { const m=acsList.includes(acs); return '<tr><td class="p-cl-label">'+acs+'</td><td class="p-cl-opts"><span class="p-cb'+(m?' p-cb-sim':'')+'">'+(m?'✔':'')+'</span>Sim&nbsp;&nbsp;<span class="p-cb'+(!m?' p-cb-nao':'')+'">'+((!m)?'✔':'')+'</span>Não</td></tr>'; }).join('')}
-      </table>
-    </div>
-  </div>
-  <hr class="p-hr-thin">
-  ` : ''}
+  ${blocos}
+  <hr class="p-hr-thin">` : ''; })()}
 
   <!-- OBSERVAÇÕES -->
   <div class="p-section-label">Observações sobre o aparelho:</div>
@@ -5290,6 +5455,7 @@ function printOS(){
         return `
         <div style="margin-top:8pt;">
           <div style="font-size:8.5pt; font-weight:700; color:#0094d4; border-bottom:0.5pt solid #0094d4; padding-bottom:2pt; margin-bottom:4pt;">Aparelho ${i+2}: ${escapeHtml(a.modelo)}${a.imei ? ' &nbsp;|&nbsp; IMEI: '+escapeHtml(a.imei) : ''}${a.defeito ? ' &nbsp;|&nbsp; Defeito: '+escapeHtml(a.defeito) : ''}</div>
+          ${a.diagnostico ? '<div style="font-size:8.5pt; margin-bottom:3pt;">Diagnóstico: '+escapeHtml(a.diagnostico)+'</div>' : ''}
           ${(a.parts && a.parts.length) || a.maoObra ? `
           <table class="p-parts-table">
             <thead><tr><th>Item / Serviço</th><th style="text-align:center">Qtd.</th><th style="text-align:right">Preço unit.</th><th style="text-align:right">Subtotal</th></tr></thead>
