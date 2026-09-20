@@ -4204,7 +4204,7 @@ async function _saveOSInner(opts){
     pagamento: document.getElementById('os-pagamento').value,
     garantia: document.getElementById('os-garantia').value,
     data_entrada: dataEntrada,
-    data_prevista: dataPrevista,
+    data_prevista: dataPrevista || null,   // coluna do tipo date: vazio precisa ir como null, não como ""
     observacoes: document.getElementById('os-observacoes').value.trim(),
     historico
   });
