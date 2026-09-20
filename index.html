@@ -2707,6 +2707,16 @@ function goToPage(page){
   if(page === 'compras') renderComprasTable();
   if(page === 'kanban') renderKanban();
   if(page === 'cotacao') initCotacaoPage();
+  try { sessionStorage.setItem('mobit_pagina', page); } catch(e){}
+}
+
+// Ao recarregar, volta para a aba em que o usuário estava
+function restaurarPagina(){
+  let page = null;
+  try { page = sessionStorage.getItem('mobit_pagina'); } catch(e){}
+  if(page && page !== 'dashboard' && document.getElementById('page-' + page) && document.querySelector(`.nav-item[data-page="${page}"]`)){
+    goToPage(page);
+  }
 }
 
 /* =========================================================
@@ -7403,6 +7413,7 @@ function getCurrentUser(){
 function logout(){
   clearTimeout(_logoutTimer);
   sessionStorage.removeItem('mobit_user');
+  try { sessionStorage.removeItem('mobit_pagina'); } catch(e){}
   window.location.href = 'login.html';
 }
 
@@ -7450,6 +7461,7 @@ function initAutoLogout(){
   renderOSTable();
   renderStockTable();
   renderClientsTable();
+  restaurarPagina();
 })();
 
 /* =========================================================
