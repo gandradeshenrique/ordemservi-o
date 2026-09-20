@@ -4436,13 +4436,10 @@ function toggleAparelhoPrincipal(){
 }
 
 function atualizarVisibilidadeChecklist(){
-  // O checklist só é ocultado para cliente PJ (vale para todos os aparelhos)
-  const clienteId = document.getElementById('os-cliente-id').value;
-  const cliente = clienteId ? state.clients.find(c => c.id === clienteId) : null;
-  const isPJ = cliente ? getTipoPessoa(cliente.cpfcnpj) === 'PJ' : false;
+  // O checklist é obrigatório em todos os aparelhos, inclusive de clientes PJ: nunca é ocultado
   const clWrap = document.getElementById('os-checklist-wrap');
-  if(clWrap) clWrap.style.display = isPJ ? 'none' : 'block';
-  document.querySelectorAll('.ae-checklist-wrap').forEach(w => { w.style.display = isPJ ? 'none' : 'block'; });
+  if(clWrap) clWrap.style.display = 'block';
+  document.querySelectorAll('.ae-checklist-wrap').forEach(w => { w.style.display = 'block'; });
 }
 
 function colapsarAparelhoPrincipal(){
