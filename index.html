@@ -2622,7 +2622,11 @@ async function loadFromSupabase(){
     }));
 
     // A coluna 'fotos' precisa existir no Supabase; sem ela o recurso de fotos fica desligado
-    state.colunaFotos = os.length ? ('fotos' in os[0]) : true;
+    // Sonda direta: pede só a coluna; se o Supabase responder erro 4xx, a coluna não existe
+    try {
+      const rp = await fetch(`${SB_URL}/rest/v1/ordens_servico?select=fotos&limit=1`, { headers: sbHeaders() });
+      state.colunaFotos = rp.ok;
+    } catch(e){ state.colunaFotos = os.length ? ('fotos' in os[0]) : true; }
 
     state.os = os.map(o => ({
       id: o.id, numero: o.numero,
@@ -4647,7 +4651,7 @@ async function _saveOSInner(opts){
       showToast(opts.close ? `OS #${numero} criada com sucesso.` : `OS #${numero} criada e salva.`);
     }
   } catch(e) {
-    if(/fotos/i.test(e.message)){ state.colunaFotos = false; wzFotosExigir = false; showToast('A coluna "fotos" não existe no Supabase. Rode o SQL de instalação das fotos e recarregue a página.', true); return; }
+    if(/^(POST|PATCH) ordens_servico/.test(e.message) && /(PGRST204|42703|column)[^]*fotos|fotos[^]*(PGRST204|42703|column)/i.test(e.message)){ state.colunaFotos = false; wzFotosExigir = false; showToast('A coluna "fotos" não existe no Supabase. Rode o SQL de instalação das fotos e recarregue a página.', true); return; }
     showToast('Erro ao salvar OS: ' + e.message, true);
     return;
   }
