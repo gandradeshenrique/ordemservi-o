@@ -723,7 +723,6 @@
     input, select, textarea{ min-height:44px; }
     .nav-item{ min-height:46px; }
     #cotacao-layout{ grid-template-columns: 1fr !important; }
-    #imei-layout{ grid-template-columns: 1fr !important; }
     .ac-item{ padding:12px 14px; }
     .kanban-add-btn{ min-height:40px; }
 
@@ -901,7 +900,40 @@
 </style>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/tesseract.js/5.1.1/tesseract.min.js"></script>
+<style>
+/* ===== Wizard de abertura de OS ===== */
+.wz-steps{ display:flex; align-items:flex-start; margin:0 0 18px; position:sticky; top:0; z-index:5;
+  background:var(--panel); padding:8px 0 12px; border-bottom:1px solid var(--border); }
+.wz-step{ flex:1; min-width:0; background:none; border:none; cursor:pointer; display:flex; flex-direction:column;
+  align-items:center; gap:5px; padding:0 2px; color:var(--text-faint); font-family:inherit; position:relative; }
+.wz-step::before{ content:''; position:absolute; top:14px; right:50%; width:100%; height:2px; background:var(--border); z-index:0; }
+.wz-step:first-child::before{ display:none; }
+.wz-num{ width:30px; height:30px; border-radius:50%; border:2px solid var(--border); background:var(--panel);
+  display:flex; align-items:center; justify-content:center; font-size:12px; font-weight:700; position:relative; z-index:1; }
+.wz-lbl{ font-size:11px; font-weight:600; text-align:center; line-height:1.2; }
+.wz-step.done::before, .wz-step.active::before{ background:var(--accent); }
+.wz-step.done .wz-num{ border-color:var(--accent); color:var(--accent); }
+.wz-step.active{ color:var(--accent); }
+.wz-step.active .wz-num{ border-color:var(--accent); background:var(--accent); color:#fff; }
+.wz-nav{ position:sticky; bottom:0; z-index:5; display:flex; gap:10px; align-items:center; background:var(--panel);
+  margin-top:20px; padding:14px 0 4px; border-top:1px solid var(--border); }
+.wz-nav #wz-btn-exit{ margin-left:auto; }
+@media (max-width:768px){
+  .wz-lbl{ font-size:10px; }
+  .wz-nav{ display:grid; grid-template-columns:1fr 1fr; grid-template-areas:"back next" "exit exit"; gap:8px;
+    margin:16px -16px -32px; padding:12px 16px calc(14px + env(safe-area-inset-bottom)); }
+  .wz-nav .btn{ width:100%; justify-content:center; min-height:44px; }
+  #wz-btn-back{ grid-area:back; } #wz-btn-next{ grid-area:next; } #wz-btn-exit{ grid-area:exit; margin-left:0 !important; }
+  /* O modal da OS fica acima da barra inferior do app, senão ela cobre os botões */
+  #os-modal-overlay{ z-index:160; }
+  /* Checklist em 1 coluna no celular (a grade de 2 colunas estourava a largura da tela) */
+  #os-checklist-wrap fieldset{ padding:12px 10px !important; min-width:0; }
+  #os-checklist-wrap fieldset > div[style*="grid-template-columns"]{ grid-template-columns:1fr !important; }
+  #os-modal-overlay .modal{ overflow-x:hidden; }
+  /* Avisos no topo enquanto a OS está aberta, para não cobrir os botões de navegação */
+  body:has(#os-modal-overlay.open) #toast-wrap{ top:12px; bottom:auto; left:12px; right:12px; }
+}
+</style>
 </head>
 <body>
 
@@ -959,9 +991,6 @@
     </button>
     <button class="nav-item" data-page="cotacao" onclick="goToPage('cotacao')">
       <span class="nav-icon">🔍</span> Cotação
-    </button>
-    <button class="nav-item" data-page="imei" onclick="goToPage('imei')">
-      <span class="nav-icon">📷</span> Coletor de IMEI
     </button>
 
     <div class="nav-divider"></div>
@@ -1157,6 +1186,7 @@
         <select id="os-filter-status" onchange="renderOSTable()">
           <option value="">Todos os status</option>
           <option value="Aberto">Aberto</option>
+          <option value="Aguardando aparelho">Aguardando aparelho</option>
           <option value="Aguardando aprovação">Aguardando aprovação</option>
           <option value="Aguardando peça">Aguardando peça</option>
           <option value="Em andamento">Em andamento</option>
@@ -1360,122 +1390,6 @@
       </div>
     </div>
 
-    <!-- ===================== COLETOR DE IMEI ===================== -->
-    <div class="page" id="page-imei">
-      <div class="page-header">
-        <div>
-          <h1>Coletor de IMEI</h1>
-          <p>Leitura por foto (OCR) do texto da etiqueta, para conferência em lote e exportação</p>
-        </div>
-        <button class="btn btn-primary" onclick="exportarImeiCSV()">⬇ Exportar CSV</button>
-      </div>
-
-      <div class="stats-grid">
-        <div class="stat-card">
-          <div class="stat-label">Coletados</div>
-          <div class="stat-value stat-accent" id="imei-stat-total">0</div>
-        </div>
-        <div class="stat-card">
-          <div class="stat-label">Meta</div>
-          <div class="stat-value" id="imei-stat-target">850</div>
-          <div class="stat-sub"><a href="#" onclick="editarMetaImei(event)" style="color:var(--accent); text-decoration:none;">alterar</a></div>
-        </div>
-        <div class="stat-card">
-          <div class="stat-label">Progresso</div>
-          <div class="stat-value stat-green" id="imei-stat-pct">0%</div>
-        </div>
-        <div class="stat-card">
-          <div class="stat-label">Duplicados</div>
-          <div class="stat-value stat-red" id="imei-stat-dup">0</div>
-        </div>
-        <div class="stat-card">
-          <div class="stat-label">Falhas OCR</div>
-          <div class="stat-value stat-red" id="imei-stat-fail">0</div>
-        </div>
-      </div>
-
-      <div class="card" style="padding:16px; margin-bottom:16px;">
-        <div style="display:grid; grid-template-columns:1fr 1fr; gap:20px;" id="imei-layout">
-          <div>
-            <div style="font-size:13px; font-weight:700; margin-bottom:10px; color:var(--text);">📷 Câmera</div>
-            <input type="file" id="imei-photo-input" accept="image/*" capture="environment" style="display:none;" onchange="onFotoImeiSelecionada(event)">
-            <div id="imei-photo-frame" style="position:relative; width:100%; aspect-ratio:4/3; background:#0b0d10; border-radius:8px; overflow:hidden; display:flex; align-items:center; justify-content:center; border:1px solid var(--border);">
-              <video id="imei-live-video" muted playsinline autoplay style="display:none; width:100%; height:100%; object-fit:cover;"></video>
-              <img id="imei-photo-preview" style="display:none; width:100%; height:100%; object-fit:contain;">
-              <div id="imei-photo-placeholder" style="color:#c7ccd4; font-size:13px; text-align:center; padding:0 20px;">
-                Nenhuma foto ainda.<br><br>
-                <button class="btn btn-primary" onclick="ligarCameraAoVivoImei()">📷 Ligar câmera ao vivo (beta)</button><br><br>
-                <a href="#" onclick="dispararFotoImei(); return false;" style="color:var(--accent); text-decoration:none; font-size:12px;">ou tirar uma foto pela câmera nativa do celular</a>
-              </div>
-            </div>
-
-            <!-- controles do modo câmera ao vivo (beta): sem reabrir app nativo a cada foto -->
-            <div id="imei-live-controls" style="display:none; align-items:center; gap:8px; margin-top:8px; flex-wrap:wrap;">
-              <button class="btn btn-primary" id="imei-btn-live-shot" onclick="tirarFotoAoVivoImei()">📸 Tirar foto</button>
-              <button class="btn btn-ghost btn-sm" onclick="desligarCameraAoVivoImei()">Desligar câmera</button>
-            </div>
-
-            <!-- controles do modo foto nativa (fallback, um toque por foto) -->
-            <div id="imei-native-controls" style="display:none; align-items:center; gap:14px; margin-top:8px; flex-wrap:wrap;">
-              <button class="btn btn-ghost btn-sm" id="imei-btn-retake" onclick="dispararFotoImei()">Tirar outra foto</button>
-              <label style="display:flex; align-items:center; gap:6px; font-size:12px; color:var(--text-faint); cursor:pointer;">
-                <input type="checkbox" id="imei-continuo-toggle" checked onchange="_imeiContinuo = this.checked">
-                Reabrir a câmera sozinha após cada foto
-              </label>
-            </div>
-
-            <div id="imei-ocr-status" style="margin-top:8px; min-height:18px; font-size:12.5px; color:var(--text-faint);">Tire uma foto nítida do texto "IMEI:" impresso na etiqueta.</div>
-            <div id="imei-feed" style="margin-top:6px; font-family:var(--mono); font-size:11.5px; line-height:1.7; min-height:18px;"></div>
-            <details style="margin-top:10px;">
-              <summary style="cursor:pointer; font-size:11.5px; color:var(--text-faint);">Diagnóstico (mostrar se a leitura não funcionar)</summary>
-              <div id="imei-diag" style="margin-top:6px; font-family:var(--mono); font-size:11px; color:var(--text-faint); line-height:1.7; white-space:pre-wrap; word-break:break-word;">—</div>
-            </details>
-          </div>
-
-          <div>
-            <div style="font-size:13px; font-weight:700; margin-bottom:10px; color:var(--text);">⌨️ Adicionar manualmente</div>
-            <div style="display:flex; gap:8px;">
-              <input type="text" id="imei-manual-input" placeholder="Digitar IMEI (se a leitura falhar)" inputmode="numeric"
-                style="flex:1;" onkeydown="if(event.key==='Enter') adicionarImeiManual()">
-              <button class="btn btn-primary" onclick="adicionarImeiManual()">+ Adicionar</button>
-            </div>
-            <div class="hint" style="margin-top:10px; line-height:1.6;">
-              "Câmera ao vivo (beta)" pede acesso à câmera uma vez só e cada toque em "Tirar foto" já captura, sem abrir nenhum app separado — o jeito mais rápido, mas só funciona em alguns navegadores (Chrome/Android, por ex.). Se não aparecer ou o foco não ficar bom, use "tirar foto pela câmera nativa": aí o app de câmera do celular abre a cada foto, com o melhor autofoco possível. Em ambos os modos, cada foto entra numa fila e é lida (OCR) em segundo plano, sem travar a próxima captura.
-              IMEI com 15 dígitos e ainda não coletado entra direto na lista; caso duvidoso (dígitos a mais/a menos, ou nada reconhecido) também entra, marcado com ⚠ pra conferir depois na tabela — assim nenhum aparelho fica de fora da captura em lote.
-              Aparelhos com dois chips têm dois IMEIs impressos na etiqueta — o app considera só o primeiro (IMEI 1); não é preciso fotografar o segundo.
-              Se preferir, digite o IMEI manualmente aqui a qualquer momento.
-            </div>
-          </div>
-        </div>
-      </div>
-
-      <div class="card" style="padding:16px;">
-        <div class="toolbar" style="margin-bottom:12px;">
-          <div class="search">
-            <span class="search-icon">&#128269;</span>
-            <input type="text" id="imei-filter" placeholder="Filtrar por IMEI ou observação..." oninput="renderImeiTable()">
-          </div>
-          <button class="btn btn-ghost" id="imei-btn-clear" onclick="limparImeiLista()">Limpar tudo</button>
-        </div>
-        <div class="table-wrap">
-          <table>
-            <thead>
-              <tr>
-                <th>#</th>
-                <th>IMEI</th>
-                <th>Observação</th>
-                <th>Horário</th>
-                <th></th>
-              </tr>
-            </thead>
-            <tbody id="imei-table-body">
-              <tr class="empty-row"><td colspan="5">Nenhum IMEI coletado ainda.</td></tr>
-            </tbody>
-          </table>
-        </div>
-      </div>
-    </div>
-
   </div>
 </div>
 
@@ -1484,12 +1398,21 @@
   <div class="modal modal-wide">
     <div class="modal-header">
       <h2 id="os-modal-title">Nova ordem de serviço</h2>
-      <button class="modal-close" onclick="closeModal('os-modal-overlay')">&times;</button>
+      <button class="modal-close" onclick="wzClose()">&times;</button>
     </div>
 
     <input type="hidden" id="os-id">
 
-    <fieldset>
+    <!-- Etapas da abertura de OS -->
+    <div class="wz-steps" id="wz-steps">
+      <button type="button" class="wz-step" data-go="1" onclick="wzGo(1)"><span class="wz-num">1</span><span class="wz-lbl">Cliente</span></button>
+      <button type="button" class="wz-step" data-go="2" onclick="wzGo(2)"><span class="wz-num">2</span><span class="wz-lbl">Aparelho</span></button>
+      <button type="button" class="wz-step" data-go="3" onclick="wzGo(3)"><span class="wz-num">3</span><span class="wz-lbl">Diagnóstico</span></button>
+      <button type="button" class="wz-step" data-go="4" onclick="wzGo(4)"><span class="wz-num">4</span><span class="wz-lbl">Custos</span></button>
+      <button type="button" class="wz-step" data-go="5" onclick="wzGo(5)"><span class="wz-num">5</span><span class="wz-lbl">Status</span></button>
+    </div>
+
+    <fieldset data-step="1">
       <legend>Cliente</legend>
       <div class="field">
         <label>Cliente *</label>
@@ -1541,7 +1464,7 @@
 
     </fieldset>
 
-    <fieldset>
+    <fieldset data-step="2">
       <legend>Aparelho</legend>
 
       <!-- Card do aparelho principal — mesmo visual dos extras -->
@@ -1749,7 +1672,7 @@
 
     </fieldset>
 
-    <fieldset>
+    <fieldset data-step="3">
       <legend>Diagnóstico</legend>
       <div class="field">
         <label>Diagnóstico técnico</label>
@@ -1762,7 +1685,7 @@
       </div>
     </fieldset>
 
-    <fieldset>
+    <fieldset data-step="4">
       <legend>Custos operacionais <span style="font-weight:400; font-size:11px; color:var(--text-dim);">(uso interno — não aparece na OS impressa)</span></legend>
       <div class="field-row">
         <div class="field">
@@ -1786,12 +1709,13 @@
       </div>
     </fieldset>
 
-    <fieldset>
+    <fieldset data-step="5">
       <legend>Status e prazos</legend>
       <div class="field-row-3">
         <div class="field">
           <label>Status</label>
           <select id="os-status">
+            <option>Aguardando aparelho</option>
             <option>Aberto</option>
             <option>Aguardando aprovação</option>
             <option>Aguardando peça</option>
@@ -1836,9 +1760,10 @@
       </div>
     </fieldset>
 
-    <div class="modal-actions">
-      <button class="btn" onclick="closeModal('os-modal-overlay')">Cancelar</button>
-      <button class="btn btn-primary" onclick="saveOS()">Salvar OS</button>
+    <div class="wz-nav" id="wz-nav">
+      <button type="button" class="btn" id="wz-btn-back" onclick="wzBack()">← Voltar</button>
+      <button type="button" class="btn" id="wz-btn-exit" onclick="wzSaveExit()">Salvar e sair</button>
+      <button type="button" class="btn btn-primary" id="wz-btn-next" onclick="wzNext()">Salvar e continuar →</button>
     </div>
   </div>
 </div>
@@ -2414,6 +2339,7 @@
               <label style="font-size:11px; color:var(--text-dim); display:block; margin-bottom:4px;">Status</label>
               <select id="exp-os-status" style="width:100%; background:var(--panel-2); border:1px solid var(--border); border-radius:6px; color:var(--text); padding:7px 10px; font-size:13px;">
                 <option value="">Todos</option>
+                <option>Aguardando aparelho</option>
                 <option>Aberto</option>
                 <option>Aguardando aprovação</option>
                 <option>Aguardando peça</option>
@@ -2715,7 +2641,6 @@ function showLoadingOverlay(show){
    NAVEGAÇÃO
    ========================================================= */
 function goToPage(page){
-  if(page !== 'imei' && typeof desligarCameraAoVivoImei === 'function') desligarCameraAoVivoImei();
   document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
   document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
   document.getElementById('page-' + page).classList.add('active');
@@ -2728,7 +2653,6 @@ function goToPage(page){
   if(page === 'compras') renderComprasTable();
   if(page === 'kanban') renderKanban();
   if(page === 'cotacao') initCotacaoPage();
-  if(page === 'imei') initImeiPage();
 }
 
 /* =========================================================
@@ -2748,6 +2672,7 @@ function todayISO(){
 function statusBadgeClass(status){
   const map = {
     'Aberto':'badge-aberto',
+    'Aguardando aparelho':'badge-aguardando',
     'Em andamento':'badge-andamento',
     'Aguardando peça':'badge-aguardando',
     'Aguardando aprovação':'badge-aguardando',
@@ -2853,8 +2778,8 @@ function renderDashboard(){
     </div>`).join('');
 
   // ── Gráfico 1: OS por status (donut) ──
-  const STATUS_ALL = ['Aberto','Aguardando aprovação','Aguardando peça','Em andamento','Concluído','Entregue','Cancelado'];
-  const STATUS_COLORS = ['#0094d4','#f59e0b','#fd7e14','#6f42c1','#28a745','#20c997','#dc3545'];
+  const STATUS_ALL = ['Aguardando aparelho','Aberto','Aguardando aprovação','Aguardando peça','Em andamento','Concluído','Entregue','Cancelado'];
+  const STATUS_COLORS = ['#6c8ebf','#0094d4','#f59e0b','#fd7e14','#6f42c1','#28a745','#20c997','#dc3545'];
   const statusCountA = STATUS_ALL.map(s => osA.filter(o => o.status === s).length);
 
   renderChart('chart-status-a', 'doughnut', STATUS_ALL, [{
@@ -3064,7 +2989,7 @@ function renderChart(id, type, labels, datasets, options){
 }
 
 function statusBadgeClass(status){
-  const map = { 'Aberto':'badge-aberto','Em andamento':'badge-andamento','Aguardando peça':'badge-aguardando','Aguardando aprovação':'badge-aguardando','Concluído':'badge-concluido','Entregue':'badge-entregue','Cancelado':'badge-cancelado' };
+  const map = { 'Aberto':'badge-aberto','Aguardando aparelho':'badge-aguardando','Em andamento':'badge-andamento','Aguardando peça':'badge-aguardando','Aguardando aprovação':'badge-aguardando','Concluído':'badge-concluido','Entregue':'badge-entregue','Cancelado':'badge-cancelado' };
   return map[status]||'';
 }
 
@@ -3125,7 +3050,7 @@ async function exportDashboardPDF(){
   });
   const top5 = Object.values(clienteMap).sort((a,b)=>b.total-a.total).slice(0,5);
 
-  const STATUS_ALL = ['Aberto','Aguardando aprovação','Aguardando peça','Em andamento','Concluído','Entregue','Cancelado'];
+  const STATUS_ALL = ['Aguardando aparelho','Aberto','Aguardando aprovação','Aguardando peça','Em andamento','Concluído','Entregue','Cancelado'];
 
   function fmtPer(de, ate){ return formatDate(de) + ' a ' + formatDate(ate); }
   function deltaHTML(a,b){
@@ -3369,7 +3294,7 @@ function renderOSTable(){
       <td class="mono cell-strong" style="cursor:pointer" onclick="viewOS('${o.id}')">#${o.numero}</td>
       <td class="mono text-faint" style="cursor:pointer" onclick="viewOS('${o.id}')">${o.chamado ? escapeHtml(o.chamado) : '—'}</td>
       <td style="cursor:pointer" onclick="viewOS('${o.id}')">${escapeHtml(o.clienteNome)}</td>
-      <td style="cursor:pointer" onclick="viewOS('${o.id}')">${escapeHtml(o.aparelho)}</td>
+      <td style="cursor:pointer" onclick="viewOS('${o.id}')">${o.aparelho ? escapeHtml(o.aparelho) : '<span class="text-faint">— aguardando —</span>'}</td>
       <td class="text-faint" style="max-width:220px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;" title="${escapeHtml(o.defeito)}">${escapeHtml(o.defeito)}</td>
       <td><span class="badge ${statusBadgeClass(o.status)}">${o.status}</span></td>
       <td class="mono">${formatCurrency(o.total)}</td>
@@ -3618,7 +3543,7 @@ function openOSModal(osId){
   document.getElementById('os-logistica-equipamento').value = '';
   document.getElementById('os-horas-servico').value = '';
   document.getElementById('os-custo-horas').value = '';
-  document.getElementById('os-status').value = 'Aberto';
+  document.getElementById('os-status').value = 'Aguardando aparelho';
   document.getElementById('os-data-entrada').value = todayISO();
   document.getElementById('os-data-prevista').value = '';
   document.getElementById('os-observacoes').value = '';
@@ -3689,6 +3614,8 @@ function openOSModal(osId){
   }
 
   updateOSTotal();
+  wzDirty = false;
+  wzShow(1);
   openModal('os-modal-overlay');
 }
 
@@ -3723,6 +3650,7 @@ function onOSClientChange(){
   const isPJ = getTipoPessoa(c.cpfcnpj) === 'PJ';
   pjFields.style.display = isPJ ? 'block' : 'none';
   atualizarVisibilidadeChecklist();
+  if(typeof wzRefresh === 'function') wzRefresh();
 }
 
 
@@ -4017,8 +3945,99 @@ function updateOSTotal(){
   document.getElementById('os-total-display').textContent = formatCurrency(total);
 }
 
+/* ---------- Wizard de abertura de OS (etapas com salvamento parcial) ---------- */
+const WZ_TOTAL = 5;
+let wzCurrent = 1, wzDirty = false, wzBusy = false;
+
+function wzOsExiste(){ return !!document.getElementById('os-id').value; }
+
+function wzEstado(){
+  const v = id => ((document.getElementById(id) || {}).value || '').trim();
+  const aparelho = v('os-aparelho') || v('ac-aparelho-input');
+  const clWrap = document.getElementById('os-checklist-wrap');
+  const clOculto = clWrap && clWrap.style.display === 'none';
+  const clRespondidos = document.querySelectorAll('#os-checklist-wrap input[type=radio]:checked').length;
+  return {
+    1: !!(v('os-cliente-id') && v('os-chamado')),
+    2: !!(aparelho && v('os-imei') && v('os-defeito') && (clOculto || clRespondidos >= 20)),
+    3: !!v('os-diagnostico'),
+    4: !!(parseFloat(v('os-logistica-pecas')) || parseFloat(v('os-logistica-equipamento')) || parseFloat(v('os-horas-servico')) || parseFloat(v('os-custo-horas'))),
+    5: wzOsExiste() && v('os-status') !== 'Aguardando aparelho' && !!v('os-data-prevista')
+  };
+}
+
+function wzRefresh(){
+  const est = wzEstado();
+  document.querySelectorAll('#wz-steps .wz-step').forEach(b => {
+    const n = parseInt(b.dataset.go);
+    const ativo = n === wzCurrent;
+    b.classList.toggle('active', ativo);
+    b.classList.toggle('done', !ativo && !!est[n]);
+    b.querySelector('.wz-num').textContent = (!ativo && est[n]) ? '✓' : String(n);
+  });
+}
+
+function wzShow(n){
+  wzCurrent = n;
+  document.querySelectorAll('#os-modal-overlay fieldset[data-step]').forEach(f => {
+    f.style.display = (parseInt(f.dataset.step) === n) ? '' : 'none';
+  });
+  const ultima = n === WZ_TOTAL;
+  document.getElementById('wz-btn-back').style.display = n === 1 ? 'none' : '';
+  document.getElementById('wz-btn-exit').style.display = ultima ? 'none' : '';
+  document.getElementById('wz-btn-next').textContent = ultima ? 'Concluir e salvar' : 'Salvar e continuar →';
+  wzRefresh();
+  const ov = document.getElementById('os-modal-overlay');
+  ov.scrollTop = 0;
+  const md = ov.querySelector('.modal'); if(md) md.scrollTop = 0;
+}
+
+async function wzGo(n){
+  if(n === wzCurrent || wzBusy) return;
+  if(n > 1 && !wzOsExiste()){
+    // Primeiro salvamento: cria a OS já com o número
+    const ok = await saveOS({ level:1, close:false });
+    if(!ok) return;
+  } else if(wzOsExiste() && wzDirty){
+    const ok = await saveOS({ level:1, close:false, silent:true });
+    if(!ok) return;
+  }
+  wzShow(n);
+}
+function wzBack(){ wzGo(wzCurrent - 1); }
+async function wzNext(){
+  const ultima = wzCurrent === WZ_TOTAL;
+  const level = ultima ? 'full' : (wzCurrent >= 2 ? 2 : 1);
+  const ok = await saveOS({ level, close: ultima });
+  if(ok && !ultima) wzShow(wzCurrent + 1);
+}
+function wzSaveExit(){ saveOS({ level:1, close:true }); }
+function wzClose(){
+  if(wzDirty && !confirm('Há alterações não salvas nesta etapa. Sair mesmo assim?')) return;
+  wzDirty = false;
+  closeModal('os-modal-overlay');
+}
+document.addEventListener('DOMContentLoaded', () => {
+  const ov = document.getElementById('os-modal-overlay');
+  if(!ov) return;
+  const marca = () => { wzDirty = true; wzRefresh(); };
+  ov.addEventListener('input', marca);
+  ov.addEventListener('change', marca);
+});
+
 /* ---------- Salvar OS ---------- */
-async function saveOS(){
+// level: 1 = só cliente + chamado | 2 = exige aparelho (+ checklist) | 'full' = validação completa (última etapa)
+async function saveOS(opts){
+  if(wzBusy) return false;
+  wzBusy = true;
+  const btns = document.querySelectorAll('#wz-nav .btn');
+  btns.forEach(b => b.disabled = true);
+  try { return !!(await _saveOSInner(opts)); }
+  finally { wzBusy = false; btns.forEach(b => b.disabled = false); }
+}
+
+async function _saveOSInner(opts){
+  opts = Object.assign({ level:'full', close:true, silent:false }, opts || {});
   const clienteId = document.getElementById('os-cliente-id').value;
   const aparelho = document.getElementById('os-aparelho').value.trim() || document.getElementById('ac-aparelho-input').value.trim();
   const defeito = document.getElementById('os-defeito').value.trim();
@@ -4038,31 +4057,46 @@ async function saveOS(){
     return;
   }
 
-  if(!clienteId || !aparelho || !defeito){
-    showToast('Preencha os campos obrigatórios (*)', true);
+  const id = document.getElementById('os-id').value;
+  let status = document.getElementById('os-status').value;
+  const aparelhoCompleto = !!(aparelho && imei && defeito);
+  const dispensaAparelho = (status === 'Aguardando aparelho' || status === 'Cancelado');
+  const exigeAparelho = opts.level === 2 || (opts.level === 'full' && !dispensaAparelho);
+
+  if(!clienteId){
+    showToast('Selecione o cliente da lista.', true);
     return;
   }
   if(!chamado){
     showToast('O campo Chamado é obrigatório.', true);
     return;
   }
-  if(!imei){
-    showToast('O campo IMEI / Nº de série é obrigatório.', true);
-    return;
+  if(exigeAparelho){
+    if(!aparelho || !defeito){
+      showToast('Preencha modelo e defeito do aparelho. Se ele ainda não chegou, use "Salvar e sair".', true);
+      return;
+    }
+    if(!imei){
+      showToast('O campo IMEI / Nº de série é obrigatório.', true);
+      return;
+    }
   }
 
-  // Validar checklist (pular para clientes PJ ou quando há mais de 1 aparelho)
+  // Checklist (oculto para PJ ou quando há mais de 1 aparelho). Salva parcial; só exige completo quando o aparelho é exigido.
   const clWrapEl = document.getElementById('os-checklist-wrap');
   const checklistOculto = clWrapEl && clWrapEl.style.display === 'none';
   const checklist = {};
-  let clIncompleto = false;
-  if(!checklistOculto){
-    const clNames = ['cl-liga','cl-carrega','cl-display','cl-touch','cl-vidro','cl-tampa','cl-camtraseira','cl-camfrontal','cl-faceid','cl-biometria','cl-microfone','cl-altofalante','cl-auricular','cl-sinal','cl-wifi','cl-bluetooth','cl-sensor','cl-gaveta','cl-power','cl-volume'];
+  const clNames = ['cl-liga','cl-carrega','cl-display','cl-touch','cl-vidro','cl-tampa','cl-camtraseira','cl-camfrontal','cl-faceid','cl-biometria','cl-microfone','cl-altofalante','cl-auricular','cl-sinal','cl-wifi','cl-bluetooth','cl-sensor','cl-gaveta','cl-power','cl-volume'];
+  if(checklistOculto){
+    const oAtual = id ? state.os.find(x => x.id === id) : null;
+    Object.assign(checklist, (oAtual && oAtual.checklist) || {});
+  } else {
+    let clIncompleto = false;
     clNames.forEach(n => {
       const checked = document.querySelector(`input[name="${n}"]:checked`);
-      if(!checked){ clIncompleto = true; } else { checklist[n] = checked.value; }
+      if(checked){ checklist[n] = checked.value; } else { clIncompleto = true; }
     });
-    if(clIncompleto){
+    if(exigeAparelho && clIncompleto){
       document.getElementById('checklist-error').style.display = 'block';
       document.getElementById('checklist-error').scrollIntoView({ behavior:'smooth', block:'center' });
       showToast('Preencha todos os itens do checklist.', true);
@@ -4131,8 +4165,9 @@ async function saveOS(){
   const horasServico = parseFloat(document.getElementById('os-horas-servico').value) || 0;
   const custoHoras = parseFloat(document.getElementById('os-custo-horas').value) || 0;
 
-  const id = document.getElementById('os-id').value;
-  const status = document.getElementById('os-status').value;
+  // Aparelho completo numa OS "Aguardando aparelho" => passa automaticamente para "Aberto" (recebido)
+  let transicaoAuto = false;
+  if(status === 'Aguardando aparelho' && aparelhoCompleto){ status = 'Aberto'; transicaoAuto = true; }
   const dataEntrada = document.getElementById('os-data-entrada').value || todayISO();
   const dataPrevista = document.getElementById('os-data-prevista').value;
 
@@ -4181,23 +4216,27 @@ async function saveOS(){
       const oldStatus = o.status;
       const oldParts  = o.parts;
 
-      oldParts.forEach(p => adjustStock(p.stockId, p.qtd));
-      parts.forEach(p => adjustStock(p.stockId, -p.qtd));
-
       if(oldStatus !== status){
-        try {
-          const comentario = await pedirComentarioStatus(oldStatus, status);
-          const texto = `Status alterado de "${oldStatus}" para "${status}".` +
-            (comentario ? ` Obs: ${comentario}` : '');
-          addHistoryEntry(id, texto);
-        } catch(e) {
-          // Usuário cancelou — reverter status no select
-          document.getElementById('os-status').value = oldStatus;
-          return;
+        if(transicaoAuto){
+          addHistoryEntry(id, `Aparelho recebido. Status alterado de "${oldStatus}" para "${status}".`);
+        } else {
+          try {
+            const comentario = await pedirComentarioStatus(oldStatus, status);
+            const texto = `Status alterado de "${oldStatus}" para "${status}".` +
+              (comentario ? ` Obs: ${comentario}` : '');
+            addHistoryEntry(id, texto);
+          } catch(e) {
+            // Usuário cancelou — reverter status no select (antes de mexer no estoque)
+            document.getElementById('os-status').value = oldStatus;
+            return;
+          }
         }
-      } else {
+      } else if(opts.close){
         addHistoryEntry(id, 'Ordem de serviço atualizada.');
       }
+
+      oldParts.forEach(p => adjustStock(p.stockId, p.qtd));
+      parts.forEach(p => adjustStock(p.stockId, -p.qtd));
 
       const payload = osData(id, o.numero, state.history[id] || []);
       await sbPatch('ordens_servico', 'id', id, payload);
@@ -4205,6 +4244,7 @@ async function saveOS(){
       Object.assign(o, {
         clienteId, clienteNome: nome, clienteTelefone: telefone, aparelho,
         chamado: payload.chamado, imei: payload.imei,
+        centroCusto, chamadoCliente, solicitante,
         defeito, senha: payload.senha, checklist,
         acessorios: payload.acessorios,
         diagnostico: payload.diagnostico,
@@ -4215,7 +4255,7 @@ async function saveOS(){
         historico: state.history[id] || []
       });
 
-      showToast(`OS #${o.numero} atualizada com sucesso.`);
+      if(!opts.silent) showToast(opts.close ? `OS #${o.numero} atualizada com sucesso.` : 'Etapa salva.');
 
     } else {
       // Nova OS
@@ -4223,7 +4263,7 @@ async function saveOS(){
       const newId  = 'os' + Date.now();
 
       parts.forEach(p => adjustStock(p.stockId, -p.qtd));
-      addHistoryEntry(newId, 'OS criada. Aparelho recebido.');
+      addHistoryEntry(newId, aparelhoCompleto ? 'OS criada. Aparelho recebido.' : 'OS criada. Aguardando chegada do aparelho.');
 
       const payload = osData(newId, numero, state.history[newId] || []);
       await sbPost('ordens_servico', payload);
@@ -4244,16 +4284,22 @@ async function saveOS(){
         historico: state.history[newId] || []
       });
 
-      showToast(`OS #${numero} criada com sucesso.`);
+      // A partir daqui o modal passa a editar a OS recém-criada (evita duplicar no próximo salvamento)
+      document.getElementById('os-id').value = newId;
+      document.getElementById('os-modal-title').textContent = `Editar OS #${numero}`;
+      showToast(opts.close ? `OS #${numero} criada com sucesso.` : `OS #${numero} criada e salva.`);
     }
   } catch(e) {
     showToast('Erro ao salvar OS: ' + e.message, true);
     return;
   }
 
-  closeModal('os-modal-overlay');
+  document.getElementById('os-status').value = status;
+  wzDirty = false;
   renderOSTable();
   renderDashboard();
+  if(opts.close){ closeModal('os-modal-overlay'); } else { wzRefresh(); }
+  return true;
 }
 
 /* ---------- Aparelhos extras ---------- */
@@ -4891,6 +4937,7 @@ function viewOS(osId){
           <div style="margin-top:14px;">
             <label>Atualizar status rapidamente</label>
             <select id="quick-status-select" onchange="quickUpdateStatus('${o.id}', this.value)">
+              <option ${o.status==='Aguardando aparelho'?'selected':''}>Aguardando aparelho</option>
               <option ${o.status==='Aberto'?'selected':''}>Aberto</option>
               <option ${o.status==='Aguardando aprovação'?'selected':''}>Aguardando aprovação</option>
               <option ${o.status==='Aguardando peça'?'selected':''}>Aguardando peça</option>
@@ -4954,6 +5001,7 @@ function printOS(){
   const numero = parseInt(match[1]);
   const o = state.os.find(x => x.numero === numero);
   if(!o) { window.print(); return; }
+  if(!o.aparelho || !o.imei){ showToast('Cadastre o aparelho (etapa 2 da OS) antes de imprimir.', true); return; }
 
   const cli = state.clients.find(c => c.id === o.clienteId) || {};
 
@@ -7115,559 +7163,6 @@ function verCotacaoHistorico(idx){
   if(resultadoBody) resultadoBody.style.display = 'block';
   window.scrollTo({ top: 0, behavior: 'smooth' });
 }
-
-/* =========================================================
-   MÓDULO: COLETOR DE IMEI
-   Leitura por OCR (Tesseract.js) do texto "IMEI: ..." impresso na
-   etiqueta. A foto vem da câmera NATIVA do celular (input file com
-   capture="environment"), não de um stream de vídeo ao vivo — isso
-   dá foco/zoom automáticos do app de câmera do aparelho, que é mais
-   confiável do que o autofoco de um <video> embutido na página.
-   A leitura gráfica de código de barras/Data Matrix (ZXing) foi
-   removida por não funcionar de forma confiável nas etiquetas
-   testadas; só o caminho OCR + digitação manual permanece.
-   Lote avulso, sem vínculo com cliente/OS e sem gravação no
-   Supabase — persiste só localmente (localStorage) como
-   rascunho da sessão, e é exportado em CSV.
-   ========================================================= */
-
-const IMEI_STORAGE_KEY = 'mobitos_imei_collector_v1';
-let _imeiRecords = [];        // {id, imei, nota, ts, sinalizado, duplicados}
-let _imeiByValue = new Map(); // imei -> record.id
-let _imeiTarget = 850;
-let _imeiAudioCtx = null;
-
-function _imeiLoadState(){
-  try{
-    const raw = localStorage.getItem(IMEI_STORAGE_KEY);
-    if(!raw) return;
-    const parsed = JSON.parse(raw);
-    if(parsed && Array.isArray(parsed.records)){
-      _imeiRecords = parsed.records;
-      _imeiByValue = new Map();
-      _imeiRecords.forEach(r => _imeiByValue.set(r.imei, r.id));
-    }
-    if(parsed && typeof parsed.target === 'number' && parsed.target > 0){
-      _imeiTarget = parsed.target;
-    }
-  }catch(e){ /* localStorage indisponível — segue só em memória */ }
-}
-function _imeiSaveState(){
-  try{
-    localStorage.setItem(IMEI_STORAGE_KEY, JSON.stringify({ records: _imeiRecords, target: _imeiTarget }));
-  }catch(e){ /* ignora falha de storage */ }
-}
-
-function initImeiPage(){
-  _imeiLoadState();
-  renderImeiStats();
-  renderImeiTable();
-}
-
-/* ---------- feedback sonoro ---------- */
-function _imeiEnsureAudio(){
-  if(!_imeiAudioCtx){
-    try{ _imeiAudioCtx = new (window.AudioContext || window.webkitAudioContext)(); }catch(e){}
-  }
-  return _imeiAudioCtx;
-}
-function _imeiBeep(freq, durMs, delayMs){
-  const ctx = _imeiEnsureAudio();
-  if(!ctx) return;
-  setTimeout(() => {
-    try{
-      const osc = ctx.createOscillator();
-      const gain = ctx.createGain();
-      osc.frequency.value = freq;
-      osc.type = 'sine';
-      gain.gain.setValueAtTime(0.0001, ctx.currentTime);
-      gain.gain.exponentialRampToValueAtTime(0.15, ctx.currentTime + 0.01);
-      gain.gain.exponentialRampToValueAtTime(0.0001, ctx.currentTime + durMs/1000);
-      osc.connect(gain).connect(ctx.destination);
-      osc.start();
-      osc.stop(ctx.currentTime + durMs/1000 + 0.02);
-    }catch(e){}
-  }, delayMs || 0);
-}
-function _imeiFeedback(kind){
-  if(kind === 'ok') _imeiBeep(880, 90, 0);
-  else if(kind === 'dup'){ _imeiBeep(520, 70, 0); _imeiBeep(520, 70, 130); }
-  else if(kind === 'bad') _imeiBeep(220, 160, 0);
-}
-
-/* ---------- estatísticas e tabela ---------- */
-function renderImeiStats(){
-  const total = _imeiRecords.length;
-  const dup = _imeiRecords.reduce((n, r) => n + (r.duplicados || 0), 0);
-  const pct = _imeiTarget > 0 ? Math.min(100, Math.round((total / _imeiTarget) * 100)) : 0;
-  const elTotal = document.getElementById('imei-stat-total');
-  const elTarget = document.getElementById('imei-stat-target');
-  const elPct = document.getElementById('imei-stat-pct');
-  const elDup = document.getElementById('imei-stat-dup');
-  const elFail = document.getElementById('imei-stat-fail');
-  if(elTotal) elTotal.textContent = total;
-  if(elTarget) elTarget.textContent = _imeiTarget;
-  if(elPct) elPct.textContent = pct + '%';
-  if(elDup) elDup.textContent = dup;
-  if(elFail) elFail.textContent = _imeiFailCount;
-}
-
-function _imeiFmtHora(ts){
-  const d = new Date(ts);
-  const p = n => String(n).padStart(2, '0');
-  return p(d.getHours()) + ':' + p(d.getMinutes()) + ':' + p(d.getSeconds());
-}
-
-function renderImeiTable(){
-  const body = document.getElementById('imei-table-body');
-  if(!body) return;
-  const q = (document.getElementById('imei-filter')?.value || '').toLowerCase().trim();
-
-  let list = [..._imeiRecords].reverse();
-  if(q){
-    list = list.filter(r => r.imei.toLowerCase().includes(q) || (r.nota || '').toLowerCase().includes(q));
-  }
-
-  if(list.length === 0){
-    body.innerHTML = `<tr class="empty-row"><td colspan="5">${_imeiRecords.length === 0 ? 'Nenhum IMEI coletado ainda.' : 'Nenhum resultado para esse filtro.'}</td></tr>`;
-    return;
-  }
-
-  body.innerHTML = list.map((r, i) => `
-    <tr data-imei-id="${r.id}">
-      <td class="mono">${_imeiRecords.indexOf(r) + 1}</td>
-      <td class="mono" style="${r.sinalizado ? 'color:var(--yellow);' : ''}">${escapeHtml(r.imei)}${r.sinalizado ? ' ⚠' : ''}</td>
-      <td>
-        <input type="text" value="${escapeHtml(r.nota || '')}" placeholder="modelo, IMEI 2..."
-          style="width:100%; padding:6px 8px; font-size:12.5px; background:var(--panel-2);"
-          onchange="editarNotaImei('${r.id}', this.value)">
-      </td>
-      <td class="mono">${_imeiFmtHora(r.ts)}</td>
-      <td>
-        <button class="btn btn-ghost btn-sm" onclick="removerImei('${r.id}')">&times;</button>
-      </td>
-    </tr>
-  `).join('');
-}
-
-/* ---------- operações sobre a lista ---------- */
-function _imeiAddRecord(imei, opts){
-  opts = opts || {};
-  const id = 'imei' + Date.now() + Math.random().toString(36).slice(2, 7);
-  _imeiRecords.push({ id, imei, nota: opts.nota || '', ts: Date.now(), sinalizado: !!opts.sinalizado, duplicados: 0 });
-  _imeiByValue.set(imei, id);
-  _imeiSaveState();
-  renderImeiStats();
-  renderImeiTable();
-}
-
-function removerImei(id){
-  const idx = _imeiRecords.findIndex(r => r.id === id);
-  if(idx === -1) return;
-  if(!confirm('Remover este IMEI da lista?')) return;
-  const removed = _imeiRecords[idx];
-  _imeiRecords.splice(idx, 1);
-  if(_imeiByValue.get(removed.imei) === id) _imeiByValue.delete(removed.imei);
-  _imeiSaveState();
-  renderImeiStats();
-  renderImeiTable();
-  showToast('IMEI removido: ' + removed.imei);
-}
-
-function editarNotaImei(id, valor){
-  const r = _imeiRecords.find(x => x.id === id);
-  if(!r) return;
-  r.nota = valor;
-  _imeiSaveState();
-}
-
-function _imeiMarkDuplicate(imei){
-  const id = _imeiByValue.get(imei);
-  const r = _imeiRecords.find(x => x.id === id);
-  if(r){
-    r.duplicados = (r.duplicados || 0) + 1;
-    _imeiSaveState();
-    renderImeiStats();
-  }
-}
-
-function editarMetaImei(ev){
-  if(ev) ev.preventDefault();
-  const val = prompt('Nova meta de aparelhos:', _imeiTarget);
-  if(val === null) return;
-  const n = parseInt(val, 10);
-  if(!n || n <= 0){ showToast('Informe um número válido.', true); return; }
-  _imeiTarget = n;
-  _imeiSaveState();
-  renderImeiStats();
-}
-
-function limparImeiLista(){
-  if(_imeiRecords.length === 0) return;
-  if(!confirm('Limpar todos os ' + _imeiRecords.length + ' IMEIs coletados nesta lista? Essa ação não pode ser desfeita.')) return;
-  _imeiRecords = [];
-  _imeiByValue.clear();
-  _imeiSaveState();
-  renderImeiStats();
-  renderImeiTable();
-  showToast('Lista de IMEIs limpa.');
-}
-
-/* ---------- diagnóstico ---------- */
-const _imeiDiag = { tentativas: 0, resolucao: '—', ultimoErro: '—', ultimoTextoOcr: '—' };
-function _imeiUpdateDiagPanel(){
-  const el = document.getElementById('imei-diag');
-  if(!el) return;
-  el.textContent =
-    'Resolução da foto: ' + _imeiDiag.resolucao + '\n' +
-    'Fotos processadas: ' + _imeiDiag.tentativas + '\n' +
-    'Último erro JS capturado: ' + _imeiDiag.ultimoErro + '\n' +
-    'Último texto bruto do OCR: ' + _imeiDiag.ultimoTextoOcr;
-}
-
-/* ---------- captura de fotos ----------
-   Dois modos, pra otimizar o tempo no lote de centenas de aparelhos:
-
-   1) Câmera ao vivo (beta): pede acesso à câmera UMA vez (getUserMedia) e
-      cada toque em "Tirar foto" usa a ImageCapture API (track.takePhoto())
-      pra tirar uma foto cheia, com o mesmo ciclo de autofoco de um app de
-      câmera nativo — sem abrir nenhum app/diálogo separado. Não depende de
-      gesto novo do navegador a cada foto, então é o modo mais rápido; só
-      funciona em navegadores com suporte a ImageCapture (Chrome/Android,
-      por ex. — não no Safari/iOS).
-
-   2) Foto nativa (fallback): abre o app de câmera do celular via
-      <input type=file capture="environment">, o que garante o melhor
-      autofoco possível em qualquer navegador, mas por segurança do
-      navegador só reabre sozinho quando o navegador permite (nem todos
-      permitem dar novo "click()" programático depois do "change" do input,
-      mesmo chamado na mesma função) — nesse caso é preciso tocar em
-      "Tirar outra foto" a cada etiqueta.
-
-   Em ambos, cada foto vira um item numa fila processada uma a uma pelo OCR
-   em segundo plano, sem travar a captura da próxima. IMEIs com 15 dígitos
-   e ainda não coletados entram direto na lista; casos ambíguos (dígitos
-   fora do padrão, ou nada reconhecido) também entram, sinalizados (⚠), pra
-   não perder o aparelho da fila — a conferência final fica pra tabela/CSV. */
-let _imeiContinuo = true;
-let _imeiQueue = [];       // canvases pendentes de OCR
-let _imeiQueueSeq = 0;
-let _imeiProcessing = false;
-let _imeiFailCount = 0;    // fotos em que nada foi reconhecido (sessão atual)
-let _imeiFeed = [];        // últimos resultados, pra feedback rápido em captura contínua
-let _imeiLastPreviewUrl = null;
-let _imeiLiveStream = null;
-let _imeiLiveTrack = null;
-let _imeiImageCapture = null;
-
-function _imeiLiveSuportada(){
-  return !!(navigator.mediaDevices && navigator.mediaDevices.getUserMedia && window.ImageCapture);
-}
-
-async function ligarCameraAoVivoImei(){
-  if(_imeiLiveStream) return;
-  if(!_imeiLiveSuportada()){
-    showToast('Este navegador não suporta câmera ao vivo — use a foto nativa abaixo.', true);
-    return;
-  }
-  try{
-    const stream = await navigator.mediaDevices.getUserMedia({
-      video: { facingMode: { ideal: 'environment' }, width: { ideal: 1920 }, height: { ideal: 1080 } }
-    });
-    _imeiLiveStream = stream;
-    _imeiLiveTrack = stream.getVideoTracks()[0];
-    try{
-      const caps = _imeiLiveTrack.getCapabilities ? _imeiLiveTrack.getCapabilities() : {};
-      if(caps.focusMode && caps.focusMode.includes('continuous')){
-        await _imeiLiveTrack.applyConstraints({ advanced: [{ focusMode: 'continuous' }] });
-      }
-    }catch(e){ /* nem todo navegador/câmera deixa controlar o foco — segue sem isso */ }
-    _imeiImageCapture = new ImageCapture(_imeiLiveTrack);
-
-    const video = document.getElementById('imei-live-video');
-    if(video){ video.srcObject = stream; video.style.display = 'block'; }
-    document.getElementById('imei-photo-preview').style.display = 'none';
-    document.getElementById('imei-photo-placeholder').style.display = 'none';
-    document.getElementById('imei-live-controls').style.display = 'flex';
-    document.getElementById('imei-native-controls').style.display = 'none';
-  }catch(err){
-    _imeiDiag.ultimoErro = (err && err.message) ? err.message : String(err);
-    _imeiUpdateDiagPanel();
-    showToast('Não foi possível acessar a câmera (permissão negada ou indisponível).', true);
-  }
-}
-
-function desligarCameraAoVivoImei(){
-  if(_imeiLiveStream) _imeiLiveStream.getTracks().forEach(t => t.stop());
-  _imeiLiveStream = null;
-  _imeiLiveTrack = null;
-  _imeiImageCapture = null;
-  const video = document.getElementById('imei-live-video');
-  if(video){ video.style.display = 'none'; video.srcObject = null; }
-  const liveControls = document.getElementById('imei-live-controls');
-  if(liveControls) liveControls.style.display = 'none';
-  if(!_imeiLastPreviewUrl){
-    document.getElementById('imei-photo-placeholder').style.display = 'block';
-  }
-}
-
-async function tirarFotoAoVivoImei(){
-  if(!_imeiImageCapture) return;
-  const seq = ++_imeiQueueSeq;
-  try{
-    const blob = await _imeiImageCapture.takePhoto();
-    const canvas = await _imeiFileParaCanvas(blob);
-    _imeiDiag.resolucao = canvas.width + 'x' + canvas.height;
-    _imeiQueue.push({ seq, canvas });
-    _imeiRefreshStatusLine();
-    _imeiProcessQueue();
-  }catch(err){
-    // alguns navegadores/câmeras falham no takePhoto — usa o quadro atual
-    // do preview de vídeo como alternativa, em vez de perder a foto
-    const video = document.getElementById('imei-live-video');
-    if(video && video.videoWidth){
-      const canvas = document.createElement('canvas');
-      canvas.width = video.videoWidth;
-      canvas.height = video.videoHeight;
-      canvas.getContext('2d').drawImage(video, 0, 0, canvas.width, canvas.height);
-      _imeiDiag.resolucao = canvas.width + 'x' + canvas.height;
-      _imeiQueue.push({ seq, canvas });
-      _imeiRefreshStatusLine();
-      _imeiProcessQueue();
-    } else {
-      _imeiDiag.ultimoErro = (err && err.message) ? err.message : String(err);
-      _imeiUpdateDiagPanel();
-      _imeiPushFeed(seq, 'erro', 'Foto #' + seq + ': falha ao capturar da câmera ao vivo.');
-    }
-  }
-}
-
-function dispararFotoImei(){
-  if(_imeiLiveStream) desligarCameraAoVivoImei();
-  const input = document.getElementById('imei-photo-input');
-  if(input) input.click();
-}
-
-function _imeiFileParaCanvas(file){
-  return new Promise((resolve, reject) => {
-    const img = new Image();
-    const url = URL.createObjectURL(file);
-    img.onload = () => {
-      // limita o maior lado a ~2000px: mantém nitidez suficiente pro OCR
-      // sem deixar o reconhecimento lento demais em fotos de 12+ MP
-      const maxSide = 2000;
-      const scale = Math.min(1, maxSide / Math.max(img.naturalWidth, img.naturalHeight));
-      const canvas = document.createElement('canvas');
-      canvas.width = Math.round(img.naturalWidth * scale);
-      canvas.height = Math.round(img.naturalHeight * scale);
-      canvas.getContext('2d').drawImage(img, 0, 0, canvas.width, canvas.height);
-      URL.revokeObjectURL(url);
-      resolve(canvas);
-    };
-    img.onerror = () => { URL.revokeObjectURL(url); reject(new Error('Não foi possível carregar a foto.')); };
-    img.src = url;
-  });
-}
-
-function _imeiSetPreview(url){
-  const preview = document.getElementById('imei-photo-preview');
-  const placeholder = document.getElementById('imei-photo-placeholder');
-  const video = document.getElementById('imei-live-video');
-  const liveControls = document.getElementById('imei-live-controls');
-  const nativeControls = document.getElementById('imei-native-controls');
-  if(_imeiLastPreviewUrl) URL.revokeObjectURL(_imeiLastPreviewUrl);
-  _imeiLastPreviewUrl = url;
-  if(video) video.style.display = 'none'; // foto nativa: sem preview ao vivo por trás
-  if(preview){ preview.src = url; preview.style.display = 'block'; }
-  if(placeholder) placeholder.style.display = 'none';
-  if(liveControls) liveControls.style.display = 'none';
-  if(nativeControls) nativeControls.style.display = 'flex';
-}
-
-function _imeiRefreshStatusLine(){
-  const el = document.getElementById('imei-ocr-status');
-  if(!el) return;
-  const pendentes = _imeiQueue.length + (_imeiProcessing ? 1 : 0);
-  el.textContent = pendentes > 0
-    ? 'Lendo foto(s)... ' + pendentes + ' na fila.'
-    : 'Tire uma foto nítida do texto "IMEI:" impresso na etiqueta.';
-}
-
-function _imeiPushFeed(seq, kind, text){
-  _imeiFeed.unshift({ seq, kind, text });
-  _imeiFeed = _imeiFeed.slice(0, 6);
-  const el = document.getElementById('imei-feed');
-  if(!el) return;
-  const cores = { ok: 'var(--green)', dup: 'var(--yellow)', revisar: 'var(--yellow)', falha: 'var(--red)', erro: 'var(--red)' };
-  el.innerHTML = _imeiFeed.map(f => `<div style="color:${cores[f.kind] || 'var(--text-faint)'};">${escapeHtml(f.text)}</div>`).join('');
-}
-
-async function onFotoImeiSelecionada(ev){
-  const file = ev.target.files && ev.target.files[0];
-  ev.target.value = ''; // permite fotografar de novo (inclusive repetir) em seguida
-  if(!file) return;
-
-  // Reabre a câmera JÁ, antes de qualquer await, pra aproveitar o gesto do
-  // usuário que acabou de tirar a foto — assim a próxima etiqueta pode ser
-  // fotografada enquanto esta ainda está na fila/sendo lida pelo OCR.
-  if(_imeiContinuo) dispararFotoImei();
-
-  const seq = ++_imeiQueueSeq;
-  _imeiSetPreview(URL.createObjectURL(file));
-
-  try{
-    const canvas = await _imeiFileParaCanvas(file);
-    _imeiDiag.resolucao = canvas.width + 'x' + canvas.height;
-    _imeiQueue.push({ seq, canvas });
-    _imeiRefreshStatusLine();
-    _imeiProcessQueue();
-  }catch(err){
-    _imeiDiag.ultimoErro = (err && err.message) ? err.message : String(err);
-    _imeiUpdateDiagPanel();
-    _imeiPushFeed(seq, 'erro', 'Foto #' + seq + ': não foi possível processar a imagem.');
-  }
-}
-
-/* ---------- OCR ---------- */
-let _imeiOcrWorker = null;
-
-async function _imeiGetOcrWorker(){
-  if(_imeiOcrWorker) return _imeiOcrWorker;
-  _imeiOcrWorker = await Tesseract.createWorker('eng');
-  return _imeiOcrWorker;
-}
-
-function _imeiExtractFirstCandidateFromText(text){
-  // Só o primeiro IMEI da etiqueta (IMEI 1) — em aparelhos dual chip, o segundo é ignorado de propósito.
-  // Etiquetas costumam imprimir o IMEI em blocos separados por barra/hífen/ponto (ex: "353335/86/152303/6"),
-  // e o OCR às vezes lê o "I" final de "IMEI" como "|", "1" ou "l" — por isso a extração é tolerante a isso
-  // e não depende de casar a palavra "IMEI" perfeitamente: pega o primeiro bloco de dígitos (com esses
-  // separadores no meio) que, ao remover tudo que não é dígito, resulta em 14–16 dígitos.
-  const re = /(\d[\d \/\-.]{10,28}\d)/g;
-  let m;
-  while((m = re.exec(text))){
-    const digits = m[1].replace(/\D/g, '');
-    if(digits.length >= 14 && digits.length <= 16) return digits;
-  }
-  return null;
-}
-
-/* ---------- fila de OCR (processa uma foto por vez, em segundo plano) ---------- */
-async function _imeiProcessQueue(){
-  if(_imeiProcessing) return;
-  const job = _imeiQueue.shift();
-  if(!job){ _imeiRefreshStatusLine(); return; }
-  _imeiProcessing = true;
-  _imeiRefreshStatusLine();
-  await _imeiProcessarFotoOcr(job.canvas, job.seq);
-  _imeiProcessing = false;
-  _imeiProcessQueue(); // segue pra próxima da fila, se houver
-}
-
-function _imeiHandleOcrResult(digits, seq){
-  if(!digits){
-    _imeiFailCount++;
-    renderImeiStats();
-    _imeiFeedback('bad');
-    _imeiPushFeed(seq, 'falha', 'Foto #' + seq + ': nenhum IMEI reconhecido — confira/digite manualmente.');
-    return;
-  }
-  if(_imeiByValue.has(digits)){
-    _imeiFeedback('dup');
-    _imeiMarkDuplicate(digits);
-    _imeiPushFeed(seq, 'dup', 'Foto #' + seq + ': já coletado — ' + digits);
-    return;
-  }
-  const sinalizado = digits.length !== 15;
-  _imeiAddRecord(digits, { sinalizado });
-  _imeiFeedback(sinalizado ? 'bad' : 'ok');
-  _imeiPushFeed(seq, sinalizado ? 'revisar' : 'ok',
-    'Foto #' + seq + ': ' + digits + (sinalizado ? ' (⚠ ' + digits.length + ' dígitos — conferir)' : ' — adicionado'));
-}
-
-async function _imeiProcessarFotoOcr(canvas, seq){
-  if(typeof Tesseract === 'undefined'){
-    showToast('Não foi possível carregar o leitor de texto. Verifique a conexão e recarregue a página.', true);
-    return;
-  }
-  try{
-    const worker = await _imeiGetOcrWorker();
-    const { data } = await worker.recognize(canvas);
-    const found = _imeiExtractFirstCandidateFromText(data.text || '');
-    _imeiDiag.tentativas++;
-    _imeiDiag.ultimoTextoOcr = JSON.stringify((data.text || '(vazio)').slice(0, 300));
-    _imeiUpdateDiagPanel();
-    _imeiHandleOcrResult(found, seq);
-  }catch(err){
-    _imeiDiag.ultimoErro = (err && err.message) ? err.message : String(err);
-    _imeiUpdateDiagPanel();
-    _imeiFeedback('bad');
-    _imeiPushFeed(seq, 'erro', 'Foto #' + seq + ': falha ao processar (confira a conexão).');
-  }finally{
-    _imeiRefreshStatusLine();
-  }
-}
-
-/* ---------- entrada manual ---------- */
-function adicionarImeiManual(){
-  const input = document.getElementById('imei-manual-input');
-  const raw = input.value.trim();
-  if(!raw) return;
-  const digits = raw.replace(/\D/g, '');
-  if(digits.length < 8){
-    showToast('Digite um IMEI válido (14–15 dígitos).', true);
-    return;
-  }
-  if(_imeiByValue.has(digits)){
-    showToast('Esse IMEI já está na lista.', true);
-    _imeiMarkDuplicate(digits);
-    input.value = '';
-    return;
-  }
-  _imeiAddRecord(digits, { sinalizado: digits.length !== 15 });
-  input.value = '';
-  _imeiFeedback(digits.length === 15 ? 'ok' : 'bad');
-  showToast('IMEI adicionado: ' + digits);
-}
-
-/* ---------- exportação CSV ---------- */
-function exportarImeiCSV(){
-  if(_imeiRecords.length === 0){
-    showToast('Nada para exportar ainda.', true);
-    return;
-  }
-  const linhas = ['IMEI;Observacao;DataHora'];
-  _imeiRecords.forEach(r => {
-    const dt = new Date(r.ts).toLocaleString('pt-BR');
-    const nota = (r.nota || '').replace(/;/g, ',');
-    linhas.push(r.imei + ';' + nota + ';' + dt);
-  });
-  const csv = '﻿' + linhas.join('\r\n');
-  const stamp = new Date().toISOString().slice(0, 16).replace(/[-:T]/g, '');
-  const filename = 'imeis_' + stamp + '.csv';
-
-  try{
-    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = filename;
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-    setTimeout(() => URL.revokeObjectURL(url), 2000);
-    showToast('CSV exportado: ' + filename);
-  }catch(err){
-    showToast('Não foi possível gerar o CSV neste navegador.', true);
-  }
-}
-
-document.addEventListener('visibilitychange', () => {
-  // libera a câmera ao vivo ao esconder a aba (evita bateria/câmera presa em
-  // segundo plano); o usuário liga de novo ao voltar
-  if(document.hidden && _imeiLiveStream) desligarCameraAoVivoImei();
-});
-
 </script>
 
 </body>
