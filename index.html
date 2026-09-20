@@ -946,6 +946,23 @@
   .ae-checklist-wrap fieldset > div[style*="grid-template-columns"]{ grid-template-columns:1fr !important; }
 }
 </style>
+<style>
+/* Janelas abertas de dentro da OS (comentário de status, novo cliente) precisam ficar acima dela no celular */
+#status-comentario-overlay, #client-modal-overlay{ z-index:170; }
+/* Fotos dos aparelhos */
+.fotos-box{ margin:0 0 14px; padding-bottom:12px; border-bottom:1px dashed var(--border); }
+.fotos-titulo{ font-size:12px; font-weight:700; color:var(--text-dim); text-transform:uppercase; letter-spacing:0.05em; }
+.fotos-cont{ font-weight:400; }
+.fotos-grid{ display:flex; flex-wrap:wrap; gap:8px; margin:8px 0; }
+.foto-th{ position:relative; width:78px; height:78px; border-radius:8px; overflow:hidden; border:1px solid var(--border); background:var(--panel-2); }
+.foto-th img{ width:100%; height:100%; object-fit:cover; display:block; cursor:zoom-in; }
+.foto-x{ position:absolute; top:2px; right:2px; width:24px; height:24px; border-radius:50%; border:none; background:rgba(0,0,0,.65); color:#fff; font-size:16px; line-height:1; cursor:pointer; }
+.foto-add{ display:inline-flex; align-items:center; gap:6px; cursor:pointer; }
+.fotos-box.enviando{ opacity:.55; pointer-events:none; }
+.foto-saida-aparelho{ margin-bottom:6px; }
+.foto-saida-aparelho > .foto-titulo-ap{ font-size:12px; font-weight:700; color:var(--accent); text-transform:uppercase; letter-spacing:0.05em; }
+#os-modal-overlay[data-wz="6"] .fotos-box[data-stage="entrada"]{ display:none; }
+</style>
 </head>
 <body>
 
@@ -1521,6 +1538,7 @@
       </div>
 </div><!-- fim cad -->
 <div class="dv-sec" data-sec="rec">
+      <div class="fotos-box" data-did="principal" data-stage="entrada"></div>
       <!-- CHECKLIST -->
       <div id="os-checklist-wrap">
       <fieldset style="border:1px solid var(--border); border-radius:var(--radius); padding:14px 18px; margin-bottom:4px;">
@@ -1775,6 +1793,11 @@
         <label>Observações</label>
         <textarea id="os-observacoes" placeholder="Observações adicionais sobre a OS..."></textarea>
       </div>
+    </fieldset>
+
+    <fieldset data-step="6">
+      <legend>Fotos de saída <span style="font-weight:400; font-size:11px; color:var(--text-dim);">(tire ao finalizar o reparo)</span></legend>
+      <div id="fotos-saida-wrap"></div>
     </fieldset>
 
     <div class="wz-nav" id="wz-nav">
@@ -2317,6 +2340,9 @@
 </div><!-- fim modal client-modal-overlay -->
 
 <!-- ===================== TOASTS ===================== -->
+<div id="foto-lightbox" onclick="fotoFechar()" style="display:none; position:fixed; inset:0; z-index:400; background:rgba(0,0,0,.88); align-items:center; justify-content:center; padding:16px; cursor:zoom-out;">
+  <img alt="" style="max-width:100%; max-height:100%; border-radius:8px;">
+</div>
 <div class="toast-wrap" id="toast-wrap"></div>
 
 <!-- ===================== MODAL RELATÓRIOS/DADOS ===================== -->
@@ -2595,6 +2621,9 @@ async function loadFromSupabase(){
       fornecedor: s.fornecedor || '', pedido: s.pedido || '', dataPedido: s.data_pedido || ''
     }));
 
+    // A coluna 'fotos' precisa existir no Supabase; sem ela o recurso de fotos fica desligado
+    state.colunaFotos = os.length ? ('fotos' in os[0]) : true;
+
     state.os = os.map(o => ({
       id: o.id, numero: o.numero,
       clienteId: o.cliente_id, clienteNome: o.cliente_nome || '',
@@ -2607,6 +2636,7 @@ async function loadFromSupabase(){
       diagnostico: o.diagnostico || '',
       parts: o.parts || [],
       aparelhosExtras: o.aparelhos_extras || [],
+      fotos: o.fotos || null,
       maoObra: o.mao_obra || 0, total: o.total || 0,
       logisticaPecas: o.logistica_pecas || 0,
       horasServico: o.horas_servico || 0,
@@ -3633,6 +3663,11 @@ function openOSModal(osId){
     document.getElementById('os-modal-title').textContent = 'Nova ordem de serviço';
   }
 
+  {
+    const oF = osId ? state.os.find(x => x.id === osId) : null;
+    wzFotos = oF && oF.fotos && oF.fotos.ap ? JSON.parse(JSON.stringify(oF.fotos.ap)) : {};
+    wzFotosExigir = !!(oF && oF.fotos && oF.fotos.exigir);
+  }
   updateOSTotal();
   wzDirty = false;
   wzShow(1);
@@ -3965,6 +4000,177 @@ function updateOSTotal(){
   document.getElementById('os-total-display').textContent = formatCurrency(total);
 }
 
+/* ---------- Fotos dos aparelhos (entrada e saída) — Supabase Storage, bucket "fotos-os" ---------- */
+let wzFotos = {};            // { idDoAparelho: { entrada:[{url,path,ts}], saida:[...] } }
+let wzFotosExigir = false;   // OS criada já com fotos obrigatórias (OS antigas: false)
+
+function fotosDisponivel(){ return state.colunaFotos !== false; }
+function fotosAtivas(){ return fotosDisponivel() && wzFotosExigir; }
+function fotosDe(did, stage){ return ((wzFotos[did] || {})[stage]) || []; }
+
+function wzDispositivos(){
+  const out = [{ id:'principal', n:1, nome:(document.getElementById('ac-aparelho-input').value || '').trim() }];
+  wzCartoesExtras().forEach((c, i) => out.push({ id:c.dataset.did, n:i + 2, nome:c.querySelector('.ae-modelo').value.trim() }));
+  return out;
+}
+
+function fotoComprimir(file, maxLado, qualidade){
+  maxLado = maxLado || 1280; qualidade = qualidade || 0.78;
+  return new Promise((resolve, reject) => {
+    const url = URL.createObjectURL(file);
+    const img = new Image();
+    img.onload = () => {
+      const esc = Math.min(1, maxLado / Math.max(img.naturalWidth, img.naturalHeight));
+      const w = Math.max(1, Math.round(img.naturalWidth * esc)), h = Math.max(1, Math.round(img.naturalHeight * esc));
+      const cv = document.createElement('canvas'); cv.width = w; cv.height = h;
+      cv.getContext('2d').drawImage(img, 0, 0, w, h);
+      URL.revokeObjectURL(url);
+      cv.toBlob(b => b ? resolve(b) : reject(new Error('Não foi possível processar a imagem.')), 'image/jpeg', qualidade);
+    };
+    img.onerror = () => { URL.revokeObjectURL(url); reject(new Error('Arquivo de imagem inválido.')); };
+    img.src = url;
+  });
+}
+
+async function fotoEnviar(blob, path){
+  const r = await fetch(`${SB_URL}/storage/v1/object/fotos-os/${path}`, {
+    method:'POST',
+    headers:{ apikey:SB_KEY, Authorization:'Bearer ' + SB_KEY, 'Content-Type':'image/jpeg', 'x-upsert':'false' },
+    body: blob
+  });
+  if(!r.ok) throw new Error(`upload falhou (${r.status}). O bucket "fotos-os" existe e tem as políticas de envio?`);
+  return `${SB_URL}/storage/v1/object/public/fotos-os/${path}`;
+}
+async function fotoApagarStorage(path){
+  try { await fetch(`${SB_URL}/storage/v1/object/fotos-os/${path}`, { method:'DELETE', headers:{ apikey:SB_KEY, Authorization:'Bearer ' + SB_KEY } }); } catch(e){}
+}
+function fotoNovoPath(numero, did, stage){
+  return `os-${numero}/${did}/${stage}-${Date.now()}-${Math.random().toString(36).slice(2, 7)}.jpg`;
+}
+
+// Foto adicionada dentro do assistente da OS
+async function fotoSelecionar(input, did, stage){
+  const files = [...input.files]; input.value = '';
+  if(!files.length) return;
+  const osId = document.getElementById('os-id').value;
+  const o = osId ? state.os.find(x => x.id === osId) : null;
+  if(!o){ showToast('Salve a OS (etapa Cliente) antes de adicionar fotos.', true); return; }
+  const box = input.closest('.fotos-box'); if(box) box.classList.add('enviando');
+  showToast('Enviando foto...');
+  try {
+    for(const f of files){
+      const blob = await fotoComprimir(f);
+      const url = await fotoEnviar(blob, fotoNovoPath(o.numero, did, stage));
+      if(!wzFotos[did]) wzFotos[did] = { entrada:[], saida:[] };
+      if(!wzFotos[did][stage]) wzFotos[did][stage] = [];
+      wzFotos[did][stage].push({ url, path:url.split('/object/public/fotos-os/')[1], ts:Date.now() });
+    }
+    wzDirty = true;
+    await saveOS({ level:1, close:false, silent:true, preservarStatus:true });   // grava as fotos na OS na hora
+    showToast('Foto salva.');
+  } catch(e){
+    showToast('Erro ao enviar foto: ' + e.message, true);
+  } finally {
+    fotosRender(); wzRefresh();
+  }
+}
+
+async function fotoRemover(did, stage, idx){
+  const arr = fotosDe(did, stage); const f = arr[idx];
+  if(!f) return;
+  if(!confirm('Remover esta foto?')) return;
+  arr.splice(idx, 1);
+  fotoApagarStorage(f.path);
+  fotosRender(); wzDirty = true;
+  await saveOS({ level:1, close:false, silent:true, preservarStatus:true });
+  fotosRender(); wzRefresh();
+}
+
+function fotosBoxHtml(did, stage, titulo, obrigatoria){
+  if(!fotosDisponivel()) return '<div class="hint">Fotos indisponíveis: falta criar a coluna "fotos" na tabela ordens_servico do Supabase.</div>';
+  const fs = fotosDe(did, stage);
+  return `<div class="fotos-titulo">${titulo}${obrigatoria ? ' <span style="color:var(--red);">*</span>' : ''} <span class="fotos-cont">(${fs.length})</span></div>
+    <div class="fotos-grid">${fs.map((f, i) => `<div class="foto-th"><img src="${f.url}" alt="" loading="lazy" onclick="fotoAbrir('${f.url}')"><button type="button" class="foto-x" onclick="fotoRemover('${did}','${stage}',${i})">&times;</button></div>`).join('')}</div>
+    <label class="btn btn-sm foto-add">📷 Adicionar foto<input type="file" accept="image/*" multiple hidden onchange="fotoSelecionar(this,'${did}','${stage}')"></label>`;
+}
+
+function fotosRender(){
+  const obrig = fotosAtivas();
+  document.querySelectorAll('#os-modal-overlay .fotos-box').forEach(box => {
+    let did = box.dataset.did;
+    if(!did){ const c = box.closest('.aparelho-extra-card'); did = c ? c.dataset.did : 'principal'; }
+    const stage = box.dataset.stage;
+    box.innerHTML = fotosBoxHtml(did, stage, stage === 'entrada' ? 'Fotos de entrada (como o aparelho chegou)' : 'Fotos de saída (como o aparelho saiu)', obrig);
+  });
+}
+function fotosRenderSaida(){
+  const wrap = document.getElementById('fotos-saida-wrap'); if(!wrap) return;
+  wrap.innerHTML = wzDispositivos().map(d => `<div class="foto-saida-aparelho">
+      <div class="foto-titulo-ap">Aparelho ${d.n}${d.nome ? ' — ' + escapeHtml(d.nome) : ''}</div>
+      <div class="fotos-box" data-did="${d.id}" data-stage="saida" style="border:none; margin:4px 0 0; padding:0;"></div>
+    </div>`).join('');
+  fotosRender();
+}
+
+function fotoAbrir(url){
+  const lb = document.getElementById('foto-lightbox');
+  lb.querySelector('img').src = url; lb.style.display = 'flex';
+}
+function fotoFechar(){ document.getElementById('foto-lightbox').style.display = 'none'; }
+
+// Aparelho (nº) que ainda não tem foto do tipo pedido; 0 = todos têm
+function fotosFaltando(o, stage){
+  const devs = [{ id:'principal', n:1 }].concat((o.aparelhosExtras || []).map((a, i) => ({ id:a.id || ('x' + i), n:i + 2 })));
+  const ap = (o.fotos && o.fotos.ap) || {};
+  const d = devs.find(x => !((ap[x.id] || {})[stage] || []).length);
+  return d ? d.n : 0;
+}
+
+// Galeria na tela de visualização (permite adicionar foto de saída sem abrir o assistente)
+function fotosViewHtml(o){
+  if(!fotosDisponivel()) return '';
+  const devs = [{ id:'principal', n:1, nome:o.aparelho }].concat((o.aparelhosExtras || []).map((a, i) => ({ id:a.id || ('x' + i), n:i + 2, nome:a.modelo })));
+  const ap = (o.fotos && o.fotos.ap) || {};
+  const col = (d, stage, label) => {
+    const fs = (ap[d.id] || {})[stage] || [];
+    return `<div style="flex:1; min-width:150px;">
+      <div style="font-size:11px; font-weight:700; color:var(--text-dim); text-transform:uppercase; margin-bottom:6px;">${label} (${fs.length})</div>
+      <div class="fotos-grid">${fs.length ? fs.map(f => `<div class="foto-th"><img src="${f.url}" alt="" loading="lazy" onclick="fotoAbrir('${f.url}')"></div>`).join('') : '<span class="text-faint" style="font-size:12px;">Sem fotos</span>'}</div>
+      <label class="btn btn-sm foto-add">📷 Adicionar<input type="file" accept="image/*" multiple hidden onchange="fotoSelecionarView(this,'${o.id}','${d.id}','${stage}')"></label>
+    </div>`;
+  };
+  return `<div class="section-title">Fotos do aparelho</div>
+    <div class="card" style="margin-bottom:16px;">
+      ${devs.map(d => `<div style="margin-bottom:12px;">
+        <div style="font-size:12px; font-weight:700; color:var(--accent); margin-bottom:8px;">Aparelho ${d.n}${d.nome ? ' — ' + escapeHtml(d.nome) : ''}</div>
+        <div style="display:flex; gap:16px; flex-wrap:wrap;">${col(d, 'entrada', 'Entrada')}${col(d, 'saida', 'Saída')}</div>
+      </div>`).join('')}
+    </div>`;
+}
+
+async function fotoSelecionarView(input, osId, did, stage){
+  const files = [...input.files]; input.value = '';
+  if(!files.length) return;
+  const o = state.os.find(x => x.id === osId); if(!o) return;
+  showToast('Enviando foto...');
+  try {
+    if(!o.fotos) o.fotos = { exigir:false, ap:{} };
+    if(!o.fotos.ap) o.fotos.ap = {};
+    for(const f of files){
+      const blob = await fotoComprimir(f);
+      const url = await fotoEnviar(blob, fotoNovoPath(o.numero, did, stage));
+      if(!o.fotos.ap[did]) o.fotos.ap[did] = { entrada:[], saida:[] };
+      if(!o.fotos.ap[did][stage]) o.fotos.ap[did][stage] = [];
+      o.fotos.ap[did][stage].push({ url, path:url.split('/object/public/fotos-os/')[1], ts:Date.now() });
+    }
+    await sbPatch('ordens_servico', 'id', osId, { fotos:o.fotos });
+    showToast('Foto salva.');
+    viewOS(osId);
+  } catch(e){
+    showToast('Erro ao enviar foto: ' + e.message, true);
+  }
+}
+
 /* ---------- Wizard de abertura de OS (etapas com salvamento parcial) ---------- */
 const WZ_TOTAL = 6;
 let wzCurrent = 1, wzDirty = false, wzBusy = false;
@@ -3990,7 +4196,7 @@ function wzEstado(){
   return {
     1: !!(v('os-cliente-id') && v('os-chamado')),
     2: cadOk,
-    3: cadOk && clOk,
+    3: cadOk && clOk && (!fotosAtivas() || wzDispositivos().every(d => fotosDe(d.id, 'entrada').length)),
     4: diagOk,
     5: !!(parseFloat(v('os-logistica-pecas')) || parseFloat(v('os-logistica-equipamento')) || parseFloat(v('os-horas-servico')) || parseFloat(v('os-custo-horas'))),
     6: wzOsExiste() && v('os-status') !== 'Aguardando aparelho' && !!v('os-data-prevista')
@@ -4044,6 +4250,8 @@ function wzShow(n){
   ovw.dataset.wz = String(n);
   const lg = document.getElementById('dv-legend'); if(lg && WZ_LEGENDAS[n]) lg.textContent = WZ_LEGENDAS[n];
   if(n === 3 || n === 4) wzExpandirAparelhos();
+  if(n === 3) fotosRender();
+  if(n === 6) fotosRenderSaida();
   const ultima = n === WZ_TOTAL;
   document.getElementById('wz-btn-back').style.display = n === 1 ? 'none' : '';
   document.getElementById('wz-btn-exit').style.display = ultima ? 'none' : '';
@@ -4157,6 +4365,8 @@ async function _saveOSInner(opts){
 
   const id = document.getElementById('os-id').value;
   let status = document.getElementById('os-status').value;
+  // Salvamentos automáticos das fotos não mexem no status que o usuário ainda está escolhendo na tela
+  if(opts.preservarStatus && id){ const oPrev = state.os.find(x => x.id === id); if(oPrev) status = oPrev.status; }
   const aparelhoCompleto = !!(aparelho && imei && defeito);
   const dispensaAparelho = (status === 'Aguardando aparelho' || status === 'Cancelado');
   const exigeChecklist = (typeof opts.level === 'number' && opts.level >= 3) || (opts.level === 'full' && !dispensaAparelho);
@@ -4221,6 +4431,24 @@ async function _saveOSInner(opts){
     }
   }
 
+  // Fotos obrigatórias (só nas OS criadas com o recurso de fotos): entrada para sair do Recebimento, saída para concluir/entregar
+  if(exigeChecklist && fotosAtivas()){
+    for(const d of wzDispositivos()){
+      if(!fotosDe(d.id, 'entrada').length){
+        showToast(`Aparelho ${d.n}: adicione pelo menos 1 foto de entrada.`, true);
+        return;
+      }
+    }
+  }
+  if((status === 'Concluído' || status === 'Entregue') && fotosAtivas()){
+    for(const d of wzDispositivos()){
+      if(!fotosDe(d.id, 'saida').length){
+        showToast(`Aparelho ${d.n}: adicione a foto de saída antes de marcar como ${status}.`, true);
+        return;
+      }
+    }
+  }
+
   const cliente = state.clients.find(c => c.id === clienteId);
   if(!cliente){
     showToast('Cliente selecionado não foi encontrado.', true);
@@ -4242,6 +4470,7 @@ async function _saveOSInner(opts){
       card.querySelector('.ae-acs-carregador').checked ? 'Carregador' : ''
     ].filter(Boolean).join(', ');
     if(modelo || imei || defeito) aparelhosExtras.push({
+      id: card.dataset.did,
       modelo, imei, defeito, senha, acessorios,
       parts: (() => {
         const ps = [];
@@ -4290,6 +4519,8 @@ async function _saveOSInner(opts){
   // Aparelho completo numa OS "Aguardando aparelho" => passa automaticamente para "Aberto" (recebido)
   let transicaoAuto = false;
   if(status === 'Aguardando aparelho' && aparelhoCompleto){ status = 'Aberto'; transicaoAuto = true; }
+  const temFotos = Object.values(wzFotos).some(d => (d.entrada || []).length || (d.saida || []).length);
+  const fotosPayload = (fotosDisponivel() && (!id || wzFotosExigir || temFotos)) ? { exigir: id ? wzFotosExigir : true, ap: wzFotos } : null;
   const dataEntrada = document.getElementById('os-data-entrada').value || todayISO();
   const dataPrevista = document.getElementById('os-data-prevista').value;
 
@@ -4328,7 +4559,8 @@ async function _saveOSInner(opts){
     data_entrada: dataEntrada,
     data_prevista: dataPrevista || null,   // coluna do tipo date: vazio precisa ir como null, não como ""
     observacoes: document.getElementById('os-observacoes').value.trim(),
-    historico
+    historico,
+    ...(fotosPayload ? { fotos: fotosPayload } : {})
   });
 
   try {
@@ -4367,6 +4599,7 @@ async function _saveOSInner(opts){
         clienteId, clienteNome: nome, clienteTelefone: telefone, aparelho,
         chamado: payload.chamado, imei: payload.imei,
         centroCusto, chamadoCliente, solicitante,
+        fotos: fotosPayload || o.fotos,
         defeito, senha: payload.senha, checklist,
         acessorios: payload.acessorios,
         diagnostico: payload.diagnostico,
@@ -4403,8 +4636,10 @@ async function _saveOSInner(opts){
         logisticaPecas, logisticaEquipamento, horasServico, custoHoras,
         pagamento: payload.pagamento, garantia: payload.garantia,
         dataEntrada, dataPrevista, observacoes: payload.observacoes,
+        fotos: fotosPayload,
         historico: state.history[newId] || []
       });
+      wzFotosExigir = !!(fotosPayload && fotosPayload.exigir);
 
       // A partir daqui o modal passa a editar a OS recém-criada (evita duplicar no próximo salvamento)
       document.getElementById('os-id').value = newId;
@@ -4412,11 +4647,12 @@ async function _saveOSInner(opts){
       showToast(opts.close ? `OS #${numero} criada com sucesso.` : `OS #${numero} criada e salva.`);
     }
   } catch(e) {
+    if(/fotos/i.test(e.message)){ state.colunaFotos = false; wzFotosExigir = false; showToast('A coluna "fotos" não existe no Supabase. Rode o SQL de instalação das fotos e recarregue a página.', true); return; }
     showToast('Erro ao salvar OS: ' + e.message, true);
     return;
   }
 
-  document.getElementById('os-status').value = status;
+  if(!opts.preservarStatus) document.getElementById('os-status').value = status;
   wzDirty = false;
   renderOSTable();
   renderDashboard();
@@ -4523,6 +4759,8 @@ function addAparelhoExtra(existing){
   const num = list.children.length + 2; // Aparelho 2, 3, 4...
   const card = document.createElement('div');
   card.className = 'aparelho-extra-card';
+  // id estável do aparelho (as fotos ficam vinculadas a ele); OS antigas sem id usam 'x' + posição
+  card.dataset.did = (existing && existing.id) ? existing.id : (existing ? 'x' + list.children.length : 'd' + Date.now().toString(36) + Math.random().toString(36).slice(2,5));
   card.style.cssText = 'border:1px solid var(--border); border-radius:var(--radius); overflow:hidden; background:var(--panel-2);';
 
   const acs = existing ? (existing.acessorios || '') : '';
@@ -4574,6 +4812,7 @@ function addAparelhoExtra(existing){
       </div>
       </div>
       <div class="dv-sec" data-sec="rec">
+      <div class="fotos-box" data-stage="entrada"></div>
       <div class="field-row">
         <div class="field">
           <label>Senha / padrão de desbloqueio</label>
@@ -5038,6 +5277,8 @@ function viewOS(osId){
         </div>
         ` : ''}
 
+        ${fotosViewHtml(o)}
+
         <div class="section-title">Defeito relatado</div>
         <p style="margin-bottom:16px;">${escapeHtml(o.defeito)}</p>
 
@@ -5153,6 +5394,15 @@ async function quickUpdateStatus(osId, newStatus){
   if(!o) return;
   const oldStatus = o.status;
   if(oldStatus === newStatus) return;
+
+  if((newStatus === 'Concluído' || newStatus === 'Entregue') && o.fotos && o.fotos.exigir && fotosDisponivel()){
+    const falta = fotosFaltando(o, 'saida');
+    if(falta){
+      showToast(`Aparelho ${falta}: adicione a foto de saída antes de marcar como ${newStatus}.`, true);
+      viewOS(osId);
+      return;
+    }
+  }
 
   try {
     const comentario = await pedirComentarioStatus(oldStatus, newStatus);
