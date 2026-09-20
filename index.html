@@ -1665,7 +1665,7 @@
       <!-- APARELHOS EXTRAS -->
       <div id="aparelhos-extras-list" style="display:flex; flex-direction:column; gap:12px; margin-top:12px;"></div>
       <div style="margin-top:10px;">
-        <button type="button" class="btn btn-sm" onclick="addAparelhoExtra()" style="border-color:var(--accent); color:var(--accent);">
+        <button type="button" class="btn btn-sm" onclick="wzAddAparelho()" style="border-color:var(--accent); color:var(--accent);">
           ＋ Adicionar aparelho
         </button>
       </div>
@@ -4011,6 +4011,37 @@ async function wzNext(){
   const ok = await saveOS({ level, close: ultima });
   if(ok && !ultima) wzShow(wzCurrent + 1);
 }
+// Todo aparelho extra precisa de modelo, IMEI e defeito (mesma regra do aparelho 1)
+function wzValidarExtras(){
+  const cards = [...document.querySelectorAll('#aparelhos-extras-list .aparelho-extra-card')];
+  for(let i = 0; i < cards.length; i++){
+    const c = cards[i];
+    for(const [sel, nome] of [['.ae-modelo','o modelo'], ['.ae-imei','o IMEI / nº de série'], ['.ae-defeito','o defeito']]){
+      const el = c.querySelector(sel);
+      if(el.value.trim()) continue;
+      if(c.querySelector('.ae-campos').style.display === 'none') toggleAparelhoExtra(c.querySelector('.ae-toggle-icon'));
+      el.style.borderColor = 'var(--red)';
+      setTimeout(() => { el.style.borderColor = ''; }, 2500);
+      el.scrollIntoView({ behavior:'smooth', block:'center' });
+      return `Aparelho ${i + 2}: informe ${nome}.`;
+    }
+  }
+  return null;
+}
+
+// "+ Adicionar aparelho": só adiciona se os anteriores estiverem completos, e já salva a OS
+async function wzAddAparelho(){
+  const ok = await saveOS({ level:'dev', close:false, msg:'Aparelho salvo.' });
+  if(!ok) return;
+  addAparelhoExtra();
+  const cards = document.querySelectorAll('#aparelhos-extras-list .aparelho-extra-card');
+  const novo = cards[cards.length - 1];
+  if(novo){
+    novo.scrollIntoView({ behavior:'smooth', block:'center' });
+    const m = novo.querySelector('.ae-modelo'); if(m) m.focus();
+  }
+  wzDirty = true;
+}
 function wzSaveExit(){ saveOS({ level:1, close:true }); }
 function wzClose(){
   if(wzDirty && !confirm('Há alterações não salvas nesta etapa. Sair mesmo assim?')) return;
@@ -4061,7 +4092,8 @@ async function _saveOSInner(opts){
   let status = document.getElementById('os-status').value;
   const aparelhoCompleto = !!(aparelho && imei && defeito);
   const dispensaAparelho = (status === 'Aguardando aparelho' || status === 'Cancelado');
-  const exigeAparelho = opts.level === 2 || (opts.level === 'full' && !dispensaAparelho);
+  const exigeChecklist = opts.level === 2 || (opts.level === 'full' && !dispensaAparelho);
+  const exigeAparelho = exigeChecklist || opts.level === 'dev';
 
   if(!clienteId){
     showToast('Selecione o cliente da lista.', true);
@@ -4080,6 +4112,11 @@ async function _saveOSInner(opts){
       showToast('O campo IMEI / Nº de série é obrigatório.', true);
       return;
     }
+    const erroExtra = wzValidarExtras();
+    if(erroExtra){
+      showToast(erroExtra, true);
+      return;
+    }
   }
 
   // Checklist (oculto para PJ ou quando há mais de 1 aparelho). Salva parcial; só exige completo quando o aparelho é exigido.
@@ -4096,7 +4133,7 @@ async function _saveOSInner(opts){
       const checked = document.querySelector(`input[name="${n}"]:checked`);
       if(checked){ checklist[n] = checked.value; } else { clIncompleto = true; }
     });
-    if(exigeAparelho && clIncompleto){
+    if(exigeChecklist && clIncompleto){
       document.getElementById('checklist-error').style.display = 'block';
       document.getElementById('checklist-error').scrollIntoView({ behavior:'smooth', block:'center' });
       showToast('Preencha todos os itens do checklist.', true);
@@ -4125,7 +4162,7 @@ async function _saveOSInner(opts){
       card.querySelector('.ae-acs-chip').checked    ? 'Chip'      : '',
       card.querySelector('.ae-acs-carregador').checked ? 'Carregador' : ''
     ].filter(Boolean).join(', ');
-    if(modelo) aparelhosExtras.push({
+    if(modelo || imei || defeito) aparelhosExtras.push({
       modelo, imei, defeito, senha, acessorios,
       parts: (() => {
         const ps = [];
@@ -4255,7 +4292,7 @@ async function _saveOSInner(opts){
         historico: state.history[id] || []
       });
 
-      if(!opts.silent) showToast(opts.close ? `OS #${o.numero} atualizada com sucesso.` : 'Etapa salva.');
+      if(!opts.silent) showToast(opts.close ? `OS #${o.numero} atualizada com sucesso.` : opts.msg || 'Etapa salva.');
 
     } else {
       // Nova OS
@@ -4399,7 +4436,7 @@ function addAparelhoExtra(existing){
     <div class="ae-campos" style="padding:14px 16px; display:block;">
       <div class="field-row">
         <div class="field">
-          <label>Marca / Modelo</label>
+          <label>Marca / Modelo *</label>
           <div class="ac-wrap ae-ac-wrap" style="position:relative;">
             <input type="text" class="ae-modelo ac-input" placeholder="Ex: iPhone 13, Galaxy A54..."
               value="${existing ? escapeHtml(existing.modelo) : ''}"
@@ -4410,13 +4447,13 @@ function addAparelhoExtra(existing){
           </div>
         </div>
         <div class="field">
-          <label>IMEI / Nº de série</label>
-          <input type="text" class="ae-imei" placeholder="Opcional"
+          <label>IMEI / Nº de série *</label>
+          <input type="text" class="ae-imei" placeholder="IMEI ou nº de série"
             value="${existing ? escapeHtml(existing.imei||'') : ''}">
         </div>
       </div>
       <div class="field">
-        <label>Defeito relatado</label>
+        <label>Defeito relatado *</label>
         <textarea class="ae-defeito" placeholder="Descreva o defeito deste aparelho..."
           style="min-height:52px;"
           oninput="atualizarResumoExtra(this)">${existing ? escapeHtml(existing.defeito||'') : ''}</textarea>
