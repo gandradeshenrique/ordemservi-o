@@ -119,6 +119,7 @@
     padding: 28px 36px 60px;
     max-width: 1200px;
     width:100%;
+    min-width:0;
   }
 
   .page-header{
@@ -323,7 +324,7 @@
     background: var(--panel);
     border:1px solid var(--border);
     border-radius: var(--radius);
-    overflow:hidden;
+    overflow-x:auto;
   }
   table{ width:100%; border-collapse:collapse; }
   thead th{
@@ -344,6 +345,7 @@
     font-size:13.5px;
     vertical-align:middle;
   }
+  table:has(#os-table-body) th, table:has(#os-table-body) td{ padding-left:10px; padding-right:10px; }
   tbody tr:last-child td{ border-bottom:none; }
   tbody tr:hover{ background: rgba(255,255,255,0.018); }
   .mono{ font-family: var(--mono); font-size:12.5px; color: var(--text-dim); }
@@ -3350,14 +3352,16 @@ function renderOSTable(){
       <td class="mono text-faint" style="cursor:pointer" onclick="viewOS('${o.id}')">${o.chamado ? escapeHtml(o.chamado) : '—'}</td>
       <td style="cursor:pointer" onclick="viewOS('${o.id}')">${escapeHtml(o.clienteNome)}</td>
       <td style="cursor:pointer" onclick="viewOS('${o.id}')">${o.aparelho ? escapeHtml(o.aparelho) : '<span class="text-faint">— aguardando —</span>'}</td>
-      <td class="text-faint" style="max-width:220px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;" title="${escapeHtml(o.defeito)}">${escapeHtml(o.defeito)}</td>
+      <td class="text-faint" style="max-width:120px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;" title="${escapeHtml(o.defeito)}">${escapeHtml(o.defeito)}</td>
       <td><span class="badge ${statusBadgeClass(o.status)}">${o.status}</span></td>
       <td class="mono">${formatCurrency(o.total)}</td>
       <td class="mono">${formatDate(o.dataEntrada)}</td>
-      <td style="display:flex;gap:6px;">
+      <td style="white-space:nowrap;">
+        <div style="display:flex;gap:2px;align-items:center;">
         <button class="btn btn-ghost btn-sm" onclick="viewOS('${o.id}')">Ver</button>
         <button class="btn btn-ghost btn-sm" onclick="openOSModal('${o.id}')">Editar</button>
         <button class="btn btn-ghost btn-sm" style="color:var(--red)" onclick="deleteOS('${o.id}')">Excluir</button>
+        </div>
       </td>
     </tr>
   `).join('');
