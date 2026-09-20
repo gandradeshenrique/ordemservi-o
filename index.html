@@ -1818,6 +1818,7 @@
     <div id="os-view-content"></div>
     <div class="modal-actions">
       <button class="btn" onclick="closeModal('os-view-overlay')">Fechar</button>
+      <button class="btn" id="os-view-del-btn" style="color:var(--red)">Excluir OS</button>
       <button class="btn" onclick="printOS()">Imprimir / PDF</button>
       <button class="btn btn-primary" id="os-view-edit-btn">Editar OS</button>
     </div>
@@ -3356,6 +3357,7 @@ function renderOSTable(){
       <td style="display:flex;gap:6px;">
         <button class="btn btn-ghost btn-sm" onclick="viewOS('${o.id}')">Ver</button>
         <button class="btn btn-ghost btn-sm" onclick="openOSModal('${o.id}')">Editar</button>
+        <button class="btn btn-ghost btn-sm" style="color:var(--red)" onclick="deleteOS('${o.id}')">Excluir</button>
       </td>
     </tr>
   `).join('');
@@ -5182,6 +5184,33 @@ async function salvarPedidoNoEstoque(){
   showToast(ok + ' ' + (ok === 1 ? 'peça adicionada' : 'peças adicionadas') + ' ao estoque!');
 }
 
+async function deleteOS(osId){
+  const o = state.os.find(x => x.id === osId);
+  if(!o) return;
+  const pecas = pecasDaOS(o.parts, o.aparelhosExtras);
+  const nFotos = Object.values((o.fotos && o.fotos.ap) || {}).reduce((n, d) => n + ((d.entrada||[]).length + (d.saida||[]).length), 0);
+  let msg = `Excluir a OS #${o.numero} (${o.clienteNome || 'sem cliente'})?\n\nEssa ação não pode ser desfeita.`;
+  if(pecas.length) msg += `\n• As peças usadas (${pecas.reduce((n,p)=>n+(p.qtd||0),0)} un.) voltam ao estoque.`;
+  if(nFotos) msg += `\n• ${nFotos} foto(s) serão apagadas.`;
+  if(!confirm(msg)) return;
+  try {
+    await sbDelete('ordens_servico', 'id', osId);
+  } catch(e) {
+    showToast('Erro ao excluir OS: ' + e.message, true);
+    return;
+  }
+  // Só depois de a OS sair do banco: devolve peças e apaga fotos
+  pecas.forEach(p => { if(p.stockId) adjustStock(p.stockId, p.qtd); });
+  Object.values((o.fotos && o.fotos.ap) || {}).forEach(d => [...(d.entrada||[]), ...(d.saida||[])].forEach(f => { if(f.path) fotoApagarStorage(f.path); }));
+  state.os = state.os.filter(x => x.id !== osId);
+  delete state.history[osId];
+  closeModal('os-view-overlay');
+  renderOSTable();
+  renderDashboard();
+  if(typeof renderStockTable === 'function') renderStockTable();
+  showToast(`OS #${o.numero} excluída.`);
+}
+
 function adjustStock(stockId, delta){
   const item = state.stock.find(s => s.id === stockId);
   if(!item) return;
@@ -5385,6 +5414,7 @@ function viewOS(osId){
     </div>
   `;
 
+  document.getElementById('os-view-del-btn').onclick = () => deleteOS(o.id);
   document.getElementById('os-view-edit-btn').onclick = () => {
     closeModal('os-view-overlay');
     openOSModal(o.id);
