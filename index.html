@@ -1822,8 +1822,20 @@
       <button class="btn" onclick="closeModal('os-view-overlay')">Fechar</button>
       <button class="btn" id="os-view-del-btn" style="color:var(--red)">Excluir OS</button>
       <button class="btn" onclick="printOS()">Imprimir / PDF</button>
+      <button class="btn" id="os-view-link-btn">🔗 Link de acompanhamento</button>
       <button class="btn btn-primary" id="os-view-edit-btn">Editar OS</button>
     </div>
+  </div>
+</div>
+
+<!-- ===================== MODAL: LINK DE ACOMPANHAMENTO ===================== -->
+<div class="modal-overlay" id="rastreio-link-overlay">
+  <div class="modal" style="max-width:480px;">
+    <div class="modal-header">
+      <h2 class="modal-title">Link de acompanhamento</h2>
+      <button class="modal-close" onclick="closeModal('rastreio-link-overlay')">&times;</button>
+    </div>
+    <div class="modal-body" id="rastreio-link-content"></div>
   </div>
 </div>
 
@@ -2581,6 +2593,53 @@ async function sbSetConfig(chave, valor){
 }
 
 /* =========================================================
+   LINK DE ACOMPANHAMENTO (rastreio público da OS)
+   ========================================================= */
+// Cache só em memória (nunca persistido) das senhas em texto puro recém-geradas,
+// pra podermos mostrar/copiar uma única vez logo após gerar. Some ao recarregar a página.
+const _rastreioSenhaPlainCache = {};
+
+function gerarTokenRastreio(){
+  if(window.crypto && crypto.randomUUID) return crypto.randomUUID().replace(/-/g, '');
+  // fallback para navegadores sem randomUUID
+  const bytes = new Uint8Array(16);
+  crypto.getRandomValues(bytes);
+  return Array.from(bytes, b => b.toString(16).padStart(2, '0')).join('');
+}
+
+function gerarSenhaRastreio(){
+  const bytes = new Uint32Array(1);
+  crypto.getRandomValues(bytes);
+  return String(bytes[0] % 1000000).padStart(6, '0');
+}
+
+async function sha256Hex(texto){
+  const buf = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(texto));
+  return Array.from(new Uint8Array(buf), b => b.toString(16).padStart(2, '0')).join('');
+}
+
+function gerarSaltRastreio(){
+  const bytes = new Uint8Array(16);
+  crypto.getRandomValues(bytes);
+  return Array.from(bytes, b => b.toString(16).padStart(2, '0')).join('');
+}
+
+// Gera um novo token+senha pra uma OS (usado na criação e no botão "Gerar novo link/senha").
+// Devolve { token, senha, hash, salt } — a senha em texto puro só existe aqui e no cache em memória.
+async function gerarCredenciaisRastreio(){
+  const token = gerarTokenRastreio();
+  const senha = gerarSenhaRastreio();
+  const salt  = gerarSaltRastreio();
+  const hash  = await sha256Hex(salt + ':' + senha);
+  return { token, senha, hash, salt };
+}
+
+function urlRastreio(token){
+  const base = location.href.replace(/[^/]*$/, ''); // pasta atual do index.html
+  return `${base}rastreio.html?t=${token}`;
+}
+
+/* =========================================================
    STATE — cache local durante a sessão
    ========================================================= */
 let state = {
@@ -2631,6 +2690,12 @@ async function loadFromSupabase(){
       state.colunaFotos = rp.ok;
     } catch(e){ state.colunaFotos = os.length ? ('fotos' in os[0]) : true; }
 
+    // Mesma sonda pras colunas do link de acompanhamento (rodar sql_rastreio_os.sql cria elas)
+    try {
+      const rr = await fetch(`${SB_URL}/rest/v1/ordens_servico?select=rastreio_token&limit=1`, { headers: sbHeaders() });
+      state.colunaRastreio = rr.ok;
+    } catch(e){ state.colunaRastreio = os.length ? ('rastreio_token' in os[0]) : false; }
+
     state.os = os.map(o => ({
       id: o.id, numero: o.numero,
       clienteId: o.cliente_id, clienteNome: o.cliente_nome || '',
@@ -2653,7 +2718,10 @@ async function loadFromSupabase(){
       pagamento: o.pagamento || '', garantia: o.garantia || '',
       dataEntrada: o.data_entrada || '', dataPrevista: o.data_prevista || '',
       observacoes: o.observacoes || '',
-      historico: o.historico || []
+      historico: o.historico || [],
+      rastreioToken: o.rastreio_token || null,
+      rastreioSenhaHash: o.rastreio_senha_hash || null,
+      rastreioSenhaSalt: o.rastreio_senha_salt || null
     }));
 
     // Reconstruir history a partir do campo historico de cada OS
@@ -4544,7 +4612,7 @@ async function _saveOSInner(opts){
   const dataEntrada = document.getElementById('os-data-entrada').value || todayISO();
   const dataPrevista = document.getElementById('os-data-prevista').value;
 
-  const osData = (osId, numero, historico) => ({
+  const osData = (osId, numero, historico, rastreio) => ({
     id: osId,
     numero,
     cliente_id: clienteId,
@@ -4580,7 +4648,8 @@ async function _saveOSInner(opts){
     data_prevista: dataPrevista || null,   // coluna do tipo date: vazio precisa ir como null, não como ""
     observacoes: document.getElementById('os-observacoes').value.trim(),
     historico,
-    ...(fotosPayload ? { fotos: fotosPayload } : {})
+    ...(fotosPayload ? { fotos: fotosPayload } : {}),
+    ...(rastreio ? { rastreio_token: rastreio.token, rastreio_senha_hash: rastreio.hash, rastreio_senha_salt: rastreio.salt } : {})
   });
 
   try {
@@ -4612,7 +4681,11 @@ async function _saveOSInner(opts){
       pecasDaOS(oldParts, o.aparelhosExtras).forEach(p => adjustStock(p.stockId, p.qtd));
       pecasDaOS(parts, aparelhosExtras).forEach(p => adjustStock(p.stockId, -p.qtd));
 
-      const payload = osData(id, o.numero, state.history[id] || []);
+      // Preserva o token/senha de acompanhamento já existentes (não gera de novo a cada edição)
+      const rastreioExistente = o.rastreioToken
+        ? { token: o.rastreioToken, hash: o.rastreioSenhaHash, salt: o.rastreioSenhaSalt }
+        : null;
+      const payload = osData(id, o.numero, state.history[id] || [], rastreioExistente);
       await sbPatch('ordens_servico', 'id', id, payload);
 
       Object.assign(o, {
@@ -4640,9 +4713,17 @@ async function _saveOSInner(opts){
       pecasDaOS(parts, aparelhosExtras).forEach(p => adjustStock(p.stockId, -p.qtd));
       addHistoryEntry(newId, aparelhoCompleto ? 'OS criada. Aparelho recebido.' : 'OS criada. Aguardando chegada do aparelho.');
 
-      const payload = osData(newId, numero, state.history[newId] || []);
+      // Gera token + senha de acompanhamento (só se as colunas já existirem no Supabase)
+      let novoRastreio = null;
+      if(state.colunaRastreio !== false){
+        novoRastreio = await gerarCredenciaisRastreio();
+      }
+
+      const payload = osData(newId, numero, state.history[newId] || [], novoRastreio);
       await sbPost('ordens_servico', payload);
       await sbSetConfig('next_os_number', state.nextOSNumber);
+
+      if(novoRastreio) _rastreioSenhaPlainCache[newId] = novoRastreio.senha;
 
       state.os.unshift({
         id: newId, numero,
@@ -4657,7 +4738,10 @@ async function _saveOSInner(opts){
         pagamento: payload.pagamento, garantia: payload.garantia,
         dataEntrada, dataPrevista, observacoes: payload.observacoes,
         fotos: fotosPayload,
-        historico: state.history[newId] || []
+        historico: state.history[newId] || [],
+        rastreioToken: novoRastreio ? novoRastreio.token : null,
+        rastreioSenhaHash: novoRastreio ? novoRastreio.hash : null,
+        rastreioSenhaSalt: novoRastreio ? novoRastreio.salt : null
       });
       wzFotosExigir = !!(fotosPayload && fotosPayload.exigir);
 
@@ -4668,6 +4752,7 @@ async function _saveOSInner(opts){
     }
   } catch(e) {
     if(/^(POST|PATCH) ordens_servico/.test(e.message) && /(PGRST204|42703|column)[^]*fotos|fotos[^]*(PGRST204|42703|column)/i.test(e.message)){ state.colunaFotos = false; wzFotosExigir = false; showToast('A coluna "fotos" não existe no Supabase. Rode o SQL de instalação das fotos e recarregue a página.', true); return; }
+    if(/^(POST|PATCH) ordens_servico/.test(e.message) && /(PGRST204|42703|column)[^]*rastreio|rastreio[^]*(PGRST204|42703|column)/i.test(e.message)){ state.colunaRastreio = false; showToast('As colunas de link de acompanhamento não existem no Supabase ainda. Rode o sql_rastreio_os.sql e recarregue a página.', true); return; }
     showToast('Erro ao salvar OS: ' + e.message, true);
     return;
   }
@@ -5433,8 +5518,118 @@ function viewOS(osId){
     closeModal('os-view-overlay');
     openOSModal(o.id);
   };
+  document.getElementById('os-view-link-btn').onclick = () => abrirLinkAcompanhamento(o.id);
 
   openModal('os-view-overlay');
+}
+
+/* =========================================================
+   MODAL: LINK DE ACOMPANHAMENTO
+   ========================================================= */
+function abrirLinkAcompanhamento(osId){
+  const o = state.os.find(x => x.id === osId);
+  if(!o) return;
+
+  if(state.colunaRastreio === false){
+    document.getElementById('rastreio-link-content').innerHTML = `
+      <p style="color:var(--text-dim); font-size:13px;">
+        Esse recurso ainda não foi instalado no banco de dados. Rode o script <span class="mono">sql_rastreio_os.sql</span>
+        no Supabase e recarregue a página pra ativar o link de acompanhamento.
+      </p>`;
+    openModal('rastreio-link-overlay');
+    return;
+  }
+
+  renderRastreioModal(o);
+  openModal('rastreio-link-overlay');
+}
+
+function renderRastreioModal(o){
+  const senhaPlain = _rastreioSenhaPlainCache[o.id];
+  const content = document.getElementById('rastreio-link-content');
+
+  if(!o.rastreioToken){
+    content.innerHTML = `
+      <p style="color:var(--text-dim); font-size:13px; margin-bottom:14px;">
+        Essa OS ainda não tem um link de acompanhamento (provavelmente foi criada antes desse recurso existir).
+        Gere um agora pra poder enviar ao cliente.
+      </p>
+      <button class="btn btn-primary" style="width:100%;" onclick="gerarNovoLinkRastreio('${o.id}')">Gerar link de acompanhamento</button>
+    `;
+    return;
+  }
+
+  const link = urlRastreio(o.rastreioToken);
+
+  content.innerHTML = `
+    <div class="field">
+      <label>Link</label>
+      <input type="text" readonly value="${escapeHtml(link)}" onclick="this.select()" class="mono" style="font-size:12px;">
+    </div>
+    <div class="field">
+      <label>Senha de acesso</label>
+      ${senhaPlain
+        ? `<input type="text" readonly value="${escapeHtml(senhaPlain)}" onclick="this.select()" class="mono" style="font-size:18px; font-weight:700; letter-spacing:2px;">`
+        : `<p style="font-size:12px; color:var(--text-faint); margin:4px 0 0;">
+             A senha só é exibida uma vez, no momento em que é gerada (ela não fica salva em texto puro).
+             Se você não a copiou ou o cliente perdeu, gere uma nova abaixo — a antiga para de funcionar.
+           </p>`
+      }
+    </div>
+    <div class="modal-actions" style="padding:0; margin-top:16px;">
+      ${senhaPlain ? `<button class="btn btn-primary" style="flex:1;" onclick="copiarLinkRastreio('${o.id}')">Copiar link e senha</button>` : ''}
+      <button class="btn" onclick="gerarNovoLinkRastreio('${o.id}')">${senhaPlain ? 'Gerar novo' : 'Gerar nova senha'}</button>
+    </div>
+  `;
+}
+
+async function gerarNovoLinkRastreio(osId){
+  const o = state.os.find(x => x.id === osId);
+  if(!o) return;
+
+  if(o.rastreioToken && !confirm('Gerar um novo link/senha invalida o link atual — o cliente vai precisar do novo. Continuar?')) return;
+
+  try {
+    const cred = await gerarCredenciaisRastreio();
+    await sbPatch('ordens_servico', 'id', osId, {
+      rastreio_token: cred.token,
+      rastreio_senha_hash: cred.hash,
+      rastreio_senha_salt: cred.salt
+    });
+    o.rastreioToken = cred.token;
+    o.rastreioSenhaHash = cred.hash;
+    o.rastreioSenhaSalt = cred.salt;
+    _rastreioSenhaPlainCache[osId] = cred.senha;
+    renderRastreioModal(o);
+    showToast('Novo link de acompanhamento gerado.');
+  } catch(e){
+    showToast('Erro ao gerar link: ' + e.message, true);
+  }
+}
+
+async function copiarLinkRastreio(osId){
+  const o = state.os.find(x => x.id === osId);
+  if(!o || !o.rastreioToken) return;
+  const senhaPlain = _rastreioSenhaPlainCache[osId];
+  const texto = `Acompanhe sua OS #${o.numero} em tempo real:\n${urlRastreio(o.rastreioToken)}\n\nSenha de acesso: ${senhaPlain || '(gere novamente)'}`;
+
+  try {
+    if(navigator.clipboard && navigator.clipboard.writeText){
+      await navigator.clipboard.writeText(texto);
+    } else {
+      const ta = document.createElement('textarea');
+      ta.value = texto;
+      ta.style.position = 'fixed';
+      ta.style.opacity = '0';
+      document.body.appendChild(ta);
+      ta.select();
+      document.execCommand('copy');
+      document.body.removeChild(ta);
+    }
+    showToast('Link e senha copiados — cole pra enviar ao cliente.');
+  } catch(e){
+    showToast('Não foi possível copiar automaticamente. Selecione e copie manualmente.', true);
+  }
 }
 
 async function quickUpdateStatus(osId, newStatus){
