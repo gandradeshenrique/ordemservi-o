@@ -275,7 +275,12 @@ async function verificarAcesso(senha){
     headers: { apikey: SB_KEY, Authorization: 'Bearer ' + SB_KEY, 'Content-Type': 'application/json' },
     body: JSON.stringify({ p_token: token, p_senha: senha })
   });
-  if(!r.ok) throw new Error('Falha ao consultar (' + r.status + ')');
+  if(!r.ok){
+    let detalhe = '';
+    try { const j = await r.json(); detalhe = j.message || j.hint || j.code || ''; } catch(e){}
+    console.error('verificar_acesso_rastreio falhou:', r.status, detalhe);
+    throw new Error(`Erro ${r.status}${detalhe ? ' — ' + detalhe : ''}`);
+  }
   return r.json();
 }
 
@@ -299,7 +304,7 @@ async function tentarAcesso(){
     mostrarAcompanhamento(rows[0]);
     iniciarPolling(senha);
   } catch(e){
-    erro.textContent = 'Não foi possível verificar agora. Tente novamente em instantes.';
+    erro.textContent = 'Não foi possível verificar agora (' + e.message + '). Se persistir, confirme se o sql_rastreio_os.sql foi executado no Supabase.';
     erro.classList.add('show');
     btn.disabled = false; btn.textContent = 'Ver andamento';
   }
