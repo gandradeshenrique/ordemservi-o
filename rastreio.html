@@ -603,7 +603,7 @@ function renderAprovacaoView(o){
         </div>
         <div style="text-align:right;">
           <div class="aprov-item-valor-label">Total do aparelho</div>
-          <div class="aprov-item-valor mono">${formatCurrency(d.valor)}</div>
+          <div class="aprov-item-valor mono" data-dev-valor="${escapeHtml(d.id)}">${formatCurrency(d.valor)}</div>
         </div>
       </label>
       ${acessoriosHtml}
@@ -645,6 +645,8 @@ function atualizarTotalAprovacao(){
         if(item) valorDev -= item.valor;
       }
     });
+    const valorEl = document.querySelector(`.aprov-item-valor[data-dev-valor="${CSS.escape(c.dataset.dev)}"]`);
+    if(valorEl) valorEl.textContent = formatCurrency(valorDev);
     total += valorDev;
   });
   document.getElementById('aprov-total').textContent = formatCurrency(total);
