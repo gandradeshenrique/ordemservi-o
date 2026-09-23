@@ -165,6 +165,7 @@
   .aprov-item input[type=checkbox]{ width:20px; height:20px; accent-color:var(--green); flex-shrink:0; cursor:pointer; }
   .aprov-item-info{ flex:1; min-width:0; }
   .aprov-item-nome{ font-weight:700; font-size:13.5px; }
+  .aprov-item-imei{ font-weight:400; font-size:11.5px; color:var(--text-dim); }
   .aprov-item-diag{ font-size:12px; color:var(--text-dim); margin-top:2px; }
   .aprov-item-valor{ font-weight:700; font-size:13.5px; white-space:nowrap; }
   .aprov-item-valor-label{ font-size:10px; color:var(--text-faint); text-transform:uppercase; letter-spacing:0.4px; margin-bottom:2px; }
@@ -510,9 +511,9 @@ function mostrarAcompanhamento(o){
         <tfoot><tr><td colspan="3" style="text-align:right; font-weight:700;">Subtotal do aparelho</td><td class="mono" style="font-weight:700; color:var(--accent);">${formatCurrency(subtotal)}</td></tr></tfoot>
       </table>`;
     };
-    let html = `<div style="font-size:12px; font-weight:700; color:var(--accent); margin-bottom:6px;">Aparelho 1 — ${escapeHtml(o.aparelho||'')}</div>` + tabelaPecas(parts, o.mao_obra);
+    let html = `<div style="font-size:12px; font-weight:700; color:var(--accent); margin-bottom:6px;">Aparelho 1 — ${escapeHtml(o.aparelho||'')}${o.imei ? ` <span style="font-weight:400; color:var(--text-dim); font-size:11px;">(IMEI: ${escapeHtml(o.imei)})</span>` : ''}</div>` + tabelaPecas(parts, o.mao_obra);
     extras.forEach((a,i) => {
-      html += `<div style="font-size:12px; font-weight:700; color:var(--accent); margin:12px 0 6px;">Aparelho ${i+2} — ${escapeHtml(a.modelo||'')}</div>` + tabelaPecas(a.parts||[], a.maoObra);
+      html += `<div style="font-size:12px; font-weight:700; color:var(--accent); margin:12px 0 6px;">Aparelho ${i+2} — ${escapeHtml(a.modelo||'')}${a.imei ? ` <span style="font-weight:400; color:var(--text-dim); font-size:11px;">(IMEI: ${escapeHtml(a.imei)})</span>` : ''}</div>` + tabelaPecas(a.parts||[], a.maoObra);
     });
     document.getElementById('os-pecas').innerHTML = html;
     document.getElementById('os-total').textContent = formatCurrency(o.total);
@@ -559,10 +560,10 @@ function orcamentoDispositivos(o){
   }
 
   const principalTotal = (o.parts || []).reduce((s,p) => s + p.qtd*p.preco, 0) + (o.mao_obra || 0);
-  const lista = [{ id:'principal', nome:o.aparelho || 'Aparelho 1', diagnostico:o.diagnostico || '', valor:principalTotal, acessorios:acessoriosDoAparelho(o.parts) }];
+  const lista = [{ id:'principal', nome:o.aparelho || 'Aparelho 1', imei:o.imei || '', diagnostico:o.diagnostico || '', valor:principalTotal, acessorios:acessoriosDoAparelho(o.parts) }];
   (o.aparelhos_extras || []).forEach((a,i) => {
     const partsTotal = (a.parts || []).reduce((s,p) => s + p.qtd*p.preco, 0);
-    lista.push({ id:a.id || ('x'+i), nome:a.modelo || `Aparelho ${i+2}`, diagnostico:a.diagnostico || '', valor:partsTotal + (a.maoObra || 0), acessorios:acessoriosDoAparelho(a.parts) });
+    lista.push({ id:a.id || ('x'+i), nome:a.modelo || `Aparelho ${i+2}`, imei:a.imei || '', diagnostico:a.diagnostico || '', valor:partsTotal + (a.maoObra || 0), acessorios:acessoriosDoAparelho(a.parts) });
   });
   return lista;
 }
@@ -598,7 +599,7 @@ function renderAprovacaoView(o){
       <label class="aprov-item">
         <input type="checkbox" class="aprov-check" data-dev="${escapeHtml(d.id)}" ${marcado ? 'checked' : ''} onchange="toggleAprovDispositivo(this)">
         <div class="aprov-item-info">
-          <div class="aprov-item-nome">${escapeHtml(d.nome)}</div>
+          <div class="aprov-item-nome">${escapeHtml(d.nome)}${d.imei ? ` <span class="aprov-item-imei">(IMEI: ${escapeHtml(d.imei)})</span>` : ''}</div>
           ${d.diagnostico ? `<div class="aprov-item-diag">${escapeHtml(d.diagnostico)}</div>` : ''}
         </div>
         <div style="text-align:right;">
