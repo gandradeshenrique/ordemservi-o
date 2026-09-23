@@ -899,6 +899,49 @@
   .comentario-data  { font-size:10px; color:var(--text-faint); margin-left:6px; }
   .comentario-texto { font-size:13px; margin-top:4px; color:var(--text); }
 
+  /* Widget de notificações (aprovação/reprovação de orçamento pelo cliente) */
+  #notif-widget{ position:fixed; right:20px; bottom:20px; z-index:9998; font-family:inherit; }
+  #notif-bubble{
+    width:52px; height:52px; border-radius:50%; background:var(--accent);
+    display:flex; align-items:center; justify-content:center; cursor:pointer;
+    box-shadow:0 4px 16px rgba(0,0,0,0.35); font-size:22px; position:relative;
+    transition:transform .15s;
+  }
+  #notif-bubble:hover{ transform:scale(1.06); }
+  .notif-badge{
+    position:absolute; top:-4px; right:-4px; min-width:20px; height:20px; padding:0 5px;
+    border-radius:10px; background:var(--red); color:#fff; font-size:11px; font-weight:700;
+    display:none; align-items:center; justify-content:center; border:2px solid var(--bg,#181c20);
+  }
+  .notif-panel{
+    display:none; flex-direction:column; position:absolute; right:0; bottom:64px;
+    width:340px; max-width:calc(100vw - 40px); max-height:440px; background:var(--panel);
+    border:1px solid var(--border); border-radius:12px; box-shadow:0 8px 30px rgba(0,0,0,0.45);
+    overflow:hidden;
+  }
+  .notif-panel-header{
+    display:flex; align-items:center; justify-content:space-between; padding:12px 14px;
+    border-bottom:1px solid var(--border); font-size:13.5px; font-weight:700;
+  }
+  .notif-panel-header button{
+    background:none; border:none; color:var(--accent); font-size:11.5px; font-weight:600;
+    cursor:pointer; padding:0;
+  }
+  .notif-panel-header button:hover{ text-decoration:underline; }
+  #notif-lista{ overflow-y:auto; flex:1; }
+  .notif-item{
+    display:flex; gap:10px; padding:11px 14px; border-bottom:1px solid var(--border);
+    cursor:pointer; transition:background .15s;
+  }
+  .notif-item:last-child{ border-bottom:none; }
+  .notif-item:hover{ background:var(--panel-2); }
+  .notif-item-naolida{ background:rgba(45,160,224,0.07); }
+  .notif-item-icone{ font-size:16px; flex-shrink:0; line-height:1.4; }
+  .notif-item-corpo{ min-width:0; }
+  .notif-item-msg{ font-size:12.5px; color:var(--text); line-height:1.4; }
+  .notif-item-data{ font-size:10.5px; color:var(--text-faint); margin-top:3px; }
+  .notif-vazio{ padding:24px 14px; text-align:center; color:var(--text-faint); font-size:12.5px; }
+
 </style>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
@@ -992,6 +1035,21 @@
   </div>
 </nav>
 <div class="app">
+  <!-- Widget de notificações: alerta quando o cliente aprova/reprova o orçamento pelo link -->
+  <div id="notif-widget" style="display:none;">
+    <div class="notif-panel" id="notif-panel">
+      <div class="notif-panel-header">
+        <span>Notificações</span>
+        <button onclick="marcarTodasNotificacoesLidas()">Marcar todas como lidas</button>
+      </div>
+      <div id="notif-lista"></div>
+    </div>
+    <div id="notif-bubble" onclick="toggleNotifPanel()" title="Notificações">
+      🔔
+      <span class="notif-badge" id="notif-badge">0</span>
+    </div>
+  </div>
+
   <!-- ===== SIDEBAR ===== -->
   <div class="sidebar">
     <div class="brand">
@@ -7918,7 +7976,218 @@ function initAutoLogout(){
   renderStockTable();
   renderClientsTable();
   restaurarPagina();
+  iniciarNotificacoes();
 })();
+
+/* =========================================================
+   NOTIFICAÇÕES — alerta quando o cliente aprova/reprova o orçamento
+   pelo link de acompanhamento (rastreio.html)
+   ========================================================= */
+let notifPollTimer = null;
+let notifCache = [];
+const notifVistos = new Set();
+let notifPanelAberto = false;
+let notifPrimeiraCheck = true;
+
+function iniciarNotificacoes(){
+  const widget = document.getElementById('notif-widget');
+  if(widget) widget.style.display = 'block';
+
+  if('Notification' in window && Notification.permission === 'default'){
+    Notification.requestPermission();
+  }
+
+  checarNotificacoes();
+  if(notifPollTimer) clearInterval(notifPollTimer);
+  notifPollTimer = setInterval(checarNotificacoes, 20000);
+}
+
+async function checarNotificacoes(){
+  try{
+    const res = await fetch(
+      `${SB_URL}/rest/v1/notificacoes?order=criado_em.desc&limit=30&select=id,os_id,os_numero,aparelho,tipo,mensagem,lida,criado_em`,
+      { headers: { apikey: SB_KEY, Authorization: 'Bearer ' + SB_KEY } }
+    );
+    const rows = await res.json();
+    if(!Array.isArray(rows)) return;
+
+    notifCache = rows;
+    const naoLidas = rows.filter(r => !r.lida);
+    renderNotifBadge(naoLidas.length);
+    renderNotifLista();
+
+    const novas = naoLidas.filter(r => !notifVistos.has(r.id));
+    novas.forEach(r => notifVistos.add(r.id));
+    // Não dispara som/notificação na primeira checagem (ao abrir o app) — só
+    // pra novidades que chegarem de fato durante a sessão. O badge, esse sim,
+    // já mostra a contagem real desde o primeiro carregamento.
+    if(novas.length && !notifPrimeiraCheck) dispararAlertaNotificacao(novas);
+    notifPrimeiraCheck = false;
+  } catch(e){ /* falha de rede pontual — tenta de novo no próximo ciclo */ }
+}
+
+function renderNotifBadge(n){
+  const badge = document.getElementById('notif-badge');
+  if(!badge) return;
+  if(n > 0){
+    badge.textContent = n > 99 ? '99+' : n;
+    badge.style.display = 'flex';
+  } else {
+    badge.style.display = 'none';
+  }
+}
+
+function formatarTempoRelativo(isoStr){
+  if(!isoStr) return '';
+  const diffMs = Date.now() - new Date(isoStr).getTime();
+  const min = Math.floor(diffMs / 60000);
+  if(min < 1) return 'agora mesmo';
+  if(min < 60) return `há ${min} min`;
+  const h = Math.floor(min / 60);
+  if(h < 24) return `há ${h}h`;
+  const d = Math.floor(h / 24);
+  if(d === 1) return 'ontem';
+  if(d < 7) return `há ${d} dias`;
+  const dt = new Date(isoStr);
+  return `${String(dt.getDate()).padStart(2,'0')}/${String(dt.getMonth()+1).padStart(2,'0')}`;
+}
+
+function renderNotifLista(){
+  const el = document.getElementById('notif-lista');
+  if(!el) return;
+  if(!notifCache.length){
+    el.innerHTML = '<div class="notif-vazio">Nenhuma notificação ainda.</div>';
+    return;
+  }
+  el.innerHTML = notifCache.map(n => `
+    <div class="notif-item ${n.lida ? '' : 'notif-item-naolida'}" onclick="clicarNotificacao(${n.id}, '${escapeHtml(n.os_id || '')}')">
+      <div class="notif-item-icone">${n.tipo === 'reprovado' ? '⚠️' : '✅'}</div>
+      <div class="notif-item-corpo">
+        <div class="notif-item-msg">${escapeHtml(n.mensagem || '')}</div>
+        <div class="notif-item-data">${formatarTempoRelativo(n.criado_em)}</div>
+      </div>
+    </div>
+  `).join('');
+}
+
+function toggleNotifPanel(){
+  notifPanelAberto = !notifPanelAberto;
+  const panel = document.getElementById('notif-panel');
+  if(panel) panel.style.display = notifPanelAberto ? 'flex' : 'none';
+  if(notifPanelAberto) checarNotificacoes();
+}
+
+function clicarNotificacao(id, osId){
+  marcarNotificacaoLida(id);
+  notifPanelAberto = false;
+  const panel = document.getElementById('notif-panel');
+  if(panel) panel.style.display = 'none';
+  if(osId) openOSModal(osId);
+}
+
+async function marcarNotificacaoLida(id){
+  const item = notifCache.find(n => n.id === id);
+  if(item) item.lida = true;
+  renderNotifBadge(notifCache.filter(n => !n.lida).length);
+  renderNotifLista();
+  try{
+    await fetch(`${SB_URL}/rest/v1/notificacoes?id=eq.${id}`, {
+      method: 'PATCH',
+      headers: { apikey: SB_KEY, Authorization: 'Bearer ' + SB_KEY, 'Content-Type': 'application/json', Prefer: 'return=minimal' },
+      body: JSON.stringify({ lida: true })
+    });
+  } catch(e){ /* próxima checagem corrige se a marcação não persistir */ }
+}
+
+async function marcarTodasNotificacoesLidas(){
+  const idsNaoLidas = notifCache.filter(n => !n.lida).map(n => n.id);
+  if(!idsNaoLidas.length) return;
+  notifCache.forEach(n => n.lida = true);
+  renderNotifBadge(0);
+  renderNotifLista();
+  try{
+    await fetch(`${SB_URL}/rest/v1/notificacoes?id=in.(${idsNaoLidas.join(',')})`, {
+      method: 'PATCH',
+      headers: { apikey: SB_KEY, Authorization: 'Bearer ' + SB_KEY, 'Content-Type': 'application/json', Prefer: 'return=minimal' },
+      body: JSON.stringify({ lida: true })
+    });
+  } catch(e){ /* próxima checagem corrige se a marcação não persistir */ }
+}
+
+// Beep sintetizado via Web Audio API — sem precisar de arquivo de áudio externo
+function tocarSomNotificacao(){
+  try{
+    const ctx = new (window.AudioContext || window.webkitAudioContext)();
+    const osc = ctx.createOscillator();
+    const gain = ctx.createGain();
+    osc.type = 'sine';
+    osc.frequency.setValueAtTime(880, ctx.currentTime);
+    osc.frequency.setValueAtTime(1175, ctx.currentTime + 0.12);
+    gain.gain.setValueAtTime(0.0001, ctx.currentTime);
+    gain.gain.exponentialRampToValueAtTime(0.28, ctx.currentTime + 0.01);
+    gain.gain.exponentialRampToValueAtTime(0.0001, ctx.currentTime + 0.35);
+    osc.connect(gain);
+    gain.connect(ctx.destination);
+    osc.start();
+    osc.stop(ctx.currentTime + 0.4);
+    osc.onended = () => ctx.close();
+  } catch(e){ /* autoplay bloqueado antes de qualquer interação do usuário — ignora */ }
+}
+
+// Pisca o título da aba até a janela recuperar o foco — chama atenção mesmo
+// se o técnico estiver em outra aba do navegador.
+const _tituloOriginalApp = document.title;
+let _notifPiscaTimer = null;
+function piscarTituloAba(){
+  if(_notifPiscaTimer) return;
+  let visivel = true;
+  _notifPiscaTimer = setInterval(() => {
+    document.title = visivel ? '🔔 Nova resposta do cliente' : _tituloOriginalApp;
+    visivel = !visivel;
+  }, 1200);
+  const parar = () => {
+    clearInterval(_notifPiscaTimer);
+    _notifPiscaTimer = null;
+    document.title = _tituloOriginalApp;
+    window.removeEventListener('focus', parar);
+  };
+  window.addEventListener('focus', parar);
+}
+
+function dispararAlertaNotificacao(novas){
+  tocarSomNotificacao();
+  piscarTituloAba();
+
+  if('Notification' in window && Notification.permission === 'granted'){
+    const primeira = novas[0];
+    const corpo = novas.length === 1
+      ? primeira.mensagem
+      : `${primeira.mensagem} e mais ${novas.length - 1} notificação(ões)`;
+    try{
+      const n = new Notification('MobitOS — Nova resposta do cliente', {
+        body: corpo,
+        icon: 'logo.png',
+        tag: 'mobitos-notif-' + primeira.id
+      });
+      n.onclick = () => {
+        window.focus();
+        if(primeira.os_id) openOSModal(primeira.os_id);
+        n.close();
+      };
+    } catch(e){ /* navegador pode recusar Notification fora de contexto seguro (http) */ }
+  }
+}
+
+// Fecha o painel ao clicar fora dele
+document.addEventListener('click', (ev) => {
+  if(!notifPanelAberto) return;
+  const widget = document.getElementById('notif-widget');
+  if(widget && !widget.contains(ev.target)){
+    notifPanelAberto = false;
+    const panel = document.getElementById('notif-panel');
+    if(panel) panel.style.display = 'none';
+  }
+});
 
 /* =========================================================
    MÓDULO DE COTAÇÃO
