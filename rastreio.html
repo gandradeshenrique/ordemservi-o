@@ -156,6 +156,18 @@
   .text-dim{ color:var(--text-dim); }
   .footer-note{ text-align:center; color:var(--text-faint); font-size:11px; margin-top:20px; }
 
+  /* ---- Aprovação do orçamento ---- */
+  #aprovacao-view{ display:none; }
+  .aprov-hint{ font-size:12.5px; color:var(--text-dim); margin-bottom:14px; }
+  .aprov-item{ display:flex; align-items:center; gap:12px; padding:12px 0; border-bottom:1px solid var(--border); }
+  .aprov-item:last-child{ border-bottom:none; }
+  .aprov-item input[type=checkbox]{ width:20px; height:20px; accent-color:var(--green); flex-shrink:0; cursor:pointer; }
+  .aprov-item-info{ flex:1; min-width:0; }
+  .aprov-item-nome{ font-weight:700; font-size:13.5px; }
+  .aprov-item-diag{ font-size:12px; color:var(--text-dim); margin-top:2px; }
+  .aprov-item-valor{ font-weight:700; font-size:13.5px; white-space:nowrap; }
+  .aprov-total-line{ display:flex; justify-content:space-between; align-items:center; padding-top:12px; margin-top:6px; border-top:1.5px solid var(--border); font-weight:700; font-size:15px; }
+
   @media (max-width:420px){
     .kv-list, .checklist-grid{ grid-template-columns:1fr; }
   }
@@ -229,6 +241,37 @@
     </div>
 
     <div class="erro" id="track-erro"></div>
+    <div class="footer-note">Mobit Soluções · página de acompanhamento</div>
+  </div>
+
+  <!-- ===== APROVAÇÃO DO ORÇAMENTO ===== -->
+  <div id="aprovacao-view">
+    <div class="topbar">
+      <img src="logo.png" alt="Mobit Soluções" onerror="this.style.display='none'">
+      <a class="sair" onclick="sair()">Sair</a>
+    </div>
+
+    <div class="os-header">
+      <div>
+        <h2 id="aprov-titulo">OS #0000</h2>
+        <div class="sub" id="aprov-cliente"></div>
+      </div>
+      <span class="badge badge-aguardando">Aguardando aprovação</span>
+    </div>
+
+    <div class="card">
+      <div class="section-title">Orçamento</div>
+      <p class="aprov-hint">Confira o diagnóstico e o valor de cada aparelho abaixo. Desmarque os que você <strong>não</strong> quer aprovar — as peças desses aparelhos não serão instaladas.</p>
+      <div id="aprov-itens"></div>
+      <div class="aprov-total-line">
+        <span>Total aprovado</span>
+        <span id="aprov-total" class="mono">R$ 0,00</span>
+      </div>
+    </div>
+
+    <button class="btn" id="btn-confirmar-aprovacao" onclick="confirmarAprovacao()">Confirmar decisão</button>
+    <div class="erro" id="aprov-erro"></div>
+
     <div class="footer-note">Mobit Soluções · página de acompanhamento</div>
   </div>
 
@@ -346,10 +389,26 @@ document.addEventListener('visibilitychange', () => {
 });
 
 let ultimoOS = null;
+let aprovacaoAtiva = false;
 
 function mostrarAcompanhamento(o){
   ultimoOS = o;
   document.getElementById('login-view').style.display = 'none';
+
+  // Orçamento aguardando resposta do cliente: mostra a tela de aprovação em vez do acompanhamento normal
+  if(o.status === 'Aguardando aprovação'){
+    document.getElementById('track-view').style.display = 'none';
+    document.getElementById('aprovacao-view').style.display = 'block';
+    // Só reconstrói a lista/checkboxes na primeira vez que a tela aparece — evita apagar
+    // uma seleção que o cliente já esteja fazendo quando o polling atualiza em segundo plano
+    if(!aprovacaoAtiva){
+      aprovacaoAtiva = true;
+      renderAprovacaoView(o);
+    }
+    return;
+  }
+  aprovacaoAtiva = false;
+  document.getElementById('aprovacao-view').style.display = 'none';
   document.getElementById('track-view').style.display = 'block';
 
   document.getElementById('os-titulo').textContent = `OS #${o.numero} — ${o.aparelho || ''}`;
@@ -455,6 +514,123 @@ function mostrarAcompanhamento(o){
     document.getElementById('os-obs').textContent = o.observacoes;
   } else {
     document.getElementById('card-obs').style.display = 'none';
+  }
+}
+
+/* =========================================================
+   APROVAÇÃO DO ORÇAMENTO
+   ========================================================= */
+// Lista unificada dos aparelhos (principal + extras) com nome, diagnóstico e valor —
+// mesma lógica usada no app interno (index.html) pra montar o orçamento por aparelho.
+function orcamentoDispositivos(o){
+  const principalTotal = (o.parts || []).reduce((s,p) => s + p.qtd*p.preco, 0) + (o.mao_obra || 0);
+  const lista = [{ id:'principal', nome:o.aparelho || 'Aparelho 1', diagnostico:o.diagnostico || '', valor:principalTotal }];
+  (o.aparelhos_extras || []).forEach((a,i) => {
+    const partsTotal = (a.parts || []).reduce((s,p) => s + p.qtd*p.preco, 0);
+    lista.push({ id:a.id || ('x'+i), nome:a.modelo || `Aparelho ${i+2}`, diagnostico:a.diagnostico || '', valor:partsTotal + (a.maoObra || 0) });
+  });
+  return lista;
+}
+
+function renderAprovacaoView(o){
+  document.getElementById('aprov-titulo').textContent = `OS #${o.numero} — ${o.aparelho || ''}`;
+  document.getElementById('aprov-cliente').textContent = o.cliente_nome || '';
+
+  const lista = orcamentoDispositivos(o);
+  const decisoesAtuais = o.aprovacoes_dispositivos || {};
+
+  document.getElementById('aprov-itens').innerHTML = lista.map(d => {
+    // Já reprovado manualmente pelo técnico antes do cliente entrar: vem desmarcado.
+    // Qualquer outro estado (pendente ou já aprovado manualmente) vem marcado por padrão.
+    const marcado = decisoesAtuais[d.id] !== 'reprovado';
+    return `
+    <label class="aprov-item">
+      <input type="checkbox" class="aprov-check" data-dev="${escapeHtml(d.id)}" ${marcado ? 'checked' : ''} onchange="atualizarTotalAprovacao()">
+      <div class="aprov-item-info">
+        <div class="aprov-item-nome">${escapeHtml(d.nome)}</div>
+        ${d.diagnostico ? `<div class="aprov-item-diag">${escapeHtml(d.diagnostico)}</div>` : ''}
+      </div>
+      <div class="aprov-item-valor mono">${formatCurrency(d.valor)}</div>
+    </label>`;
+  }).join('');
+
+  const erro = document.getElementById('aprov-erro');
+  erro.classList.remove('show');
+  const btn = document.getElementById('btn-confirmar-aprovacao');
+  btn.disabled = false; btn.textContent = 'Confirmar decisão';
+
+  atualizarTotalAprovacao();
+}
+
+function atualizarTotalAprovacao(){
+  const o = ultimoOS;
+  if(!o) return;
+  const lista = orcamentoDispositivos(o);
+  const checks = [...document.querySelectorAll('.aprov-check')];
+  let total = 0, aprovados = 0;
+  checks.forEach(c => {
+    const d = lista.find(x => x.id === c.dataset.dev);
+    if(d && c.checked){ total += d.valor; aprovados++; }
+  });
+  document.getElementById('aprov-total').textContent = formatCurrency(total);
+  const btn = document.getElementById('btn-confirmar-aprovacao');
+  if(!btn.disabled) btn.textContent = aprovados === 0 ? 'Reprovar todos os aparelhos' : 'Confirmar decisão';
+}
+
+async function confirmarAprovacao(){
+  const senha = sessionStorage.getItem('rastreio_senha_' + token);
+  if(!senha){ sair(); return; }
+  const checks = [...document.querySelectorAll('.aprov-check')];
+  if(!checks.length) return;
+
+  const algumDesmarcado = checks.some(c => !c.checked);
+  if(algumDesmarcado && !confirm('Os aparelhos desmarcados serão reprovados e as peças voltam pro estoque. Essa decisão vale pra todos os aparelhos da OS de uma vez. Confirmar?')) return;
+
+  const decisoes = {};
+  checks.forEach(c => { decisoes[c.dataset.dev] = c.checked; });
+
+  const btn = document.getElementById('btn-confirmar-aprovacao');
+  const erro = document.getElementById('aprov-erro');
+  erro.classList.remove('show');
+  btn.disabled = true; btn.textContent = 'Enviando...';
+
+  try {
+    const r = await fetch(`${SB_URL}/rest/v1/rpc/responder_orcamento_rastreio`, {
+      method: 'POST',
+      headers: { apikey: SB_KEY, Authorization: 'Bearer ' + SB_KEY, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ p_token: token, p_senha: senha, p_decisoes: decisoes })
+    });
+    if(!r.ok){
+      let detalhe = '';
+      try { const j = await r.json(); detalhe = j.message || j.hint || j.code || ''; } catch(e){}
+      throw new Error(`Erro ${r.status}${detalhe ? ' — ' + detalhe : ''}`);
+    }
+    const rows = await r.json();
+    const resultado = rows && rows[0];
+
+    if(!resultado || !resultado.ok){
+      const motivo = resultado ? resultado.motivo : '';
+      if(motivo === 'ja_respondido'){
+        erro.textContent = 'Esse orçamento já foi respondido antes. Atualizando a tela...';
+      } else if(motivo === 'senha_invalida' || motivo === 'token_invalido'){
+        erro.textContent = 'Sua sessão expirou. Saia e entre novamente com a senha de acesso.';
+      } else {
+        erro.textContent = 'Não foi possível registrar sua decisão agora. Tente novamente.';
+      }
+      erro.classList.add('show');
+      btn.disabled = false; btn.textContent = 'Confirmar decisão';
+      // Recarrega o estado real da OS — pode já ter mudado (ex: técnico decidiu antes)
+      verificarAcesso(senha).then(rr => { if(rr && rr.length) mostrarAcompanhamento(rr[0]); }).catch(()=>{});
+      return;
+    }
+
+    aprovacaoAtiva = false;
+    const rows2 = await verificarAcesso(senha);
+    if(rows2 && rows2.length) mostrarAcompanhamento(rows2[0]);
+  } catch(e){
+    erro.textContent = 'Não foi possível enviar sua decisão (' + e.message + '). Tente novamente em instantes.';
+    erro.classList.add('show');
+    btn.disabled = false; btn.textContent = 'Confirmar decisão';
   }
 }
 

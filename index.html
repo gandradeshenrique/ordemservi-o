@@ -1440,8 +1440,9 @@
       <button type="button" class="wz-step" data-go="2" onclick="wzGo(2)"><span class="wz-num">2</span><span class="wz-lbl">Aparelhos</span></button>
       <button type="button" class="wz-step" data-go="3" onclick="wzGo(3)"><span class="wz-num">3</span><span class="wz-lbl">Recebimento</span></button>
       <button type="button" class="wz-step" data-go="4" onclick="wzGo(4)"><span class="wz-num">4</span><span class="wz-lbl">Bancada</span></button>
-      <button type="button" class="wz-step" data-go="5" onclick="wzGo(5)"><span class="wz-num">5</span><span class="wz-lbl">Custos</span></button>
-      <button type="button" class="wz-step" data-go="6" onclick="wzGo(6)"><span class="wz-num">6</span><span class="wz-lbl">Status</span></button>
+      <button type="button" class="wz-step" data-go="5" onclick="wzGo(5)"><span class="wz-num">5</span><span class="wz-lbl">Aprovação</span></button>
+      <button type="button" class="wz-step" data-go="6" onclick="wzGo(6)"><span class="wz-num">6</span><span class="wz-lbl">Custos</span></button>
+      <button type="button" class="wz-step" data-go="7" onclick="wzGo(7)"><span class="wz-num">7</span><span class="wz-lbl">Status</span></button>
     </div>
 
     <fieldset data-step="1">
@@ -1723,6 +1724,11 @@
     </fieldset>
 
     <fieldset data-step="5">
+      <legend>Aprovação do cliente</legend>
+      <div id="aprovacao-wizard-wrap"></div>
+    </fieldset>
+
+    <fieldset data-step="6">
       <legend>Custos operacionais <span style="font-weight:400; font-size:11px; color:var(--text-dim);">(uso interno — não aparece na OS impressa)</span></legend>
       <div class="field-row">
         <div class="field">
@@ -1746,7 +1752,7 @@
       </div>
     </fieldset>
 
-    <fieldset data-step="6">
+    <fieldset data-step="7">
       <legend>Status e prazos</legend>
       <div class="field-row-3">
         <div class="field">
@@ -1797,7 +1803,7 @@
       </div>
     </fieldset>
 
-    <fieldset data-step="6">
+    <fieldset data-step="7">
       <legend>Fotos de saída <span style="font-weight:400; font-size:11px; color:var(--text-dim);">(tire ao finalizar o reparo)</span></legend>
       <div id="fotos-saida-wrap"></div>
     </fieldset>
@@ -2696,6 +2702,12 @@ async function loadFromSupabase(){
       state.colunaRastreio = rr.ok;
     } catch(e){ state.colunaRastreio = os.length ? ('rastreio_token' in os[0]) : false; }
 
+    // Sonda pra coluna de aprovação de orçamento pelo cliente (mesmo script sql_rastreio_os.sql)
+    try {
+      const ra = await fetch(`${SB_URL}/rest/v1/ordens_servico?select=aprovacoes_dispositivos&limit=1`, { headers: sbHeaders() });
+      state.colunaAprovacoes = ra.ok;
+    } catch(e){ state.colunaAprovacoes = os.length ? ('aprovacoes_dispositivos' in os[0]) : false; }
+
     state.os = os.map(o => ({
       id: o.id, numero: o.numero,
       clienteId: o.cliente_id, clienteNome: o.cliente_nome || '',
@@ -2721,7 +2733,8 @@ async function loadFromSupabase(){
       historico: o.historico || [],
       rastreioToken: o.rastreio_token || null,
       rastreioSenhaHash: o.rastreio_senha_hash || null,
-      rastreioSenhaSalt: o.rastreio_senha_salt || null
+      rastreioSenhaSalt: o.rastreio_senha_salt || null,
+      aprovacoesDispositivos: o.aprovacoes_dispositivos || {}
     }));
 
     // Reconstruir history a partir do campo historico de cada OS
@@ -4260,7 +4273,7 @@ async function fotoSelecionarView(input, osId, did, stage){
 }
 
 /* ---------- Wizard de abertura de OS (etapas com salvamento parcial) ---------- */
-const WZ_TOTAL = 6;
+const WZ_TOTAL = 7;
 let wzCurrent = 1, wzDirty = false, wzBusy = false;
 
 function wzOsExiste(){ return !!document.getElementById('os-id').value; }
@@ -4281,13 +4294,16 @@ function wzEstado(){
   const clOk = (oculto || document.querySelectorAll('#os-checklist-wrap input[type=radio]:checked').length >= CL_ITEMS.length) &&
     (oculto || extras.every(c => c.querySelectorAll('.ae-checklist-wrap input[type=radio]:checked').length >= CL_ITEMS.length));
   const diagOk = !!v('os-diagnostico') && extras.every(c => c.querySelector('.ae-diagnostico').value.trim());
+  const osAtual = state.os.find(x => x.id === v('os-id'));
+  const aprovOk = !!(osAtual && ['Em andamento','Aguardando peça','Concluído','Entregue','Cancelado'].includes(osAtual.status));
   return {
     1: !!(v('os-cliente-id') && v('os-chamado')),
     2: cadOk,
     3: cadOk && clOk && (!fotosAtivas() || wzDispositivos().every(d => fotosDe(d.id, 'entrada').length)),
     4: diagOk,
-    5: !!(parseFloat(v('os-logistica-pecas')) || parseFloat(v('os-logistica-equipamento')) || parseFloat(v('os-horas-servico')) || parseFloat(v('os-custo-horas'))),
-    6: wzOsExiste() && v('os-status') !== 'Aguardando aparelho' && !!v('os-data-prevista')
+    5: aprovOk,
+    6: !!(parseFloat(v('os-logistica-pecas')) || parseFloat(v('os-logistica-equipamento')) || parseFloat(v('os-horas-servico')) || parseFloat(v('os-custo-horas'))),
+    7: wzOsExiste() && v('os-status') !== 'Aguardando aparelho' && !!v('os-data-prevista')
   };
 }
 
@@ -4315,7 +4331,7 @@ function wzExpandirAparelhos(){
   });
 }
 
-const WZ_LEGENDAS = { 2:'Aparelhos', 3:'Recebimento — checklist, acessórios e senha', 4:'Bancada — diagnóstico e peças' };
+const WZ_LEGENDAS = { 2:'Aparelhos', 3:'Recebimento — checklist, acessórios e senha', 4:'Bancada — diagnóstico e peças', 5:'Aprovação do cliente' };
 
 function wzRefresh(){
   const est = wzEstado();
@@ -4339,7 +4355,8 @@ function wzShow(n){
   const lg = document.getElementById('dv-legend'); if(lg && WZ_LEGENDAS[n]) lg.textContent = WZ_LEGENDAS[n];
   if(n === 3 || n === 4) wzExpandirAparelhos();
   if(n === 3) fotosRender();
-  if(n === 6) fotosRenderSaida();
+  if(n === 5) renderAprovacaoWizard();
+  if(n === 7) fotosRenderSaida();
   const ultima = n === WZ_TOTAL;
   document.getElementById('wz-btn-back').style.display = n === 1 ? 'none' : '';
   document.getElementById('wz-btn-exit').style.display = ultima ? 'none' : '';
@@ -4365,9 +4382,176 @@ async function wzGo(n){
 function wzBack(){ wzGo(wzCurrent - 1); }
 async function wzNext(){
   const ultima = wzCurrent === WZ_TOTAL;
+  const saindoDaBancada = wzCurrent === 4;
   const level = ultima ? 'full' : (wzCurrent >= 3 ? 3 : wzCurrent);
   const ok = await saveOS({ level, close: ultima });
-  if(ok && !ultima) wzShow(wzCurrent + 1);
+  if(!ok) return;
+  if(saindoDaBancada) await wzAvancarParaAprovacaoSeNecessario();
+  if(!ultima) wzShow(wzCurrent + 1);
+}
+
+// Ao sair da etapa "Bancada" com diagnóstico/peças/valores preenchidos, o reparo passa
+// a depender da aprovação do cliente: muda o status pra "Aguardando aprovação" (só quando a
+// OS estava "Aberto" — evita regredir um status mais avançado numa edição posterior).
+async function wzAvancarParaAprovacaoSeNecessario(){
+  const osId = document.getElementById('os-id').value;
+  const o = state.os.find(x => x.id === osId);
+  if(!o || o.status !== 'Aberto') return;
+  const oldStatus = o.status;
+  try {
+    o.status = 'Aguardando aprovação';
+    addHistoryEntry(osId, `Orçamento pronto. Status alterado de "${oldStatus}" para "Aguardando aprovação" — aguardando o cliente.`);
+    await sbPatch('ordens_servico', 'id', osId, {
+      status: 'Aguardando aprovação',
+      historico: state.history[osId] || []
+    });
+    const sel = document.getElementById('os-status');
+    if(sel) sel.value = 'Aguardando aprovação';
+    showToast('Orçamento salvo — status "Aguardando aprovação". Envie o link de acompanhamento pro cliente.');
+  } catch(e){
+    o.status = oldStatus;
+    console.error(e);
+    showToast('Erro ao atualizar status para aguardando aprovação: ' + e.message, true);
+  }
+}
+
+/* ---------- Etapa "Aprovação do cliente" ---------- */
+// Lista unificada dos aparelhos da OS (principal + extras) com valor e peças, usada tanto
+// pra montar a tela de aprovação quanto pra decidir o que devolver/debitar do estoque.
+function wzListaAparelhosOrcamento(o){
+  const principalTotal = (o.parts || []).reduce((s,p) => s + p.qtd*p.preco, 0) + (o.maoObra || 0);
+  const lista = [{
+    id:'principal', nome:o.aparelho || 'Aparelho 1', diagnostico:o.diagnostico || '',
+    valor:principalTotal, parts:o.parts || []
+  }];
+  (o.aparelhosExtras || []).forEach((a, i) => {
+    const partsTotal = (a.parts || []).reduce((s,p) => s + p.qtd*p.preco, 0);
+    lista.push({
+      id: a.id || ('x' + i), nome: a.modelo || `Aparelho ${i + 2}`, diagnostico: a.diagnostico || '',
+      valor: partsTotal + (a.maoObra || 0), parts: a.parts || []
+    });
+  });
+  return lista;
+}
+
+function aprovacaoLinhaHtml(d, decisao, readonly){
+  const status = decisao || 'pendente';
+  const cor = status === 'reprovado' ? 'var(--red)' : (status === 'aprovado' ? 'var(--green)' : 'var(--text-dim)');
+  const label = status === 'reprovado' ? 'Reprovado' : (status === 'aprovado' ? 'Aprovado' : 'Pendente');
+  return `<div class="card" style="display:flex; justify-content:space-between; align-items:center; gap:12px; margin-bottom:8px; padding:10px 14px;">
+    <div>
+      <div style="font-weight:700;">${escapeHtml(d.nome)}</div>
+      ${d.diagnostico ? `<div style="font-size:12px; color:var(--text-dim); margin-top:2px;">${escapeHtml(d.diagnostico)}</div>` : ''}
+      <div style="font-size:13px; margin-top:4px;">${formatCurrency(d.valor)}</div>
+    </div>
+    <div style="display:flex; align-items:center; gap:8px; flex-shrink:0;">
+      <span style="font-size:12px; font-weight:700; color:${cor};">${label}</span>
+      ${readonly ? '' : `
+        <button type="button" class="btn btn-sm" style="border-color:var(--green); color:var(--green);" onclick="wzDecidirAparelho('${d.id}', true)">✓ Aprovar</button>
+        <button type="button" class="btn btn-sm" style="border-color:var(--red); color:var(--red);" onclick="wzDecidirAparelho('${d.id}', false)">✕ Reprovar</button>
+      `}
+    </div>
+  </div>`;
+}
+
+function renderAprovacaoWizard(){
+  const wrap = document.getElementById('aprovacao-wizard-wrap');
+  if(!wrap) return;
+  const osId = document.getElementById('os-id').value;
+  const o = state.os.find(x => x.id === osId);
+  if(!o){
+    wrap.innerHTML = `<p style="color:var(--text-dim); font-size:13px;">Salve as etapas anteriores primeiro.</p>`;
+    return;
+  }
+
+  if(state.colunaAprovacoes === false){
+    wrap.innerHTML = `<p style="color:var(--text-dim); font-size:13px;">
+      Essa etapa ainda não foi instalada no banco de dados. Rode o script <span class="mono">sql_rastreio_os.sql</span>
+      atualizado no Supabase e recarregue a página.
+    </p>`;
+    return;
+  }
+
+  const lista = wzListaAparelhosOrcamento(o);
+  const decisoes = o.aprovacoesDispositivos || {};
+
+  if(o.status === 'Aguardando aprovação'){
+    wrap.innerHTML = `
+      <p style="color:var(--text-dim); font-size:13px; margin-bottom:12px;">
+        Aguardando o cliente aprovar o orçamento pelo link de acompanhamento. Se ele já respondeu por telefone
+        ou WhatsApp, registre a decisão manualmente em cada aparelho abaixo.
+      </p>
+      ${lista.map(d => aprovacaoLinhaHtml(d, decisoes[d.id])).join('')}
+      <div style="margin-top:10px;">
+        <button type="button" class="btn" onclick="abrirLinkAcompanhamento('${osId}')">🔗 Ver / copiar link de acompanhamento</button>
+      </div>`;
+  } else if(o.status === 'Aberto'){
+    wrap.innerHTML = `<p style="color:var(--text-dim); font-size:13px;">
+      Preencha o diagnóstico e as peças na etapa "Bancada" e continue — o orçamento fica disponível
+      pra aprovação do cliente aqui.
+    </p>`;
+  } else {
+    wrap.innerHTML = `
+      <p style="color:var(--green); font-size:13px; margin-bottom:12px;">
+        Orçamento já respondido — status atual: <strong>${escapeHtml(o.status)}</strong>.
+      </p>
+      ${lista.map(d => aprovacaoLinhaHtml(d, decisoes[d.id], true)).join('')}`;
+  }
+}
+
+async function wzDecidirAparelho(devId, aprovado){
+  const osId = document.getElementById('os-id').value;
+  const o = state.os.find(x => x.id === osId);
+  if(!o || wzBusy) return;
+  wzBusy = true;
+  try {
+    const lista = wzListaAparelhosOrcamento(o);
+    const dev = lista.find(d => d.id === devId);
+    if(!dev){ wzBusy = false; return; }
+
+    const novoStatusDev = aprovado ? 'aprovado' : 'reprovado';
+    const decisoes = Object.assign({}, o.aprovacoesDispositivos || {});
+    const eraReprovado = decisoes[devId] === 'reprovado';
+    const agoraReprovado = novoStatusDev === 'reprovado';
+
+    // Só mexe no estoque quando o aparelho MUDA de lado (evita duplicar devolução/débito)
+    if(eraReprovado !== agoraReprovado){
+      dev.parts.forEach(p => adjustStock(p.stockId, agoraReprovado ? p.qtd : -p.qtd));
+    }
+    decisoes[devId] = novoStatusDev;
+    o.aprovacoesDispositivos = decisoes;
+
+    const patch = { aprovacoes_dispositivos: decisoes };
+    const todosDecididos = lista.every(d => decisoes[d.id]);
+    if(todosDecididos){
+      const algumAprovado = lista.some(d => decisoes[d.id] !== 'reprovado');
+      const novoStatus = algumAprovado ? 'Em andamento' : 'Cancelado';
+      if(novoStatus !== o.status){
+        const oldStatus = o.status;
+        o.status = novoStatus;
+        addHistoryEntry(osId, `Decisão do cliente registrada manualmente: status alterado de "${oldStatus}" para "${novoStatus}".`);
+        patch.status = novoStatus;
+        patch.historico = state.history[osId] || [];
+      }
+    }
+
+    await sbPatch('ordens_servico', 'id', osId, patch);
+    const sel = document.getElementById('os-status');
+    if(sel && patch.status) sel.value = patch.status;
+    showToast(`${escapeHtml(dev.nome)} marcado como ${aprovado ? 'aprovado' : 'reprovado'}.`);
+    renderAprovacaoWizard();
+    wzRefresh();
+  } catch(e){
+    if(/^(POST|PATCH) ordens_servico/.test(e.message) && /(PGRST204|42703|column)[^]*aprova|aprova[^]*(PGRST204|42703|column)/i.test(e.message)){
+      state.colunaAprovacoes = false;
+      showToast('A coluna de aprovação de orçamento não existe no Supabase ainda. Rode o sql_rastreio_os.sql e recarregue a página.', true);
+      renderAprovacaoWizard();
+    } else {
+      showToast('Erro ao registrar decisão: ' + e.message, true);
+    }
+  } finally {
+    wzBusy = false;
+  }
 }
 // Todo aparelho extra precisa de modelo, IMEI e defeito (mesma regra do aparelho 1)
 function wzValidarExtras(){
@@ -4741,7 +4925,8 @@ async function _saveOSInner(opts){
         historico: state.history[newId] || [],
         rastreioToken: novoRastreio ? novoRastreio.token : null,
         rastreioSenhaHash: novoRastreio ? novoRastreio.hash : null,
-        rastreioSenhaSalt: novoRastreio ? novoRastreio.salt : null
+        rastreioSenhaSalt: novoRastreio ? novoRastreio.salt : null,
+        aprovacoesDispositivos: {}
       });
       wzFotosExigir = !!(fotosPayload && fotosPayload.exigir);
 
