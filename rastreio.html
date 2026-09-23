@@ -167,11 +167,13 @@
   .aprov-item-nome{ font-weight:700; font-size:13.5px; }
   .aprov-item-diag{ font-size:12px; color:var(--text-dim); margin-top:2px; }
   .aprov-item-valor{ font-weight:700; font-size:13.5px; white-space:nowrap; }
+  .aprov-item-valor-label{ font-size:10px; color:var(--text-faint); text-transform:uppercase; letter-spacing:0.4px; margin-bottom:2px; }
   .aprov-sub{ margin:8px 0 0 32px; display:flex; flex-direction:column; gap:6px; }
   .aprov-sub-item{ display:flex; align-items:center; gap:8px; font-size:12.5px; color:var(--text-dim); cursor:pointer; }
   .aprov-sub-item input[type=checkbox]{ width:16px; height:16px; accent-color:var(--green); flex-shrink:0; cursor:pointer; }
   .aprov-sub-item input[type=checkbox]:disabled{ cursor:default; opacity:0.5; }
   .aprov-sub-valor{ margin-left:auto; }
+  .aprov-sub-reparo{ cursor:default; padding-bottom:4px; margin-bottom:2px; border-bottom:1px dashed var(--border); color:var(--text-faint); }
   .aprov-total-line{ display:flex; justify-content:space-between; align-items:center; padding-top:12px; margin-top:6px; border-top:1.5px solid var(--border); font-weight:700; font-size:15px; }
 
   @media (max-width:420px){
@@ -496,14 +498,18 @@ function mostrarAcompanhamento(o){
   const temPecas = parts.length || o.mao_obra || extras.length;
   if(temPecas){
     document.getElementById('card-pecas').style.display = 'block';
-    const tabelaPecas = (lista, maoObra) => `
+    const tabelaPecas = (lista, maoObra) => {
+      const subtotal = lista.reduce((s,p) => s + p.qtd*p.preco, 0) + (maoObra || 0);
+      return `
       <table style="margin-bottom:10px;">
         <thead><tr><th>Item</th><th>Qtd.</th><th>Preço</th><th>Subtotal</th></tr></thead>
         <tbody>
           ${lista.map(p => `<tr><td>${escapeHtml(p.nome)}</td><td class="mono">${p.qtd}</td><td class="mono">${formatCurrency(p.preco)}</td><td class="mono">${formatCurrency(p.qtd*p.preco)}</td></tr>`).join('')}
           ${maoObra ? `<tr><td colspan="3" style="text-align:right; font-weight:600;">Mão de obra</td><td class="mono">${formatCurrency(maoObra)}</td></tr>` : ''}
         </tbody>
+        <tfoot><tr><td colspan="3" style="text-align:right; font-weight:700;">Subtotal do aparelho</td><td class="mono" style="font-weight:700; color:var(--accent);">${formatCurrency(subtotal)}</td></tr></tfoot>
       </table>`;
+    };
     let html = `<div style="font-size:12px; font-weight:700; color:var(--accent); margin-bottom:6px;">Aparelho 1 — ${escapeHtml(o.aparelho||'')}</div>` + tabelaPecas(parts, o.mao_obra);
     extras.forEach((a,i) => {
       html += `<div style="font-size:12px; font-weight:700; color:var(--accent); margin:12px 0 6px;">Aparelho ${i+2} — ${escapeHtml(a.modelo||'')}</div>` + tabelaPecas(a.parts||[], a.maoObra);
@@ -572,8 +578,14 @@ function renderAprovacaoView(o){
     // Já reprovado manualmente pelo técnico antes do cliente entrar: vem desmarcado.
     // Qualquer outro estado (pendente ou já aprovado manualmente) vem marcado por padrão.
     const marcado = decisoesAtuais[d.id] !== 'reprovado';
+    const acessoriosTotal = d.acessorios.reduce((s,a) => s + a.valor, 0);
+    const reparoValor = d.valor - acessoriosTotal;
     const acessoriosHtml = d.acessorios.length ? `
       <div class="aprov-sub">
+        <div class="aprov-sub-item aprov-sub-reparo">
+          <span>Reparo (peças + mão de obra)</span>
+          <span class="mono aprov-sub-valor">${formatCurrency(reparoValor)}</span>
+        </div>
         ${d.acessorios.map(a => `
           <label class="aprov-sub-item">
             <input type="checkbox" class="aprov-ac-check" data-dev="${escapeHtml(d.id)}" data-cat="${a.categoria}" checked ${marcado ? '' : 'disabled'} onchange="atualizarTotalAprovacao()">
@@ -589,7 +601,10 @@ function renderAprovacaoView(o){
           <div class="aprov-item-nome">${escapeHtml(d.nome)}</div>
           ${d.diagnostico ? `<div class="aprov-item-diag">${escapeHtml(d.diagnostico)}</div>` : ''}
         </div>
-        <div class="aprov-item-valor mono">${formatCurrency(d.valor)}</div>
+        <div style="text-align:right;">
+          <div class="aprov-item-valor-label">Total do aparelho</div>
+          <div class="aprov-item-valor mono">${formatCurrency(d.valor)}</div>
+        </div>
       </label>
       ${acessoriosHtml}
     </div>`;
