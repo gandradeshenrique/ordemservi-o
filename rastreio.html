@@ -159,13 +159,19 @@
   /* ---- Aprovação do orçamento ---- */
   #aprovacao-view{ display:none; }
   .aprov-hint{ font-size:12.5px; color:var(--text-dim); margin-bottom:14px; }
-  .aprov-item{ display:flex; align-items:center; gap:12px; padding:12px 0; border-bottom:1px solid var(--border); }
-  .aprov-item:last-child{ border-bottom:none; }
+  .aprov-block{ padding:12px 0; border-bottom:1px solid var(--border); }
+  .aprov-block:last-child{ border-bottom:none; }
+  .aprov-item{ display:flex; align-items:center; gap:12px; padding:0; border-bottom:none; }
   .aprov-item input[type=checkbox]{ width:20px; height:20px; accent-color:var(--green); flex-shrink:0; cursor:pointer; }
   .aprov-item-info{ flex:1; min-width:0; }
   .aprov-item-nome{ font-weight:700; font-size:13.5px; }
   .aprov-item-diag{ font-size:12px; color:var(--text-dim); margin-top:2px; }
   .aprov-item-valor{ font-weight:700; font-size:13.5px; white-space:nowrap; }
+  .aprov-sub{ margin:8px 0 0 32px; display:flex; flex-direction:column; gap:6px; }
+  .aprov-sub-item{ display:flex; align-items:center; gap:8px; font-size:12.5px; color:var(--text-dim); cursor:pointer; }
+  .aprov-sub-item input[type=checkbox]{ width:16px; height:16px; accent-color:var(--green); flex-shrink:0; cursor:pointer; }
+  .aprov-sub-item input[type=checkbox]:disabled{ cursor:default; opacity:0.5; }
+  .aprov-sub-valor{ margin-left:auto; }
   .aprov-total-line{ display:flex; justify-content:space-between; align-items:center; padding-top:12px; margin-top:6px; border-top:1.5px solid var(--border); font-weight:700; font-size:15px; }
 
   @media (max-width:420px){
@@ -520,14 +526,37 @@ function mostrarAcompanhamento(o){
 /* =========================================================
    APROVAÇÃO DO ORÇAMENTO
    ========================================================= */
-// Lista unificada dos aparelhos (principal + extras) com nome, diagnóstico e valor —
+// Capa/Película/Carregador são itens universais no Estoque (um único item de cada
+// categoria pra todos os modelos) — verificar_acesso_rastreio devolve o id de cada um
+// desses 3 itens; comparamos com o stockId de cada peça do aparelho pra saber se ele
+// está no orçamento e montar os checkboxes individuais.
+const ACESSORIO_CATEGORIAS = [
+  { key:'capa', label:'Capa' },
+  { key:'pelicula', label:'Película' },
+  { key:'carregador', label:'Carregador' }
+];
+
+// Lista unificada dos aparelhos (principal + extras) com nome, diagnóstico, valor e os
+// itens opcionais (capa/película/carregador) que estiverem no orçamento de cada um —
 // mesma lógica usada no app interno (index.html) pra montar o orçamento por aparelho.
 function orcamentoDispositivos(o){
+  const acessorioIds = { capa:o.estoque_capa_id || null, pelicula:o.estoque_pelicula_id || null, carregador:o.estoque_carregador_id || null };
+  function acessoriosDoAparelho(parts){
+    const out = [];
+    ACESSORIO_CATEGORIAS.forEach(c => {
+      const id = acessorioIds[c.key];
+      if(!id) return;
+      const p = (parts || []).find(x => x.stockId === id);
+      if(p) out.push({ categoria:c.key, label:c.label, valor:(p.qtd||0)*(p.preco||0) });
+    });
+    return out;
+  }
+
   const principalTotal = (o.parts || []).reduce((s,p) => s + p.qtd*p.preco, 0) + (o.mao_obra || 0);
-  const lista = [{ id:'principal', nome:o.aparelho || 'Aparelho 1', diagnostico:o.diagnostico || '', valor:principalTotal }];
+  const lista = [{ id:'principal', nome:o.aparelho || 'Aparelho 1', diagnostico:o.diagnostico || '', valor:principalTotal, acessorios:acessoriosDoAparelho(o.parts) }];
   (o.aparelhos_extras || []).forEach((a,i) => {
     const partsTotal = (a.parts || []).reduce((s,p) => s + p.qtd*p.preco, 0);
-    lista.push({ id:a.id || ('x'+i), nome:a.modelo || `Aparelho ${i+2}`, diagnostico:a.diagnostico || '', valor:partsTotal + (a.maoObra || 0) });
+    lista.push({ id:a.id || ('x'+i), nome:a.modelo || `Aparelho ${i+2}`, diagnostico:a.diagnostico || '', valor:partsTotal + (a.maoObra || 0), acessorios:acessoriosDoAparelho(a.parts) });
   });
   return lista;
 }
@@ -543,15 +572,27 @@ function renderAprovacaoView(o){
     // Já reprovado manualmente pelo técnico antes do cliente entrar: vem desmarcado.
     // Qualquer outro estado (pendente ou já aprovado manualmente) vem marcado por padrão.
     const marcado = decisoesAtuais[d.id] !== 'reprovado';
+    const acessoriosHtml = d.acessorios.length ? `
+      <div class="aprov-sub">
+        ${d.acessorios.map(a => `
+          <label class="aprov-sub-item">
+            <input type="checkbox" class="aprov-ac-check" data-dev="${escapeHtml(d.id)}" data-cat="${a.categoria}" checked ${marcado ? '' : 'disabled'} onchange="atualizarTotalAprovacao()">
+            <span>${a.label}</span>
+            <span class="mono aprov-sub-valor">${formatCurrency(a.valor)}</span>
+          </label>`).join('')}
+      </div>` : '';
     return `
-    <label class="aprov-item">
-      <input type="checkbox" class="aprov-check" data-dev="${escapeHtml(d.id)}" ${marcado ? 'checked' : ''} onchange="atualizarTotalAprovacao()">
-      <div class="aprov-item-info">
-        <div class="aprov-item-nome">${escapeHtml(d.nome)}</div>
-        ${d.diagnostico ? `<div class="aprov-item-diag">${escapeHtml(d.diagnostico)}</div>` : ''}
-      </div>
-      <div class="aprov-item-valor mono">${formatCurrency(d.valor)}</div>
-    </label>`;
+    <div class="aprov-block">
+      <label class="aprov-item">
+        <input type="checkbox" class="aprov-check" data-dev="${escapeHtml(d.id)}" ${marcado ? 'checked' : ''} onchange="toggleAprovDispositivo(this)">
+        <div class="aprov-item-info">
+          <div class="aprov-item-nome">${escapeHtml(d.nome)}</div>
+          ${d.diagnostico ? `<div class="aprov-item-diag">${escapeHtml(d.diagnostico)}</div>` : ''}
+        </div>
+        <div class="aprov-item-valor mono">${formatCurrency(d.valor)}</div>
+      </label>
+      ${acessoriosHtml}
+    </div>`;
   }).join('');
 
   const erro = document.getElementById('aprov-erro');
@@ -559,6 +600,16 @@ function renderAprovacaoView(o){
   const btn = document.getElementById('btn-confirmar-aprovacao');
   btn.disabled = false; btn.textContent = 'Confirmar decisão';
 
+  atualizarTotalAprovacao();
+}
+
+// Desmarcar o aparelho inteiro desabilita (e não conta) os itens opcionais dele —
+// reprovar o aparelho já devolve tudo pro estoque, incluindo capa/película/carregador.
+function toggleAprovDispositivo(checkbox){
+  const bloco = checkbox.closest('.aprov-block');
+  if(bloco){
+    bloco.querySelectorAll('.aprov-ac-check').forEach(cb => { cb.disabled = !checkbox.checked; });
+  }
   atualizarTotalAprovacao();
 }
 
@@ -570,7 +621,16 @@ function atualizarTotalAprovacao(){
   let total = 0, aprovados = 0;
   checks.forEach(c => {
     const d = lista.find(x => x.id === c.dataset.dev);
-    if(d && c.checked){ total += d.valor; aprovados++; }
+    if(!d || !c.checked) return;
+    aprovados++;
+    let valorDev = d.valor;
+    document.querySelectorAll('.aprov-ac-check').forEach(ac => {
+      if(ac.dataset.dev === c.dataset.dev && !ac.checked){
+        const item = d.acessorios.find(a => a.categoria === ac.dataset.cat);
+        if(item) valorDev -= item.valor;
+      }
+    });
+    total += valorDev;
   });
   document.getElementById('aprov-total').textContent = formatCurrency(total);
   const btn = document.getElementById('btn-confirmar-aprovacao');
@@ -580,14 +640,28 @@ function atualizarTotalAprovacao(){
 async function confirmarAprovacao(){
   const senha = sessionStorage.getItem('rastreio_senha_' + token);
   if(!senha){ sair(); return; }
+  const o = ultimoOS;
+  if(!o) return;
+  const lista = orcamentoDispositivos(o);
   const checks = [...document.querySelectorAll('.aprov-check')];
   if(!checks.length) return;
 
   const algumDesmarcado = checks.some(c => !c.checked);
-  if(algumDesmarcado && !confirm('Os aparelhos desmarcados serão reprovados e as peças voltam pro estoque. Essa decisão vale pra todos os aparelhos da OS de uma vez. Confirmar?')) return;
+  const algumItemOpcionalDesmarcado = [...document.querySelectorAll('.aprov-ac-check')].some(c => !c.disabled && !c.checked);
+  if((algumDesmarcado || algumItemOpcionalDesmarcado) && !confirm('Os itens desmarcados serão removidos do orçamento — aparelhos reprovados têm as peças devolvidas ao estoque, e o mesmo vale para capa/película/carregador desmarcados individualmente. Confirmar?')) return;
 
   const decisoes = {};
-  checks.forEach(c => { decisoes[c.dataset.dev] = c.checked; });
+  checks.forEach(c => {
+    const devId = c.dataset.dev;
+    const d = lista.find(x => x.id === devId);
+    const obj = { aprovado: c.checked };
+    if(d){
+      document.querySelectorAll('.aprov-ac-check').forEach(ac => {
+        if(ac.dataset.dev === devId) obj[ac.dataset.cat] = ac.checked;
+      });
+    }
+    decisoes[devId] = obj;
+  });
 
   const btn = document.getElementById('btn-confirmar-aprovacao');
   const erro = document.getElementById('aprov-erro');

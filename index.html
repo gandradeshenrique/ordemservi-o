@@ -1696,6 +1696,17 @@
               oninput="updateOSTotal()">
           </div>
         </div>
+        <div style="display:flex; gap:14px; margin-top:10px; flex-wrap:wrap;">
+          <label style="display:flex;align-items:center;gap:5px;cursor:pointer;font-weight:400; font-size:13px;">
+            <input type="checkbox" class="ac-item-capa" style="width:15px;height:15px;accent-color:var(--accent);" onchange="toggleAcessorioParte(this,'capa')"> Capa
+          </label>
+          <label style="display:flex;align-items:center;gap:5px;cursor:pointer;font-weight:400; font-size:13px;">
+            <input type="checkbox" class="ac-item-pelicula" style="width:15px;height:15px;accent-color:var(--accent);" onchange="toggleAcessorioParte(this,'pelicula')"> Película
+          </label>
+          <label style="display:flex;align-items:center;gap:5px;cursor:pointer;font-weight:400; font-size:13px;">
+            <input type="checkbox" class="ac-item-carregador" style="width:15px;height:15px;accent-color:var(--accent);" onchange="toggleAcessorioParte(this,'carregador')"> Carregador
+          </label>
+        </div>
         <div style="text-align:right; font-size:13px; font-weight:600; color:var(--accent); margin-top:6px; padding-bottom:4px;">
           Subtotal: <span id="os-subtotal-display">R$ 0,00</span>
         </div>
@@ -3684,6 +3695,7 @@ function openOSModal(osId){
   document.getElementById('os-acs-capa').checked = false;
   document.getElementById('os-acs-chip').checked = false;
   document.getElementById('os-acs-carregador').checked = false;
+  document.querySelectorAll('#aparelho-principal-card .ac-item-capa, #aparelho-principal-card .ac-item-pelicula, #aparelho-principal-card .ac-item-carregador').forEach(cb => cb.checked = false);
   // Limpar checklist
   const clNames = ['cl-liga','cl-carrega','cl-display','cl-touch','cl-vidro','cl-tampa','cl-camtraseira','cl-camfrontal','cl-faceid','cl-biometria','cl-microfone','cl-altofalante','cl-auricular','cl-sinal','cl-wifi','cl-bluetooth','cl-sensor','cl-gaveta','cl-power','cl-volume'];
   clNames.forEach(n => { document.querySelectorAll(`input[name="${n}"]`).forEach(r => r.checked = false); });
@@ -3753,6 +3765,7 @@ function openOSModal(osId){
     document.getElementById('os-garantia').value = o.garantia || '';
 
     o.parts.forEach(p => addPartRow(p));
+    sincronizarAcessorioCheckboxes(document.getElementById('aparelho-principal-card'), o.parts);
     // Se há peças, mão de obra já foi ocultada pelo addPartRow
     // Se não há peças, garantir que mão de obra aparece
     if((o.aparelhosExtras || []).length > 0){
@@ -4056,6 +4069,56 @@ function aePartAcClose(rowId){
 function onPartSelectChange(select){
   // mantido por compatibilidade
   updateOSTotal();
+}
+
+/* ---------- Itens opcionais do orçamento: Capa / Película / Carregador ---------- */
+// Cadastrados no Estoque como itens universais (um único item de cada categoria pra
+// todos os modelos — não um item por modelo). Achar pela categoria normalizada.
+function acessorioStockItem(categoria){
+  return state.stock.find(s => normalizeCategoria(s.categoria) === categoria);
+}
+const ACESSORIO_LABEL = { capa:'Capa', pelicula:'Película', carregador:'Carregador' };
+
+// Marcar/desmarcar um dos 3 checkboxes funciona exatamente como adicionar/remover uma
+// peça normal do estoque na lista de peças do aparelho — usa os mesmos addPartRow/
+// addAePartRow, então o desconto/devolução de estoque na hora de salvar já funciona
+// sozinho (mesma lógica que já existe pra qualquer peça).
+function toggleAcessorioParte(checkbox, categoria){
+  const card = checkbox.closest('.aparelho-extra-card');
+  const isExtra = !!card;
+  const list = isExtra ? card.querySelector('.ae-parts-list') : document.getElementById('os-parts-list');
+
+  const item = acessorioStockItem(categoria);
+  if(checkbox.checked && !item){
+    checkbox.checked = false;
+    showToast(`Nenhum item de estoque com a categoria "${ACESSORIO_LABEL[categoria]}" foi encontrado. Cadastre um item no Estoque com essa categoria.`, true);
+    return;
+  }
+
+  const rowExistente = item ? [...list.querySelectorAll('.part-row')].find(r => r.querySelector('.part-stock-id').value === item.id) : null;
+
+  if(checkbox.checked){
+    if(!rowExistente){
+      const existingPart = { stockId: item.id, qtd: 1, preco: item.venda || 0 };
+      if(isExtra) addAePartRow(card.querySelector('.ae-add-part-btn'), existingPart);
+      else addPartRow(existingPart);
+    }
+  } else if(rowExistente){
+    rowExistente.remove();
+    updateOSTotal();
+  }
+}
+
+// Ao abrir uma OS existente pra edição, os checkboxes precisam refletir se aquele
+// aparelho já tem Capa/Película/Carregador entre as peças salvas.
+function sincronizarAcessorioCheckboxes(scopeEl, parts){
+  if(!scopeEl) return;
+  CATEGORIAS_ACESSORIO.forEach(categoria => {
+    const cb = scopeEl.querySelector('.ac-item-' + categoria);
+    if(!cb) return;
+    const item = acessorioStockItem(categoria);
+    cb.checked = !!(item && (parts || []).some(p => p.stockId === item.id));
+  });
 }
 
 // Recalcula o custo das horas de serviço com base na taxa de hora técnica
@@ -5155,6 +5218,17 @@ function addAparelhoExtra(existing){
               oninput="updateOSTotal()">
           </div>
         </div>
+        <div style="display:flex; gap:14px; margin-top:10px; flex-wrap:wrap;">
+          <label style="display:flex;align-items:center;gap:5px;cursor:pointer;font-weight:400; font-size:13px;">
+            <input type="checkbox" class="ac-item-capa" style="width:15px;height:15px;accent-color:var(--accent);" onchange="toggleAcessorioParte(this,'capa')"> Capa
+          </label>
+          <label style="display:flex;align-items:center;gap:5px;cursor:pointer;font-weight:400; font-size:13px;">
+            <input type="checkbox" class="ac-item-pelicula" style="width:15px;height:15px;accent-color:var(--accent);" onchange="toggleAcessorioParte(this,'pelicula')"> Película
+          </label>
+          <label style="display:flex;align-items:center;gap:5px;cursor:pointer;font-weight:400; font-size:13px;">
+            <input type="checkbox" class="ac-item-carregador" style="width:15px;height:15px;accent-color:var(--accent);" onchange="toggleAcessorioParte(this,'carregador')"> Carregador
+          </label>
+        </div>
         <div style="text-align:right; font-size:13px; font-weight:600; color:var(--accent); margin-top:6px; padding-bottom:10px;">
           Subtotal: <span class="ae-subtotal">R$ 0,00</span>
         </div>
@@ -5187,6 +5261,7 @@ function addAparelhoExtra(existing){
   if(existing && existing.parts && existing.parts.length){
     existing.parts.forEach(p => addAePartRow(card.querySelector('.ae-add-part-btn'), p));
   }
+  if(existing) sincronizarAcessorioCheckboxes(card, existing.parts);
   if(existing && existing.maoObra){
     card.querySelector('.ae-mao-obra').value = existing.maoObra;
     updateOSTotal();
