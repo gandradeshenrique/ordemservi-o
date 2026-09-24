@@ -6889,37 +6889,62 @@ function renderLaudoAparelhoCard(l, a, index){
   </div>`;
 }
 
-function renderLaudoAparelhoCardEdit(a, index){
+function renderLaudoAparelhoCardEdit(a, uid){
   return `
-  <div class="card laudo-edit-card" data-idx="${index}">
-    <div class="field-row">
-      <div class="field">
-        <label>Marca/Modelo</label>
-        <div class="ac-wrap la-ac-wrap" style="position:relative;">
-          <input type="text" class="le-modelo la-modelo ac-input" autocomplete="off" value="${escapeHtml(a.modelo||'')}"
-            oninput="laAcFilter(this)" onfocus="laAcFilter(this)"
-            onblur="setTimeout(()=>{ const l=this.closest('.la-ac-wrap').querySelector('.la-ac-list'); if(l) l.classList.remove('open'); },150)">
-          <div class="ac-dropdown la-ac-list"></div>
+  <div class="laudo-edit-card" data-uid="${uid}" data-device-id="${escapeHtml(a.device_id||'')}"
+    style="border:1px solid var(--border); border-radius:var(--radius); overflow:hidden; background:var(--panel-2); margin-bottom:10px;">
+    <div style="display:flex; justify-content:space-between; align-items:center; padding:10px 14px; background:var(--panel-2); border-bottom:1px solid var(--border);">
+      <span style="font-size:12px; font-weight:700; color:var(--accent); text-transform:uppercase; letter-spacing:0.05em;">Aparelho</span>
+      <button type="button" onclick="removerAparelhoEdicaoLaudo(this)"
+        style="background:none;border:none;color:var(--text-faint);font-size:18px;cursor:pointer;line-height:1;padding:0 2px;" title="Remover aparelho">&times;</button>
+    </div>
+    <div style="padding:14px 16px;">
+      <div class="field-row">
+        <div class="field">
+          <label>Marca/Modelo</label>
+          <div class="ac-wrap la-ac-wrap" style="position:relative;">
+            <input type="text" class="le-modelo la-modelo ac-input" autocomplete="off" value="${escapeHtml(a.modelo||'')}"
+              oninput="laAcFilter(this)" onfocus="laAcFilter(this)"
+              onblur="setTimeout(()=>{ const l=this.closest('.la-ac-wrap').querySelector('.la-ac-list'); if(l) l.classList.remove('open'); },150)">
+            <div class="ac-dropdown la-ac-list"></div>
+          </div>
+        </div>
+        <div class="field">
+          <label>IMEI/Série</label>
+          <input type="text" class="le-imei" value="${escapeHtml(a.imei||'')}">
+        </div>
+        <div class="field">
+          <label>Patrimônio</label>
+          <input type="text" class="le-patrimonio" value="${escapeHtml(a.patrimonio||'')}">
         </div>
       </div>
       <div class="field">
-        <label>IMEI/Série</label>
-        <input type="text" class="le-imei" value="${escapeHtml(a.imei||'')}">
+        <label>Defeito</label>
+        <input type="text" class="le-defeito" value="${escapeHtml(a.defeito||'')}">
       </div>
-      <div class="field">
-        <label>Patrimônio</label>
-        <input type="text" class="le-patrimonio" value="${escapeHtml(a.patrimonio||'')}">
+      <div class="field mb-0">
+        <label>Diagnóstico</label>
+        <input type="text" class="le-diagnostico" value="${escapeHtml(a.diagnostico||'')}">
       </div>
-    </div>
-    <div class="field">
-      <label>Defeito</label>
-      <input type="text" class="le-defeito" value="${escapeHtml(a.defeito||'')}">
-    </div>
-    <div class="field">
-      <label>Diagnóstico</label>
-      <input type="text" class="le-diagnostico" value="${escapeHtml(a.diagnostico||'')}">
     </div>
   </div>`;
+}
+
+let laudoEdicaoContador = 0;
+
+function adicionarAparelhoEdicaoLaudo(){
+  laudoEdicaoContador++;
+  document.getElementById('laudo-aparelhos-container')
+    .insertAdjacentHTML('beforeend', renderLaudoAparelhoCardEdit({}, laudoEdicaoContador));
+}
+
+function removerAparelhoEdicaoLaudo(btn){
+  const container = document.getElementById('laudo-aparelhos-container');
+  if(container.querySelectorAll('.laudo-edit-card').length <= 1){
+    showToast('O laudo precisa de ao menos um aparelho.', true);
+    return;
+  }
+  btn.closest('.laudo-edit-card').remove();
 }
 
 function addLaudoHistorico(l, text){
@@ -7030,8 +7055,10 @@ function viewLaudo(laudoId){
 function entrarModoEdicaoLaudo(laudoId){
   const l = state.laudos.find(x => x.id === laudoId);
   if(!l) return;
+  laudoEdicaoContador = 0;
   const container = document.getElementById('laudo-aparelhos-container');
-  container.innerHTML = (l.aparelhos||[]).map((a,i) => renderLaudoAparelhoCardEdit(a, i)).join('');
+  container.innerHTML = (l.aparelhos||[]).map((a,i) => { laudoEdicaoContador = i+1; return renderLaudoAparelhoCardEdit(a, i); }).join('')
+    + `<button type="button" class="btn btn-ghost btn-sm" id="laudo-add-aparelho-btn" onclick="adicionarAparelhoEdicaoLaudo()">+ Adicionar aparelho</button>`;
   document.getElementById('laudo-editar-btn').style.display = 'none';
   document.getElementById('laudo-salvar-edicao-btn').style.display = 'inline-flex';
   document.getElementById('laudo-cancelar-edicao-btn').style.display = 'inline-flex';
@@ -7042,19 +7069,19 @@ async function salvarEdicaoLaudo(laudoId){
   const l = state.laudos.find(x => x.id === laudoId);
   if(!l) return;
   const cards = document.querySelectorAll('#laudo-aparelhos-container .laudo-edit-card');
-  const novosAparelhos = (l.aparelhos||[]).map((a, i) => a);
-  cards.forEach(card => {
-    const idx = parseInt(card.dataset.idx, 10);
-    const orig = novosAparelhos[idx] || {};
-    novosAparelhos[idx] = {
-      ...orig,
-      modelo: card.querySelector('.le-modelo').value.trim(),
-      imei: card.querySelector('.le-imei').value.trim(),
-      patrimonio: card.querySelector('.le-patrimonio').value.trim(),
-      defeito: card.querySelector('.le-defeito').value.trim(),
-      diagnostico: card.querySelector('.le-diagnostico').value.trim()
-    };
-  });
+  const modelosVazios = [...cards].some(card => !card.querySelector('.le-modelo').value.trim());
+  if(cards.length === 0 || modelosVazios){
+    showToast('Preencha a marca/modelo de todos os aparelhos.', true);
+    return;
+  }
+  const novosAparelhos = [...cards].map(card => ({
+    device_id: card.dataset.deviceId || undefined,
+    modelo: card.querySelector('.le-modelo').value.trim(),
+    imei: card.querySelector('.le-imei').value.trim(),
+    patrimonio: card.querySelector('.le-patrimonio').value.trim(),
+    defeito: card.querySelector('.le-defeito').value.trim(),
+    diagnostico: card.querySelector('.le-diagnostico').value.trim()
+  }));
   try {
     const historico = addLaudoHistorico(l, 'Dados do(s) aparelho(s) editados.');
     await sbPatch('laudos_descarte', 'id', laudoId, { aparelhos: novosAparelhos, historico });
