@@ -1358,6 +1358,8 @@
           <option value="Aguardando autorização">Aguardando autorização</option>
           <option value="Autorizado">Autorizado</option>
           <option value="Descartado">Descartado</option>
+          <option value="Devolução solicitada">Devolução solicitada</option>
+          <option value="Devolvido">Devolvido</option>
           <option value="Cancelado">Cancelado</option>
         </select>
       </div>
@@ -6786,6 +6788,8 @@ function statusBadgeClassLaudo(status){
     'Aguardando autorização':'badge-aguardando',
     'Autorizado':'badge-aberto',
     'Descartado':'badge-concluido',
+    'Devolução solicitada':'badge-andamento',
+    'Devolvido':'badge-entregue',
     'Cancelado':'badge-cancelado'
   };
   return map[status] || 'badge-aguardando';
@@ -6860,8 +6864,9 @@ function viewLaudo(laudoId){
   document.getElementById('laudo-view-overlay').dataset.laudoId = laudoId;
   document.getElementById('laudo-view-title').textContent = `Laudo de descarte — ${laudoNumeroLabel(l)}`;
 
+  const ESTADOS_FINAIS = ['Descartado', 'Devolvido', 'Cancelado'];
   const cancelBtn = document.getElementById('laudo-cancelar-btn');
-  cancelBtn.style.display = (l.status === 'Descartado' || l.status === 'Cancelado') ? 'none' : 'inline-flex';
+  cancelBtn.style.display = ESTADOS_FINAIS.includes(l.status) ? 'none' : 'inline-flex';
   cancelBtn.onclick = () => cancelarLaudo(laudoId);
 
   const aparelhosHtml = (l.aparelhos||[]).map((a,i) => renderLaudoAparelhoCard(l, a, i)).join('');
@@ -6899,6 +6904,19 @@ function viewLaudo(laudoId){
       <div class="card" style="margin-top:14px;">
         <div class="section-title">Autorização do cliente</div>
         <p style="font-size:13px;">Autorizado por <strong>${escapeHtml(l.autorizadoNome||'—')}</strong> em ${formatDate(l.autorizadoData)}. Aparelho(s) já descartado(s).</p>
+      </div>`;
+  } else if(l.status === 'Devolução solicitada'){
+    autorizacaoHtml = `
+      <div class="card" style="margin-top:14px;">
+        <div class="section-title">Decisão do cliente</div>
+        <p style="font-size:13px; color:var(--yellow, #f59e0b);">O cliente solicitou a devolução do(s) aparelho(s) em vez do descarte.</p>
+        <button class="btn btn-primary" style="margin-top:10px;" onclick="marcarDevolvidoLaudo('${laudoId}')">Marcar como devolvido</button>
+      </div>`;
+  } else if(l.status === 'Devolvido'){
+    autorizacaoHtml = `
+      <div class="card" style="margin-top:14px;">
+        <div class="section-title">Decisão do cliente</div>
+        <p style="font-size:13px;">Aparelho(s) devolvido(s) ao cliente — laudo encerrado sem descarte.</p>
       </div>`;
   } else {
     autorizacaoHtml = `<div class="card" style="margin-top:14px;"><p style="font-size:13px; color:var(--red);">Laudo cancelado.</p></div>`;
@@ -6956,6 +6974,21 @@ async function marcarDescartadoLaudo(laudoId){
     await sbPatch('laudos_descarte', 'id', laudoId, { status: 'Descartado', historico });
     l.status = 'Descartado';
     showToast('Laudo marcado como descartado.');
+    renderLaudosTable();
+    viewLaudo(laudoId);
+  } catch(e){
+    showToast('Erro ao atualizar: ' + e.message, true);
+  }
+}
+
+async function marcarDevolvidoLaudo(laudoId){
+  const l = state.laudos.find(x => x.id === laudoId);
+  if(!l) return;
+  try {
+    const historico = addLaudoHistorico(l, 'Aparelho(s) devolvido(s) ao cliente.');
+    await sbPatch('laudos_descarte', 'id', laudoId, { status: 'Devolvido', historico });
+    l.status = 'Devolvido';
+    showToast('Laudo marcado como devolvido.');
     renderLaudosTable();
     viewLaudo(laudoId);
   } catch(e){

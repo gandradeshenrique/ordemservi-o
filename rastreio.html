@@ -216,31 +216,6 @@
 
     <button class="btn" id="btn-imprimir-os" style="display:none; margin-bottom:14px;" onclick="imprimirOSCliente()">🖨️ Imprimir / salvar OS</button>
 
-    <!-- ===== LAUDO DE DESCARTE PENDENTE ===== -->
-    <div class="card" id="card-laudo-descarte" style="display:none; border-color:rgba(248,113,113,0.35);">
-      <div class="section-title" style="color:var(--red);">⚠ Laudo de descarte pendente</div>
-      <p style="font-size:12.5px; color:var(--text-dim); margin:0 0 12px;">
-        O(s) aparelho(s) abaixo foi(ram) avaliado(s) tecnicamente e o reparo não é economicamente viável.
-        Confira os dados e autorize o descarte definitivo.
-      </p>
-      <div id="laudo-descarte-aparelhos"></div>
-      <div style="font-size:12px; color:var(--text-dim); line-height:1.5; background:var(--panel-2); border:1px solid var(--border); border-radius:8px; padding:10px 12px; margin:10px 0 14px;">
-        Ao autorizar, você declara estar ciente de que <strong>não haverá devolução</strong> do(s) aparelho(s) após o descarte,
-        e que eventuais dados pessoais ainda presentes em aparelho(s) não funcional(is) são de sua responsabilidade.
-      </div>
-      <div style="margin-bottom:12px;">
-        <label style="display:block; font-size:11px; color:var(--text-faint); text-transform:uppercase; letter-spacing:0.4px; margin-bottom:6px;">Nome de quem autoriza</label>
-        <input type="text" id="laudo-descarte-nome" placeholder="Seu nome completo"
-          style="width:100%; background:var(--panel-2); border:1px solid var(--border); border-radius:8px; padding:11px 12px; font-size:14px; color:var(--text); outline:none;">
-      </div>
-      <label style="display:flex; align-items:flex-start; gap:8px; font-size:12.5px; color:var(--text-dim); margin-bottom:14px; cursor:pointer;">
-        <input type="checkbox" id="laudo-descarte-ciente" style="width:17px; height:17px; margin-top:1px; accent-color:var(--red); flex-shrink:0; cursor:pointer;">
-        Estou ciente e autorizo o descarte definitivo do(s) aparelho(s) acima.
-      </label>
-      <button class="btn" id="btn-autorizar-laudo" style="background:var(--red); border-color:var(--red);" onclick="autorizarLaudoDescarte()">Autorizar descarte</button>
-      <div class="erro" id="laudo-descarte-erro"></div>
-    </div>
-
     <div class="card">
       <div class="section-title">Histórico</div>
       <div class="timeline" id="os-timeline"></div>
@@ -306,6 +281,60 @@
     <button class="btn" id="btn-confirmar-aprovacao" onclick="confirmarAprovacao()">Confirmar decisão</button>
     <div class="erro" id="aprov-erro"></div>
 
+    <div class="footer-note">Mobit Soluções · página de acompanhamento</div>
+  </div>
+
+  <!-- ===== LAUDO DE DESCARTE ===== -->
+  <div id="laudo-descarte-view" style="display:none;">
+    <div class="topbar">
+      <img src="logo.png" alt="Mobit Soluções" onerror="this.style.display='none'">
+      <a class="sair" onclick="sair()">Sair</a>
+    </div>
+
+    <div class="os-header">
+      <div>
+        <h2 id="laudo-descarte-titulo">OS #0000</h2>
+        <div class="sub" id="laudo-descarte-cliente"></div>
+      </div>
+      <span class="badge" style="background:var(--red-bg); color:var(--red);">Laudo de descarte</span>
+    </div>
+
+    <div class="card">
+      <div class="section-title" style="color:var(--red);">⚠ Aparelho(s) sem reparo viável</div>
+      <p style="font-size:12.5px; color:var(--text-dim); margin:0 0 4px;">
+        O(s) aparelho(s) abaixo foi(ram) avaliado(s) tecnicamente e o reparo não é economicamente viável.
+        Escolha uma das opções abaixo pra seguirmos.
+      </p>
+      <div id="laudo-descarte-aparelhos"></div>
+    </div>
+
+    <div class="card">
+      <div class="section-title">Autorizar descarte</div>
+      <div style="font-size:12px; color:var(--text-dim); line-height:1.5; background:var(--panel-2); border:1px solid var(--border); border-radius:8px; padding:10px 12px; margin-bottom:14px;">
+        Ao autorizar, você declara estar ciente de que <strong>não haverá devolução</strong> do(s) aparelho(s) após o descarte,
+        e que eventuais dados pessoais ainda presentes em aparelho(s) não funcional(is) são de sua responsabilidade.
+      </div>
+      <div style="margin-bottom:12px;">
+        <label style="display:block; font-size:11px; color:var(--text-faint); text-transform:uppercase; letter-spacing:0.4px; margin-bottom:6px;">Nome de quem autoriza</label>
+        <input type="text" id="laudo-descarte-nome" placeholder="Seu nome completo"
+          style="width:100%; background:var(--panel-2); border:1px solid var(--border); border-radius:8px; padding:11px 12px; font-size:14px; color:var(--text); outline:none;">
+      </div>
+      <label style="display:flex; align-items:flex-start; gap:8px; font-size:12.5px; color:var(--text-dim); margin-bottom:14px; cursor:pointer;">
+        <input type="checkbox" id="laudo-descarte-ciente" style="width:17px; height:17px; margin-top:1px; accent-color:var(--red); flex-shrink:0; cursor:pointer;">
+        Estou ciente e autorizo o descarte definitivo do(s) aparelho(s) acima.
+      </label>
+      <button class="btn" id="btn-autorizar-laudo" style="background:var(--red); border-color:var(--red);" onclick="autorizarLaudoDescarte()">Autorizar descarte</button>
+    </div>
+
+    <div class="card">
+      <div class="section-title">Prefere não descartar?</div>
+      <p style="font-size:12.5px; color:var(--text-dim); margin:0 0 12px;">
+        Se você não quer autorizar o descarte, pode solicitar que devolvamos o(s) aparelho(s).
+      </p>
+      <button class="btn" id="btn-solicitar-devolucao" onclick="solicitarDevolucaoLaudo()">Solicito a devolução dos equipamentos</button>
+    </div>
+
+    <div class="erro" id="laudo-descarte-erro"></div>
     <div class="footer-note">Mobit Soluções · página de acompanhamento</div>
   </div>
 
@@ -424,14 +453,16 @@ document.addEventListener('visibilitychange', () => {
 
 let ultimoOS = null;
 let aprovacaoAtiva = false;
+let laudoDescarteAtivo = null;
 
-function mostrarAcompanhamento(o){
+async function mostrarAcompanhamento(o){
   ultimoOS = o;
   document.getElementById('login-view').style.display = 'none';
 
   // Orçamento aguardando resposta do cliente: mostra a tela de aprovação em vez do acompanhamento normal
   if(o.status === 'Aguardando aprovação'){
     document.getElementById('track-view').style.display = 'none';
+    document.getElementById('laudo-descarte-view').style.display = 'none';
     document.getElementById('aprovacao-view').style.display = 'block';
     // Só reconstrói a lista/checkboxes na primeira vez que a tela aparece — evita apagar
     // uma seleção que o cliente já esteja fazendo quando o polling atualiza em segundo plano
@@ -443,6 +474,22 @@ function mostrarAcompanhamento(o){
   }
   aprovacaoAtiva = false;
   document.getElementById('aprovacao-view').style.display = 'none';
+
+  // Aparelho(s) reprovado(s) com laudo de descarte aguardando decisão do cliente:
+  // essa tela substitui o acompanhamento normal até o cliente autorizar o descarte
+  // ou solicitar a devolução — só depois disso o acompanhamento normal aparece.
+  const laudo = await buscarLaudoDescartePendente(o);
+  if(laudo){
+    document.getElementById('track-view').style.display = 'none';
+    document.getElementById('laudo-descarte-view').style.display = 'block';
+    if(!laudoDescarteAtivo || laudoDescarteAtivo.id !== laudo.id){
+      laudoDescarteAtivo = laudo;
+      renderLaudoDescarteView(laudo, o);
+    }
+    return;
+  }
+  laudoDescarteAtivo = null;
+  document.getElementById('laudo-descarte-view').style.display = 'none';
   document.getElementById('track-view').style.display = 'block';
 
   document.getElementById('os-titulo').textContent = `OS #${o.numero} — ${o.aparelho || ''}`;
@@ -452,8 +499,6 @@ function mostrarAcompanhamento(o){
   badge.className = 'badge ' + statusBadgeClass(o.status);
   badge.textContent = o.status;
   document.getElementById('btn-imprimir-os').style.display = (o.status === 'Concluído') ? 'flex' : 'none';
-
-  carregarLaudoDescarte(o);
 
   // Histórico
   const hist = (o.historico || []).slice().reverse();
@@ -558,37 +603,24 @@ function mostrarAcompanhamento(o){
 }
 
 /* =========================================================
-   LAUDO DE DESCARTE — autorização pelo cliente
+   LAUDO DE DESCARTE — decisão do cliente (autorizar ou devolver)
    ========================================================= */
-// Laudo em aberto atualmente mostrado nessa aba (evita apagar o que o cliente já
-// digitou quando o polling atualiza a tela em segundo plano)
-let laudoDescarteAtual = null;
-
-async function carregarLaudoDescarte(o){
+async function buscarLaudoDescartePendente(o){
   try {
     const statusFiltro = encodeURIComponent('Aguardando autorização');
     const r = await fetch(`${SB_URL}/rest/v1/laudos_descarte?os_numero=eq.${o.numero}&status=eq.${statusFiltro}&order=created_at.desc&limit=1`, {
       headers: { apikey: SB_KEY, Authorization: 'Bearer ' + SB_KEY }
     });
-    if(!r.ok) return; // tabela pode não existir ainda — não trava o acompanhamento normal
+    if(!r.ok) return null; // tabela pode não existir ainda — não trava o acompanhamento normal
     const rows = await r.json();
-    const laudo = rows && rows[0];
-
-    if(!laudo){
-      laudoDescarteAtual = null;
-      document.getElementById('card-laudo-descarte').style.display = 'none';
-      return;
-    }
-
-    // Já mostrando esse mesmo laudo? Não re-renderiza (preserva o que o cliente digitou)
-    if(laudoDescarteAtual && laudoDescarteAtual.id === laudo.id) return;
-
-    laudoDescarteAtual = laudo;
-    renderLaudoDescarteCard(laudo, o);
-  } catch(e){ /* falha pontual de rede — tenta de novo no próximo ciclo */ }
+    return (rows && rows[0]) || null;
+  } catch(e){ return null; } // falha pontual de rede — tenta de novo no próximo ciclo
 }
 
-function renderLaudoDescarteCard(laudo, o){
+function renderLaudoDescarteView(laudo, o){
+  document.getElementById('laudo-descarte-titulo').textContent = `OS #${o.numero}`;
+  document.getElementById('laudo-descarte-cliente').textContent = o.cliente_nome || '';
+
   const aparelhos = laudo.aparelhos || [];
   document.getElementById('laudo-descarte-aparelhos').innerHTML = aparelhos.map((a, i) => `
     <div style="padding:10px 0; ${i < aparelhos.length-1 ? 'border-bottom:1px solid var(--border);' : ''}">
@@ -600,16 +632,30 @@ function renderLaudoDescarteCard(laudo, o){
 
   document.getElementById('laudo-descarte-nome').value = o.cliente_nome || '';
   document.getElementById('laudo-descarte-ciente').checked = false;
+
   const erro = document.getElementById('laudo-descarte-erro');
   erro.classList.remove('show');
-  const btn = document.getElementById('btn-autorizar-laudo');
-  btn.disabled = false; btn.textContent = 'Autorizar descarte';
+  const btnA = document.getElementById('btn-autorizar-laudo');
+  btnA.disabled = false; btnA.textContent = 'Autorizar descarte';
+  const btnD = document.getElementById('btn-solicitar-devolucao');
+  btnD.disabled = false; btnD.textContent = 'Solicito a devolução dos equipamentos';
+}
 
-  document.getElementById('card-laudo-descarte').style.display = 'block';
+// Depois que o cliente decide (autoriza ou pede devolução), busca o estado atual da
+// OS de novo e deixa o mostrarAcompanhamento decidir a próxima tela (não há mais
+// laudo pendente, então ele mesmo libera o acompanhamento normal)
+async function avancarAposDecisaoLaudo(){
+  laudoDescarteAtivo = null;
+  const senha = sessionStorage.getItem('rastreio_senha_' + token);
+  if(!senha) return;
+  try {
+    const rows = await verificarAcesso(senha);
+    if(rows && rows.length) mostrarAcompanhamento(rows[0]);
+  } catch(e){ /* próximo polling tenta de novo */ }
 }
 
 async function autorizarLaudoDescarte(){
-  const laudo = laudoDescarteAtual;
+  const laudo = laudoDescarteAtivo;
   if(!laudo) return;
   const nome = document.getElementById('laudo-descarte-nome').value.trim();
   const ciente = document.getElementById('laudo-descarte-ciente').checked;
@@ -619,8 +665,9 @@ async function autorizarLaudoDescarte(){
   if(!nome){ erro.textContent = 'Informe seu nome.'; erro.classList.add('show'); return; }
   if(!ciente){ erro.textContent = 'Marque que está ciente e autoriza o descarte.'; erro.classList.add('show'); return; }
 
-  const btn = document.getElementById('btn-autorizar-laudo');
-  btn.disabled = true; btn.textContent = 'Enviando...';
+  const btnA = document.getElementById('btn-autorizar-laudo');
+  const btnD = document.getElementById('btn-solicitar-devolucao');
+  btnA.disabled = true; btnD.disabled = true; btnA.textContent = 'Enviando...';
 
   const hoje = new Date().toISOString().slice(0,10);
   const historico = [...(laudo.historico||[]), { date: hoje, text: `Descarte autorizado por ${nome} (via link de acompanhamento).` }];
@@ -632,13 +679,40 @@ async function autorizarLaudoDescarte(){
       body: JSON.stringify({ status: 'Autorizado', autorizado_nome: nome, autorizado_data: hoje, historico })
     });
     if(!r.ok) throw new Error(`Erro ${r.status}`);
-
-    laudoDescarteAtual = null;
-    document.getElementById('card-laudo-descarte').style.display = 'none';
+    await avancarAposDecisaoLaudo();
   } catch(e){
     erro.textContent = 'Não foi possível registrar a autorização agora. Tente novamente em instantes.';
     erro.classList.add('show');
-    btn.disabled = false; btn.textContent = 'Autorizar descarte';
+    btnA.disabled = false; btnD.disabled = false; btnA.textContent = 'Autorizar descarte';
+  }
+}
+
+async function solicitarDevolucaoLaudo(){
+  const laudo = laudoDescarteAtivo;
+  if(!laudo) return;
+  if(!confirm('Confirmar que você quer a devolução do(s) aparelho(s) em vez do descarte?')) return;
+
+  const btnA = document.getElementById('btn-autorizar-laudo');
+  const btnD = document.getElementById('btn-solicitar-devolucao');
+  const erro = document.getElementById('laudo-descarte-erro');
+  erro.classList.remove('show');
+  btnA.disabled = true; btnD.disabled = true; btnD.textContent = 'Enviando...';
+
+  const hoje = new Date().toISOString().slice(0,10);
+  const historico = [...(laudo.historico||[]), { date: hoje, text: 'Cliente solicitou a devolução do(s) aparelho(s) em vez do descarte (via link de acompanhamento).' }];
+
+  try {
+    const r = await fetch(`${SB_URL}/rest/v1/laudos_descarte?id=eq.${laudo.id}`, {
+      method: 'PATCH',
+      headers: { apikey: SB_KEY, Authorization: 'Bearer ' + SB_KEY, 'Content-Type': 'application/json', Prefer: 'return=minimal' },
+      body: JSON.stringify({ status: 'Devolução solicitada', historico })
+    });
+    if(!r.ok) throw new Error(`Erro ${r.status}`);
+    await avancarAposDecisaoLaudo();
+  } catch(e){
+    erro.textContent = 'Não foi possível registrar sua solicitação agora. Tente novamente em instantes.';
+    erro.classList.add('show');
+    btnA.disabled = false; btnD.disabled = false; btnD.textContent = 'Solicito a devolução dos equipamentos';
   }
 }
 
