@@ -6837,7 +6837,6 @@ function renderLaudosTable(){
 }
 
 function renderLaudoAparelhoCard(l, a, index){
-  const editavel = l.status === 'Aguardando autorização';
   return `
   <div class="card" style="margin-bottom:10px;">
     <div style="font-weight:700; margin-bottom:4px;">${escapeHtml(a.modelo || 'Aparelho')}</div>
@@ -6845,51 +6844,8 @@ function renderLaudoAparelhoCard(l, a, index){
       ${a.imei ? 'IMEI/Série: ' + escapeHtml(a.imei) : ''}${a.patrimonio ? ' &nbsp;|&nbsp; Patrimônio: ' + escapeHtml(a.patrimonio) : ''}
     </div>
     ${a.defeito ? `<div style="font-size:13px; margin-bottom:4px;"><strong>Defeito:</strong> ${escapeHtml(a.defeito)}</div>` : ''}
-    ${a.diagnostico ? `<div style="font-size:13px; margin-bottom:8px;"><strong>Diagnóstico:</strong> ${escapeHtml(a.diagnostico)}</div>` : ''}
-    <div class="field" style="margin-bottom:0;">
-      <label>O aparelho liga / funciona?</label>
-      <select id="laudo-func-${index}" ${editavel ? `onchange="toggleLaudoResetFields(${index})"` : 'disabled'}>
-        <option value="">— Não avaliado —</option>
-        <option value="sim" ${a.funcionando === true ? 'selected' : ''}>Sim</option>
-        <option value="nao" ${a.funcionando === false ? 'selected' : ''}>Não</option>
-      </select>
-    </div>
-    <div id="laudo-reset-wrap-${index}" style="display:${a.funcionando === true ? 'flex' : 'none'}; gap:16px; margin-top:8px; flex-wrap:wrap;">
-      <label style="display:flex; align-items:center; gap:6px; font-size:12.5px;">
-        <input type="checkbox" id="laudo-reset-${index}" ${a.reset_efetuado ? 'checked' : ''} ${editavel ? '' : 'disabled'}> Reset de fábrica efetuado
-      </label>
-      <label style="display:flex; align-items:center; gap:6px; font-size:12.5px;">
-        <input type="checkbox" id="laudo-chip-${index}" ${a.chip_sd_devolvido ? 'checked' : ''} ${editavel ? '' : 'disabled'}> Chip/cartão SD retirado e devolvido
-      </label>
-    </div>
-    ${editavel ? `<button class="btn btn-sm" style="margin-top:10px;" onclick="salvarAparelhoLaudo('${l.id}', ${index})">Salvar</button>` : ''}
+    ${a.diagnostico ? `<div style="font-size:13px;"><strong>Diagnóstico:</strong> ${escapeHtml(a.diagnostico)}</div>` : ''}
   </div>`;
-}
-
-function toggleLaudoResetFields(index){
-  const wrap = document.getElementById(`laudo-reset-wrap-${index}`);
-  const v = document.getElementById(`laudo-func-${index}`).value;
-  wrap.style.display = v === 'sim' ? 'flex' : 'none';
-}
-
-async function salvarAparelhoLaudo(laudoId, index){
-  const l = state.laudos.find(x => x.id === laudoId);
-  if(!l) return;
-  const funcVal = document.getElementById(`laudo-func-${index}`).value;
-  const aparelhos = [...l.aparelhos];
-  aparelhos[index] = {
-    ...aparelhos[index],
-    funcionando: funcVal === '' ? null : (funcVal === 'sim'),
-    reset_efetuado: funcVal === 'sim' ? document.getElementById(`laudo-reset-${index}`).checked : false,
-    chip_sd_devolvido: funcVal === 'sim' ? document.getElementById(`laudo-chip-${index}`).checked : false
-  };
-  try {
-    await sbPatch('laudos_descarte', 'id', laudoId, { aparelhos });
-    l.aparelhos = aparelhos;
-    showToast('Dados do aparelho salvos.');
-  } catch(e){
-    showToast('Erro ao salvar: ' + e.message, true);
-  }
 }
 
 function addLaudoHistorico(l, text){
@@ -6957,6 +6913,7 @@ function viewLaudo(laudoId){
   document.getElementById('laudo-view-content').innerHTML = `
     <div class="kv-list" style="margin-bottom:14px;">
       <div class="kv-row"><span class="kv-label">Cliente</span><span class="kv-value">${escapeHtml(l.clienteNome||'—')}</span></div>
+      <div class="kv-row"><span class="kv-label">E-mail</span><span class="kv-value">${escapeHtml(l.clienteEmail||'—')}</span></div>
       <div class="kv-row"><span class="kv-label">Origem</span><span class="kv-value">${l.origem === 'avulso' ? 'Laudo avulso' : ('OS #' + (l.osNumero||'—') + ' (aparelho reprovado)')}</span></div>
       <div class="kv-row"><span class="kv-label">Status</span><span class="kv-value"><span class="badge ${statusBadgeClassLaudo(l.status)}">${escapeHtml(l.status)}</span></span></div>
       <div class="kv-row"><span class="kv-label">Aberto em</span><span class="kv-value">${formatDate((l.createdAt||'').slice(0,10))}</span></div>
@@ -7180,10 +7137,6 @@ function printLaudo(laudoId){
       </div>
       ${a.defeito ? `<div style="font-size:9.5pt; margin-top:2pt;"><strong>Defeito:</strong> ${escapeHtml(a.defeito)}</div>` : ''}
       ${a.diagnostico ? `<div style="font-size:9.5pt; margin-top:2pt;"><strong>Diagnóstico técnico:</strong> ${escapeHtml(a.diagnostico)}</div>` : ''}
-      <div style="font-size:9.5pt; margin-top:2pt;">
-        <strong>Situação:</strong> ${a.funcionando === true ? 'Funcionando' : (a.funcionando === false ? 'Não funciona' : 'Não avaliado')}
-        ${a.funcionando === true ? ` &nbsp;|&nbsp; Reset de fábrica: ${a.reset_efetuado ? 'Sim' : 'Não'} &nbsp;|&nbsp; Chip/SD devolvido: ${a.chip_sd_devolvido ? 'Sim' : 'Não'}` : ''}
-      </div>
     </div>
   `).join('');
 
@@ -7237,6 +7190,7 @@ function printLaudo(laudoId){
     <div class="p-field"><span class="p-field-label">CPF/CNPJ:</span><span>${escapeHtml(l.clienteCpfCnpj||'')}</span></div>
     <div class="p-field"><span class="p-field-label">Endereço:</span><span>${escapeHtml(l.clienteEndereco||'')}</span></div>
     <div class="p-field"><span class="p-field-label">Telefone:</span><span>${escapeHtml(l.clienteTelefone||'')}</span></div>
+    <div class="p-field"><span class="p-field-label">E-mail:</span><span>${escapeHtml(l.clienteEmail||'')}</span></div>
     <div class="p-field"><span class="p-field-label">OS vinculada:</span><span>${l.osNumero ? '#'+l.osNumero : '— (laudo avulso)'}</span></div>
     <div class="p-field"><span class="p-field-label">Data de emissão:</span><span>${formatDate((l.createdAt||'').slice(0,10))}</span></div>
   </div>
