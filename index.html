@@ -1081,6 +1081,9 @@
     <button class="nav-item" data-page="cotacao" onclick="goToPage('cotacao')">
       <span class="nav-icon">🔍</span> Cotação
     </button>
+    <button class="nav-item" data-page="laudos" onclick="goToPage('laudos')">
+      <span class="nav-icon">🗑️</span> Laudos de descarte
+    </button>
 
     <div class="nav-divider"></div>
     <button class="nav-item" onclick="openDataModal()">
@@ -1331,6 +1334,43 @@
             </tr>
           </thead>
           <tbody id="stock-table-body"></tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- ===================== LAUDOS DE DESCARTE ===================== -->
+    <div class="page" id="page-laudos">
+      <div class="page-header">
+        <div>
+          <h1>Laudos de descarte</h1>
+          <p>Aparelhos reprovados nas OS e laudos avulsos</p>
+        </div>
+        <button class="btn btn-primary" onclick="openLaudoAvulsoModal()">+ Laudo avulso</button>
+      </div>
+
+      <div class="toolbar">
+        <div class="search">
+          <span class="search-icon">&#128269;</span>
+          <input type="text" id="laudo-search" placeholder="Buscar por nº, cliente ou aparelho..." oninput="renderLaudosTable()">
+        </div>
+        <select id="laudo-filter-status" onchange="renderLaudosTable()">
+          <option value="">Todos os status</option>
+          <option value="Aguardando autorização">Aguardando autorização</option>
+          <option value="Autorizado">Autorizado</option>
+          <option value="Descartado">Descartado</option>
+          <option value="Cancelado">Cancelado</option>
+        </select>
+      </div>
+
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>Nº</th><th>Cliente</th><th>Aparelho(s)</th><th>Origem</th>
+              <th>Status</th><th>Data</th><th></th>
+            </tr>
+          </thead>
+          <tbody id="laudos-table-body"></tbody>
         </table>
       </div>
     </div>
@@ -1899,6 +1939,60 @@
       <button class="btn" onclick="printOS()">Imprimir / PDF</button>
       <button class="btn" id="os-view-link-btn">🔗 Link de acompanhamento</button>
       <button class="btn btn-primary" id="os-view-edit-btn">Editar OS</button>
+    </div>
+  </div>
+</div>
+
+<!-- ===================== MODAL: LAUDO DE DESCARTE (visualizar/editar) ===================== -->
+<div class="modal-overlay" id="laudo-view-overlay">
+  <div class="modal modal-wide">
+    <div class="modal-header">
+      <h2 id="laudo-view-title">Laudo de descarte</h2>
+      <button class="modal-close" onclick="closeModal('laudo-view-overlay')">&times;</button>
+    </div>
+    <div id="laudo-view-content"></div>
+    <div class="modal-actions">
+      <button class="btn" onclick="closeModal('laudo-view-overlay')">Fechar</button>
+      <button class="btn" id="laudo-cancelar-btn" style="color:var(--red)">Cancelar laudo</button>
+      <button class="btn" onclick="printLaudo(document.getElementById('laudo-view-overlay').dataset.laudoId)">Imprimir / PDF</button>
+    </div>
+  </div>
+</div>
+
+<!-- ===================== MODAL: NOVO LAUDO AVULSO ===================== -->
+<div class="modal-overlay" id="laudo-avulso-modal-overlay">
+  <div class="modal" style="max-width:640px;">
+    <div class="modal-header">
+      <h2 class="modal-title">Novo laudo avulso</h2>
+      <button class="modal-close" onclick="closeModal('laudo-avulso-modal-overlay')">&times;</button>
+    </div>
+    <div class="modal-body">
+      <div class="field">
+        <label>Cliente</label>
+        <select id="laudo-avulso-cliente"><option value="">— Selecione —</option></select>
+      </div>
+      <div class="field">
+        <label>Aparelho / marca / modelo</label>
+        <input type="text" id="laudo-avulso-modelo" placeholder="Ex: Samsung Galaxy A10">
+      </div>
+      <div class="field-row">
+        <div class="field">
+          <label>IMEI / série</label>
+          <input type="text" id="laudo-avulso-imei">
+        </div>
+        <div class="field">
+          <label>Patrimônio (opcional)</label>
+          <input type="text" id="laudo-avulso-patrimonio">
+        </div>
+      </div>
+      <div class="field">
+        <label>Defeito / motivo do descarte</label>
+        <textarea id="laudo-avulso-defeito" placeholder="Ex: Placa queimada, sem reparo viável"></textarea>
+      </div>
+    </div>
+    <div class="modal-actions">
+      <button class="btn" onclick="closeModal('laudo-avulso-modal-overlay')">Cancelar</button>
+      <button class="btn btn-primary" onclick="saveLaudoAvulso()">Criar laudo</button>
     </div>
   </div>
 </div>
@@ -2725,6 +2819,7 @@ let state = {
   clients: [],
   compras: [],
   tarefas: [],
+  laudos: [],
   history: {}
 };
 
@@ -2776,6 +2871,28 @@ async function loadFromSupabase(){
       const ra = await fetch(`${SB_URL}/rest/v1/ordens_servico?select=aprovacoes_dispositivos&limit=1`, { headers: sbHeaders() });
       state.colunaAprovacoes = ra.ok;
     } catch(e){ state.colunaAprovacoes = os.length ? ('aprovacoes_dispositivos' in os[0]) : false; }
+
+    // Laudos de descarte (tabela criada pelo sql_laudo_descarte.sql) — carregamento tolerante:
+    // se a tabela ainda não existir, o módulo simplesmente fica vazio em vez de travar o app
+    try {
+      const laudos = await sbGet('laudos_descarte', 'order=created_at.desc');
+      state.tabelaLaudos = true;
+      state.laudos = laudos.map(l => ({
+        id: l.id, osId: l.os_id, osNumero: l.os_numero,
+        numeroAvulso: l.numero_avulso,
+        clienteId: l.cliente_id, clienteNome: l.cliente_nome || '',
+        clienteCpfCnpj: l.cliente_cpfcnpj || '', clienteEndereco: l.cliente_endereco || '',
+        clienteTelefone: l.cliente_telefone || '', clienteEmail: l.cliente_email || '',
+        aparelhos: l.aparelhos || [],
+        status: l.status || 'Aguardando autorização',
+        origem: l.origem || 'reprovacao_os',
+        tecnico: l.tecnico || '',
+        autorizadoNome: l.autorizado_nome || '',
+        autorizadoData: l.autorizado_data || '',
+        historico: l.historico || [],
+        createdAt: l.created_at
+      }));
+    } catch(e){ state.tabelaLaudos = false; state.laudos = []; }
 
     state.os = os.map(o => ({
       id: o.id, numero: o.numero,
@@ -2857,6 +2974,7 @@ function goToPage(page){
   if(page === 'compras') renderComprasTable();
   if(page === 'kanban') renderKanban();
   if(page === 'cotacao') initCotacaoPage();
+  if(page === 'laudos') renderLaudosTable();
   try { sessionStorage.setItem('mobit_pagina', page); } catch(e){}
 }
 
@@ -6666,6 +6784,411 @@ async function deleteClient(clientId){
   } catch(e) {
     showToast('Erro ao remover cliente: ' + e.message, true);
   }
+}
+
+/* =========================================================
+   LAUDOS DE DESCARTE
+   ========================================================= */
+function statusBadgeClassLaudo(status){
+  const map = {
+    'Aguardando autorização':'badge-aguardando',
+    'Autorizado':'badge-aberto',
+    'Descartado':'badge-concluido',
+    'Cancelado':'badge-cancelado'
+  };
+  return map[status] || 'badge-aguardando';
+}
+
+function laudoNumeroLabel(l){
+  return l.osId ? ('OS #' + l.osNumero) : ('LD-' + String(l.numeroAvulso || 0).padStart(4,'0'));
+}
+
+function renderLaudosTable(){
+  const body = document.getElementById('laudos-table-body');
+  if(!body) return;
+
+  if(!state.tabelaLaudos){
+    body.innerHTML = `<tr class="empty-row"><td colspan="7">Módulo ainda não instalado no banco de dados. Rode o script <span class="mono">sql_laudo_descarte.sql</span> no Supabase e recarregue a página.</td></tr>`;
+    return;
+  }
+
+  const search = (document.getElementById('laudo-search').value || '').toLowerCase();
+  const filterStatus = document.getElementById('laudo-filter-status').value;
+
+  let list = [...state.laudos];
+  if(search){
+    list = list.filter(l =>
+      laudoNumeroLabel(l).toLowerCase().includes(search) ||
+      (l.clienteNome||'').toLowerCase().includes(search) ||
+      (l.aparelhos||[]).some(a => (a.modelo||'').toLowerCase().includes(search))
+    );
+  }
+  if(filterStatus) list = list.filter(l => l.status === filterStatus);
+  list.sort((a,b) => new Date(b.createdAt||0) - new Date(a.createdAt||0));
+
+  if(list.length === 0){
+    body.innerHTML = `<tr class="empty-row"><td colspan="7">Nenhum laudo de descarte encontrado.</td></tr>`;
+    return;
+  }
+
+  body.innerHTML = list.map(l => `
+    <tr>
+      <td class="mono cell-strong" style="cursor:pointer" onclick="viewLaudo('${l.id}')">${laudoNumeroLabel(l)}</td>
+      <td style="cursor:pointer" onclick="viewLaudo('${l.id}')">${escapeHtml(l.clienteNome || '—')}</td>
+      <td class="text-faint" style="max-width:260px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;" onclick="viewLaudo('${l.id}')">${escapeHtml((l.aparelhos||[]).map(a=>a.modelo).filter(Boolean).join(', ') || '—')}</td>
+      <td>${l.origem === 'avulso' ? 'Avulso' : 'OS reprovada'}</td>
+      <td><span class="badge ${statusBadgeClassLaudo(l.status)}">${escapeHtml(l.status)}</span></td>
+      <td class="mono">${formatDate((l.createdAt||'').slice(0,10))}</td>
+      <td><button class="btn btn-ghost btn-sm" onclick="viewLaudo('${l.id}')">Ver</button></td>
+    </tr>
+  `).join('');
+}
+
+function renderLaudoAparelhoCard(l, a, index){
+  const editavel = l.status === 'Aguardando autorização';
+  return `
+  <div class="card" style="margin-bottom:10px;">
+    <div style="font-weight:700; margin-bottom:4px;">${escapeHtml(a.modelo || 'Aparelho')}</div>
+    <div style="font-size:12.5px; color:var(--text-dim); margin-bottom:8px;">
+      ${a.imei ? 'IMEI/Série: ' + escapeHtml(a.imei) : ''}${a.patrimonio ? ' &nbsp;|&nbsp; Patrimônio: ' + escapeHtml(a.patrimonio) : ''}
+    </div>
+    ${a.defeito ? `<div style="font-size:13px; margin-bottom:4px;"><strong>Defeito:</strong> ${escapeHtml(a.defeito)}</div>` : ''}
+    ${a.diagnostico ? `<div style="font-size:13px; margin-bottom:8px;"><strong>Diagnóstico:</strong> ${escapeHtml(a.diagnostico)}</div>` : ''}
+    <div class="field" style="margin-bottom:0;">
+      <label>O aparelho liga / funciona?</label>
+      <select id="laudo-func-${index}" ${editavel ? `onchange="toggleLaudoResetFields(${index})"` : 'disabled'}>
+        <option value="">— Não avaliado —</option>
+        <option value="sim" ${a.funcionando === true ? 'selected' : ''}>Sim</option>
+        <option value="nao" ${a.funcionando === false ? 'selected' : ''}>Não</option>
+      </select>
+    </div>
+    <div id="laudo-reset-wrap-${index}" style="display:${a.funcionando === true ? 'flex' : 'none'}; gap:16px; margin-top:8px; flex-wrap:wrap;">
+      <label style="display:flex; align-items:center; gap:6px; font-size:12.5px;">
+        <input type="checkbox" id="laudo-reset-${index}" ${a.reset_efetuado ? 'checked' : ''} ${editavel ? '' : 'disabled'}> Reset de fábrica efetuado
+      </label>
+      <label style="display:flex; align-items:center; gap:6px; font-size:12.5px;">
+        <input type="checkbox" id="laudo-chip-${index}" ${a.chip_sd_devolvido ? 'checked' : ''} ${editavel ? '' : 'disabled'}> Chip/cartão SD retirado e devolvido
+      </label>
+    </div>
+    ${editavel ? `<button class="btn btn-sm" style="margin-top:10px;" onclick="salvarAparelhoLaudo('${l.id}', ${index})">Salvar</button>` : ''}
+  </div>`;
+}
+
+function toggleLaudoResetFields(index){
+  const wrap = document.getElementById(`laudo-reset-wrap-${index}`);
+  const v = document.getElementById(`laudo-func-${index}`).value;
+  wrap.style.display = v === 'sim' ? 'flex' : 'none';
+}
+
+async function salvarAparelhoLaudo(laudoId, index){
+  const l = state.laudos.find(x => x.id === laudoId);
+  if(!l) return;
+  const funcVal = document.getElementById(`laudo-func-${index}`).value;
+  const aparelhos = [...l.aparelhos];
+  aparelhos[index] = {
+    ...aparelhos[index],
+    funcionando: funcVal === '' ? null : (funcVal === 'sim'),
+    reset_efetuado: funcVal === 'sim' ? document.getElementById(`laudo-reset-${index}`).checked : false,
+    chip_sd_devolvido: funcVal === 'sim' ? document.getElementById(`laudo-chip-${index}`).checked : false
+  };
+  try {
+    await sbPatch('laudos_descarte', 'id', laudoId, { aparelhos });
+    l.aparelhos = aparelhos;
+    showToast('Dados do aparelho salvos.');
+  } catch(e){
+    showToast('Erro ao salvar: ' + e.message, true);
+  }
+}
+
+function addLaudoHistorico(l, text){
+  const historico = [...(l.historico||[]), { date: new Date().toISOString().slice(0,10), text }];
+  l.historico = historico;
+  return historico;
+}
+
+function viewLaudo(laudoId){
+  const l = state.laudos.find(x => x.id === laudoId);
+  if(!l) return;
+  document.getElementById('laudo-view-overlay').dataset.laudoId = laudoId;
+  document.getElementById('laudo-view-title').textContent = `Laudo de descarte — ${laudoNumeroLabel(l)}`;
+
+  const cancelBtn = document.getElementById('laudo-cancelar-btn');
+  cancelBtn.style.display = (l.status === 'Descartado' || l.status === 'Cancelado') ? 'none' : 'inline-flex';
+  cancelBtn.onclick = () => cancelarLaudo(laudoId);
+
+  const aparelhosHtml = (l.aparelhos||[]).map((a,i) => renderLaudoAparelhoCard(l, a, i)).join('');
+
+  let autorizacaoHtml = '';
+  if(l.status === 'Aguardando autorização'){
+    autorizacaoHtml = `
+      <div class="card" style="margin-top:14px;">
+        <div class="section-title">Autorização do cliente</div>
+        <p style="font-size:12.5px; color:var(--text-dim); margin-bottom:10px;">
+          O cliente autoriza o descarte definitivo do(s) aparelho(s) acima, ciente de que não haverá devolução
+          e de que dados eventualmente não removidos são de sua responsabilidade.
+        </p>
+        <div class="field-row">
+          <div class="field">
+            <label>Nome de quem autoriza</label>
+            <input type="text" id="laudo-autoriza-nome" value="${escapeHtml(l.clienteNome||'')}">
+          </div>
+          <div class="field">
+            <label>Data</label>
+            <input type="date" id="laudo-autoriza-data" value="${new Date().toISOString().slice(0,10)}">
+          </div>
+        </div>
+        <button class="btn btn-primary" onclick="autorizarLaudo('${laudoId}')">Registrar autorização</button>
+      </div>`;
+  } else if(l.status === 'Autorizado'){
+    autorizacaoHtml = `
+      <div class="card" style="margin-top:14px;">
+        <div class="section-title">Autorização do cliente</div>
+        <p style="font-size:13px;">Autorizado por <strong>${escapeHtml(l.autorizadoNome||'—')}</strong> em ${formatDate(l.autorizadoData)}.</p>
+        <button class="btn btn-primary" style="margin-top:10px;" onclick="marcarDescartadoLaudo('${laudoId}')">Marcar como descartado</button>
+      </div>`;
+  } else if(l.status === 'Descartado'){
+    autorizacaoHtml = `
+      <div class="card" style="margin-top:14px;">
+        <div class="section-title">Autorização do cliente</div>
+        <p style="font-size:13px;">Autorizado por <strong>${escapeHtml(l.autorizadoNome||'—')}</strong> em ${formatDate(l.autorizadoData)}. Aparelho(s) já descartado(s).</p>
+      </div>`;
+  } else {
+    autorizacaoHtml = `<div class="card" style="margin-top:14px;"><p style="font-size:13px; color:var(--red);">Laudo cancelado.</p></div>`;
+  }
+
+  const histHtml = (l.historico||[]).slice().reverse().map(h => `
+    <div class="timeline-item">
+      <div class="timeline-dot"></div>
+      <div class="timeline-content"><small>${formatDate(h.date)}</small>${escapeHtml(h.text)}</div>
+    </div>`).join('');
+
+  document.getElementById('laudo-view-content').innerHTML = `
+    <div class="kv-list" style="margin-bottom:14px;">
+      <div class="kv-row"><span class="kv-label">Cliente</span><span class="kv-value">${escapeHtml(l.clienteNome||'—')}</span></div>
+      <div class="kv-row"><span class="kv-label">Origem</span><span class="kv-value">${l.origem === 'avulso' ? 'Laudo avulso' : ('OS #' + (l.osNumero||'—') + ' (aparelho reprovado)')}</span></div>
+      <div class="kv-row"><span class="kv-label">Status</span><span class="kv-value"><span class="badge ${statusBadgeClassLaudo(l.status)}">${escapeHtml(l.status)}</span></span></div>
+      <div class="kv-row"><span class="kv-label">Aberto em</span><span class="kv-value">${formatDate((l.createdAt||'').slice(0,10))}</span></div>
+    </div>
+    <div class="section-title">Aparelho(s)</div>
+    ${aparelhosHtml}
+    ${autorizacaoHtml}
+    <div class="section-title" style="margin-top:14px;">Histórico</div>
+    <div class="card"><div class="timeline">${histHtml || '<p class="text-faint">Sem histórico.</p>'}</div></div>
+  `;
+
+  openModal('laudo-view-overlay');
+}
+
+async function autorizarLaudo(laudoId){
+  const l = state.laudos.find(x => x.id === laudoId);
+  if(!l) return;
+  const nome = document.getElementById('laudo-autoriza-nome').value.trim();
+  const data = document.getElementById('laudo-autoriza-data').value;
+  if(!nome || !data){ showToast('Preencha o nome e a data de autorização.', true); return; }
+  try {
+    const historico = addLaudoHistorico(l, `Descarte autorizado por ${nome}.`);
+    await sbPatch('laudos_descarte', 'id', laudoId, {
+      status: 'Autorizado', autorizado_nome: nome, autorizado_data: data, historico
+    });
+    l.status = 'Autorizado'; l.autorizadoNome = nome; l.autorizadoData = data;
+    showToast('Autorização registrada.');
+    renderLaudosTable();
+    viewLaudo(laudoId);
+  } catch(e){
+    showToast('Erro ao registrar autorização: ' + e.message, true);
+  }
+}
+
+async function marcarDescartadoLaudo(laudoId){
+  const l = state.laudos.find(x => x.id === laudoId);
+  if(!l) return;
+  try {
+    const historico = addLaudoHistorico(l, 'Aparelho(s) descartado(s).');
+    await sbPatch('laudos_descarte', 'id', laudoId, { status: 'Descartado', historico });
+    l.status = 'Descartado';
+    showToast('Laudo marcado como descartado.');
+    renderLaudosTable();
+    viewLaudo(laudoId);
+  } catch(e){
+    showToast('Erro ao atualizar: ' + e.message, true);
+  }
+}
+
+async function cancelarLaudo(laudoId){
+  const l = state.laudos.find(x => x.id === laudoId);
+  if(!l) return;
+  if(!confirm('Cancelar este laudo de descarte?')) return;
+  try {
+    const historico = addLaudoHistorico(l, 'Laudo cancelado.');
+    await sbPatch('laudos_descarte', 'id', laudoId, { status: 'Cancelado', historico });
+    l.status = 'Cancelado';
+    showToast('Laudo cancelado.');
+    renderLaudosTable();
+    closeModal('laudo-view-overlay');
+  } catch(e){
+    showToast('Erro ao cancelar: ' + e.message, true);
+  }
+}
+
+/* ---------- Laudo avulso ---------- */
+function openLaudoAvulsoModal(){
+  if(!state.tabelaLaudos){ showToast('Módulo ainda não instalado no banco de dados. Rode o sql_laudo_descarte.sql.', true); return; }
+  const sel = document.getElementById('laudo-avulso-cliente');
+  sel.innerHTML = '<option value="">— Selecione —</option>' +
+    state.clients.map(c => `<option value="${c.id}">${escapeHtml(c.nome)}${c.cpfcnpj ? ' — ' + escapeHtml(c.cpfcnpj) : ''}</option>`).join('');
+  document.getElementById('laudo-avulso-modelo').value = '';
+  document.getElementById('laudo-avulso-imei').value = '';
+  document.getElementById('laudo-avulso-patrimonio').value = '';
+  document.getElementById('laudo-avulso-defeito').value = '';
+  openModal('laudo-avulso-modal-overlay');
+}
+
+async function saveLaudoAvulso(){
+  const clienteId = document.getElementById('laudo-avulso-cliente').value;
+  const modelo = document.getElementById('laudo-avulso-modelo').value.trim();
+  if(!clienteId || !modelo){ showToast('Selecione o cliente e informe o aparelho.', true); return; }
+  const cliente = state.clients.find(c => c.id === clienteId);
+
+  const aparelho = {
+    device_id: 'avulso1', modelo,
+    imei: document.getElementById('laudo-avulso-imei').value.trim(),
+    patrimonio: document.getElementById('laudo-avulso-patrimonio').value.trim(),
+    defeito: document.getElementById('laudo-avulso-defeito').value.trim(),
+    diagnostico: '', funcionando: null, reset_efetuado: false, chip_sd_devolvido: false
+  };
+
+  const payload = {
+    os_id: null, cliente_id: clienteId, cliente_nome: cliente ? cliente.nome : '',
+    cliente_cpfcnpj: cliente ? cliente.cpfcnpj : '', cliente_endereco: cliente ? cliente.endereco : '',
+    cliente_telefone: cliente ? cliente.telefone : '', cliente_email: cliente ? cliente.email : '',
+    aparelhos: [aparelho], status: 'Aguardando autorização', origem: 'avulso',
+    historico: [{ date: new Date().toISOString().slice(0,10), text: 'Laudo avulso criado.' }]
+  };
+
+  try {
+    const rows = await sbPost('laudos_descarte', payload);
+    const row = rows[0];
+    state.laudos.unshift({
+      id: row.id, osId: null, osNumero: null, numeroAvulso: row.numero_avulso,
+      clienteId, clienteNome: payload.cliente_nome, clienteCpfCnpj: payload.cliente_cpfcnpj,
+      clienteEndereco: payload.cliente_endereco, clienteTelefone: payload.cliente_telefone,
+      clienteEmail: payload.cliente_email, aparelhos: payload.aparelhos, status: payload.status,
+      origem: 'avulso', tecnico: '', autorizadoNome: '', autorizadoData: '',
+      historico: payload.historico, createdAt: row.created_at
+    });
+    closeModal('laudo-avulso-modal-overlay');
+    renderLaudosTable();
+    showToast('Laudo avulso criado.');
+  } catch(e){
+    showToast('Erro ao criar laudo: ' + e.message, true);
+  }
+}
+
+/* ---------- Impressão ---------- */
+function printLaudo(laudoId){
+  const l = state.laudos.find(x => x.id === laudoId);
+  if(!l) return;
+
+  const numero = laudoNumeroLabel(l);
+  const aparelhosHtml = (l.aparelhos||[]).map((a,i) => `
+    <div style="margin-bottom:8pt; padding-bottom:8pt; ${i < l.aparelhos.length-1 ? 'border-bottom:0.5pt solid #ccc;' : ''}">
+      <div style="font-weight:700; font-size:10.5pt;">${i+1}. ${escapeHtml(a.modelo||'')}</div>
+      <div style="font-size:9.5pt; color:#333;">
+        ${a.imei ? 'IMEI/Série: '+escapeHtml(a.imei)+' &nbsp; ' : ''}${a.patrimonio ? 'Patrimônio: '+escapeHtml(a.patrimonio) : ''}
+      </div>
+      ${a.defeito ? `<div style="font-size:9.5pt; margin-top:2pt;"><strong>Defeito:</strong> ${escapeHtml(a.defeito)}</div>` : ''}
+      ${a.diagnostico ? `<div style="font-size:9.5pt; margin-top:2pt;"><strong>Diagnóstico técnico:</strong> ${escapeHtml(a.diagnostico)}</div>` : ''}
+      <div style="font-size:9.5pt; margin-top:2pt;">
+        <strong>Situação:</strong> ${a.funcionando === true ? 'Funcionando' : (a.funcionando === false ? 'Não funciona' : 'Não avaliado')}
+        ${a.funcionando === true ? ` &nbsp;|&nbsp; Reset de fábrica: ${a.reset_efetuado ? 'Sim' : 'Não'} &nbsp;|&nbsp; Chip/SD devolvido: ${a.chip_sd_devolvido ? 'Sim' : 'Não'}` : ''}
+      </div>
+    </div>
+  `).join('');
+
+  const html = `<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<title>Laudo de Descarte ${numero} — Mobit Soluções</title>
+<style>
+  *{ box-sizing:border-box; margin:0; padding:0; }
+  body{ font-family: Arial, Helvetica, sans-serif; font-size:11pt; color:#111; background:#fff; }
+  .p-wrap{ width:100%; max-width:210mm; margin:0 auto; padding:14mm 14mm 10mm; }
+  .p-header{ display:flex; justify-content:space-between; align-items:flex-start; margin-bottom:8pt; }
+  .p-logo img{ filter: brightness(0) saturate(100%) invert(38%) sepia(99%) saturate(600%) hue-rotate(172deg) brightness(97%) contrast(102%); width:90pt; }
+  .p-company{ text-align:center; }
+  .p-company h1{ font-size:13pt; font-weight:700; letter-spacing:0.3px; }
+  .p-company p{ font-size:9pt; color:#333; margin-top:2pt; line-height:1.4; }
+  .p-num{ text-align:right; }
+  .p-num .p-num-label{ font-size:9pt; color:#555; }
+  .p-num .p-num-val{ font-size:15pt; font-weight:700; color:#0094d4; font-family:monospace; }
+  hr.p-hr{ border:none; border-top:1.5pt solid #111; margin:7pt 0; }
+  .p-title{ text-align:center; font-size:13pt; font-weight:700; margin:10pt 0 4pt; text-transform:uppercase; letter-spacing:0.5px; }
+  .p-fields{ display:grid; grid-template-columns:1fr 1fr; gap:3pt 20pt; margin-bottom:8pt; }
+  .p-field{ display:flex; align-items:baseline; gap:4pt; border-bottom:0.5pt solid #aaa; padding-bottom:2pt; font-size:10pt; }
+  .p-field-label{ font-weight:700; white-space:nowrap; font-size:9.5pt; }
+  .p-section-label{ font-size:10pt; font-weight:700; margin-top:10pt; margin-bottom:4pt; text-transform:uppercase; border-bottom:0.5pt solid #0094d4; padding-bottom:3pt; color:#0094d4; }
+  .p-termo{ font-size:9.5pt; text-align:justify; margin-top:6pt; line-height:1.5; border:0.5pt solid #bbb; border-radius:3pt; padding:8pt; }
+  .p-assinaturas{ display:flex; justify-content:space-between; margin-top:26pt; }
+  .p-assinatura{ flex:1; max-width:45%; text-align:center; }
+  .p-assinatura .p-ass-line{ border-top:0.75pt solid #111; margin-bottom:2pt; }
+  @media print{ body{ -webkit-print-color-adjust:exact; print-color-adjust:exact; } .p-wrap{ padding:10mm 12mm 8mm; } }
+</style>
+</head>
+<body>
+<div class="p-wrap">
+  <div class="p-header">
+    <div class="p-logo"><img src="logo.png" alt="Mobit Soluções"></div>
+    <div class="p-company">
+      <h1>MOBIT SOLUÇÕES</h1>
+      <p>(11)3500-4088 &nbsp;|&nbsp; backoffice@mobitsolucoes.com<br>
+      Av. Marquês de São Vicente, 182, Sala 53A — Várzea da Barra Funda<br>
+      São Paulo/SP — CEP: 01139-000</p>
+    </div>
+    <div class="p-num"><div class="p-num-label">Laudo de Descarte</div><div class="p-num-val">${numero}</div></div>
+  </div>
+  <hr class="p-hr">
+  <div class="p-title">Laudo de Descarte de Equipamento</div>
+
+  <div class="p-fields">
+    <div class="p-field"><span class="p-field-label">Cliente:</span><span>${escapeHtml(l.clienteNome||'')}</span></div>
+    <div class="p-field"><span class="p-field-label">CPF/CNPJ:</span><span>${escapeHtml(l.clienteCpfCnpj||'')}</span></div>
+    <div class="p-field"><span class="p-field-label">Endereço:</span><span>${escapeHtml(l.clienteEndereco||'')}</span></div>
+    <div class="p-field"><span class="p-field-label">Telefone:</span><span>${escapeHtml(l.clienteTelefone||'')}</span></div>
+    <div class="p-field"><span class="p-field-label">OS vinculada:</span><span>${l.osNumero ? '#'+l.osNumero : '— (laudo avulso)'}</span></div>
+    <div class="p-field"><span class="p-field-label">Data de emissão:</span><span>${formatDate((l.createdAt||'').slice(0,10))}</span></div>
+  </div>
+
+  <div class="p-section-label">Aparelho(s) avaliado(s)</div>
+  ${aparelhosHtml}
+
+  <div class="p-section-label">Termo de autorização</div>
+  <div class="p-termo">
+    Declaro estar ciente de que o(s) aparelho(s) descrito(s) acima foi(ram) avaliado(s) tecnicamente pela Mobit Soluções
+    e apresenta(m) defeito(s) que inviabiliza(m) o reparo economicamente, e <strong>autorizo o descarte definitivo</strong>
+    do(s) equipamento(s), estando ciente de que:<br><br>
+    (a) não haverá devolução do(s) aparelho(s) após o descarte;<br>
+    (b) eventuais dados pessoais ainda presentes no(s) aparelho(s) não funcional(is) são de minha responsabilidade,
+    tendo a Mobit Soluções realizado a remoção de dados (reset de fábrica) sempre que o aparelho estava em condições
+    de funcionamento para tal.
+  </div>
+
+  <div class="p-assinaturas">
+    <div class="p-assinatura">
+      <div class="p-ass-line"></div>
+      ${escapeHtml(l.autorizadoNome || l.clienteNome || '')}<br>
+      Assinatura do cliente ${l.autorizadoData ? '— ' + formatDate(l.autorizadoData) : ''}
+    </div>
+  </div>
+</div>
+</body>
+</html>`;
+
+  const win = window.open('', '_blank', 'width=900,height=750');
+  if(!win){ alert('Seu navegador bloqueou a janela de impressão. Permita pop-ups pra esse site e tente de novo.'); return; }
+  win.document.write(html);
+  win.document.close();
+  win.onload = () => { win.focus(); win.print(); };
 }
 
 /* =========================================================
