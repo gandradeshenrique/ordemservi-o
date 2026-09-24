@@ -215,6 +215,7 @@
     </div>
 
     <button class="btn" id="btn-imprimir-os" style="display:none; margin-bottom:14px;" onclick="imprimirOSCliente()">🖨️ Imprimir / salvar OS</button>
+    <button class="btn" id="btn-baixar-laudo" style="display:none; margin-bottom:14px;" onclick="imprimirLaudoCliente()">🖨️ Baixar laudo de descarte</button>
 
     <div class="card">
       <div class="section-title">Histórico</div>
@@ -454,6 +455,7 @@ document.addEventListener('visibilitychange', () => {
 let ultimoOS = null;
 let aprovacaoAtiva = false;
 let laudoDescarteAtivo = null;
+let laudoParaBaixar = null;
 
 async function mostrarAcompanhamento(o){
   ultimoOS = o;
@@ -475,22 +477,27 @@ async function mostrarAcompanhamento(o){
   aprovacaoAtiva = false;
   document.getElementById('aprovacao-view').style.display = 'none';
 
-  // Aparelho(s) reprovado(s) com laudo de descarte aguardando decisão do cliente:
-  // essa tela substitui o acompanhamento normal até o cliente autorizar o descarte
-  // ou solicitar a devolução — só depois disso o acompanhamento normal aparece.
-  const laudo = await buscarLaudoDescartePendente(o);
-  if(laudo){
+  // Uma consulta só traz os laudos recentes dessa OS: um em "Aguardando autorização"
+  // (se houver) bloqueia o acompanhamento normal; um já "Autorizado"/"Descartado"
+  // libera o botão de baixar o laudo lá embaixo.
+  const laudos = await buscarLaudosDaOS(o);
+  const laudoPendente = laudos.find(l => l.status === 'Aguardando autorização');
+
+  if(laudoPendente){
     document.getElementById('track-view').style.display = 'none';
     document.getElementById('laudo-descarte-view').style.display = 'block';
-    if(!laudoDescarteAtivo || laudoDescarteAtivo.id !== laudo.id){
-      laudoDescarteAtivo = laudo;
-      renderLaudoDescarteView(laudo, o);
+    if(!laudoDescarteAtivo || laudoDescarteAtivo.id !== laudoPendente.id){
+      laudoDescarteAtivo = laudoPendente;
+      renderLaudoDescarteView(laudoPendente, o);
     }
     return;
   }
   laudoDescarteAtivo = null;
   document.getElementById('laudo-descarte-view').style.display = 'none';
   document.getElementById('track-view').style.display = 'block';
+
+  laudoParaBaixar = laudos.find(l => l.status === 'Autorizado' || l.status === 'Descartado') || null;
+  document.getElementById('btn-baixar-laudo').style.display = laudoParaBaixar ? 'flex' : 'none';
 
   document.getElementById('os-titulo').textContent = `OS #${o.numero} — ${o.aparelho || ''}`;
   document.getElementById('os-cliente').textContent = o.cliente_nome || '';
@@ -605,16 +612,14 @@ async function mostrarAcompanhamento(o){
 /* =========================================================
    LAUDO DE DESCARTE — decisão do cliente (autorizar ou devolver)
    ========================================================= */
-async function buscarLaudoDescartePendente(o){
+async function buscarLaudosDaOS(o){
   try {
-    const statusFiltro = encodeURIComponent('Aguardando autorização');
-    const r = await fetch(`${SB_URL}/rest/v1/laudos_descarte?os_numero=eq.${o.numero}&status=eq.${statusFiltro}&order=created_at.desc&limit=1`, {
+    const r = await fetch(`${SB_URL}/rest/v1/laudos_descarte?os_numero=eq.${o.numero}&order=created_at.desc&limit=5`, {
       headers: { apikey: SB_KEY, Authorization: 'Bearer ' + SB_KEY }
     });
-    if(!r.ok) return null; // tabela pode não existir ainda — não trava o acompanhamento normal
-    const rows = await r.json();
-    return (rows && rows[0]) || null;
-  } catch(e){ return null; } // falha pontual de rede — tenta de novo no próximo ciclo
+    if(!r.ok) return []; // tabela pode não existir ainda — não trava o acompanhamento normal
+    return await r.json();
+  } catch(e){ return []; } // falha pontual de rede — tenta de novo no próximo ciclo
 }
 
 function renderLaudoDescarteView(laudo, o){
@@ -714,6 +719,112 @@ async function solicitarDevolucaoLaudo(){
     erro.classList.add('show');
     btnA.disabled = false; btnD.disabled = false; btnD.textContent = 'Solicito a devolução dos equipamentos';
   }
+}
+
+// Mesmo layout de impressão do laudo usado no painel interno — só libera pro cliente
+// quando o laudo já está Autorizado ou Descartado (mostrarAcompanhamento controla isso)
+function imprimirLaudoCliente(){
+  const laudo = laudoParaBaixar;
+  if(!laudo) return;
+
+  const numero = laudo.os_numero ? ('OS #' + laudo.os_numero) : ('LD-' + String(laudo.numero_avulso||0).padStart(4,'0'));
+  const aparelhos = laudo.aparelhos || [];
+  const aparelhosHtml = aparelhos.map((a,i) => `
+    <div style="margin-bottom:8pt; padding-bottom:8pt; ${i < aparelhos.length-1 ? 'border-bottom:0.5pt solid #ccc;' : ''}">
+      <div style="font-weight:700; font-size:10.5pt;">${i+1}. ${escapeHtml(a.modelo||'')}</div>
+      <div style="font-size:9.5pt; color:#333;">
+        ${a.imei ? 'IMEI/Série: '+escapeHtml(a.imei)+' &nbsp; ' : ''}${a.patrimonio ? 'Patrimônio: '+escapeHtml(a.patrimonio) : ''}
+      </div>
+      ${a.defeito ? `<div style="font-size:9.5pt; margin-top:2pt;"><strong>Defeito:</strong> ${escapeHtml(a.defeito)}</div>` : ''}
+      ${a.diagnostico ? `<div style="font-size:9.5pt; margin-top:2pt;"><strong>Diagnóstico técnico:</strong> ${escapeHtml(a.diagnostico)}</div>` : ''}
+    </div>
+  `).join('');
+
+  const html = `<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<title>Laudo de Descarte ${numero} — Mobit Soluções</title>
+<style>
+  *{ box-sizing:border-box; margin:0; padding:0; }
+  body{ font-family: Arial, Helvetica, sans-serif; font-size:11pt; color:#111; background:#fff; }
+  .p-wrap{ width:100%; max-width:210mm; margin:0 auto; padding:14mm 14mm 10mm; }
+  .p-header{ display:flex; justify-content:space-between; align-items:flex-start; margin-bottom:8pt; }
+  .p-logo img{ filter: brightness(0) saturate(100%) invert(38%) sepia(99%) saturate(600%) hue-rotate(172deg) brightness(97%) contrast(102%); width:90pt; }
+  .p-company{ text-align:center; }
+  .p-company h1{ font-size:13pt; font-weight:700; letter-spacing:0.3px; }
+  .p-company p{ font-size:9pt; color:#333; margin-top:2pt; line-height:1.4; }
+  .p-num{ text-align:right; }
+  .p-num .p-num-label{ font-size:9pt; color:#555; }
+  .p-num .p-num-val{ font-size:15pt; font-weight:700; color:#0094d4; font-family:monospace; }
+  hr.p-hr{ border:none; border-top:1.5pt solid #111; margin:7pt 0; }
+  .p-title{ text-align:center; font-size:13pt; font-weight:700; margin:10pt 0 4pt; text-transform:uppercase; letter-spacing:0.5px; }
+  .p-fields{ display:grid; grid-template-columns:1fr 1fr; gap:3pt 20pt; margin-bottom:8pt; }
+  .p-field{ display:flex; align-items:baseline; gap:4pt; border-bottom:0.5pt solid #aaa; padding-bottom:2pt; font-size:10pt; }
+  .p-field-label{ font-weight:700; white-space:nowrap; font-size:9.5pt; }
+  .p-section-label{ font-size:10pt; font-weight:700; margin-top:10pt; margin-bottom:4pt; text-transform:uppercase; border-bottom:0.5pt solid #0094d4; padding-bottom:3pt; color:#0094d4; }
+  .p-termo{ font-size:9.5pt; text-align:justify; margin-top:6pt; line-height:1.5; border:0.5pt solid #bbb; border-radius:3pt; padding:8pt; }
+  .p-assinaturas{ display:flex; justify-content:space-between; margin-top:26pt; }
+  .p-assinatura{ flex:1; max-width:45%; text-align:center; }
+  .p-assinatura .p-ass-line{ border-top:0.75pt solid #111; margin-bottom:2pt; }
+  @media print{ body{ -webkit-print-color-adjust:exact; print-color-adjust:exact; } .p-wrap{ padding:10mm 12mm 8mm; } }
+</style>
+</head>
+<body>
+<div class="p-wrap">
+  <div class="p-header">
+    <div class="p-logo"><img src="logo.png" alt="Mobit Soluções"></div>
+    <div class="p-company">
+      <h1>MOBIT SOLUÇÕES</h1>
+      <p>(11)3500-4088 &nbsp;|&nbsp; backoffice@mobitsolucoes.com<br>
+      Av. Marquês de São Vicente, 182, Sala 53A — Várzea da Barra Funda<br>
+      São Paulo/SP — CEP: 01139-000</p>
+    </div>
+    <div class="p-num"><div class="p-num-label">Laudo de Descarte</div><div class="p-num-val">${numero}</div></div>
+  </div>
+  <hr class="p-hr">
+  <div class="p-title">Laudo de Descarte de Equipamento</div>
+
+  <div class="p-fields">
+    <div class="p-field"><span class="p-field-label">Cliente:</span><span>${escapeHtml(laudo.cliente_nome||'')}</span></div>
+    <div class="p-field"><span class="p-field-label">CPF/CNPJ:</span><span>${escapeHtml(laudo.cliente_cpfcnpj||'')}</span></div>
+    <div class="p-field"><span class="p-field-label">Endereço:</span><span>${escapeHtml(laudo.cliente_endereco||'')}</span></div>
+    <div class="p-field"><span class="p-field-label">Telefone:</span><span>${escapeHtml(laudo.cliente_telefone||'')}</span></div>
+    <div class="p-field"><span class="p-field-label">E-mail:</span><span>${escapeHtml(laudo.cliente_email||'')}</span></div>
+    <div class="p-field"><span class="p-field-label">OS vinculada:</span><span>${laudo.os_numero ? '#'+laudo.os_numero : '— (laudo avulso)'}</span></div>
+    <div class="p-field"><span class="p-field-label">Data de emissão:</span><span>${formatDate((laudo.created_at||'').slice(0,10))}</span></div>
+  </div>
+
+  <div class="p-section-label">Aparelho(s) avaliado(s)</div>
+  ${aparelhosHtml}
+
+  <div class="p-section-label">Termo de autorização</div>
+  <div class="p-termo">
+    Declaro estar ciente de que o(s) aparelho(s) descrito(s) acima foi(ram) avaliado(s) tecnicamente pela Mobit Soluções
+    e apresenta(m) defeito(s) que inviabiliza(m) o reparo economicamente, e <strong>autorizo o descarte definitivo</strong>
+    do(s) equipamento(s), estando ciente de que:<br><br>
+    (a) não haverá devolução do(s) aparelho(s) após o descarte;<br>
+    (b) eventuais dados pessoais ainda presentes no(s) aparelho(s) não funcional(is) são de minha responsabilidade,
+    tendo a Mobit Soluções realizado a remoção de dados (reset de fábrica) sempre que o aparelho estava em condições
+    de funcionamento para tal.
+  </div>
+
+  <div class="p-assinaturas">
+    <div class="p-assinatura">
+      <div class="p-ass-line"></div>
+      ${escapeHtml(laudo.autorizado_nome || laudo.cliente_nome || '')}<br>
+      Assinatura do cliente ${laudo.autorizado_data ? '— ' + formatDate(laudo.autorizado_data) : ''}
+    </div>
+  </div>
+</div>
+</body>
+</html>`;
+
+  const win = window.open('', '_blank', 'width=900,height=750');
+  if(!win){ alert('Seu navegador bloqueou a janela de impressão. Permita pop-ups pra esse site e tente de novo.'); return; }
+  win.document.write(html);
+  win.document.close();
+  win.onload = () => { win.focus(); win.print(); };
 }
 
 /* =========================================================
