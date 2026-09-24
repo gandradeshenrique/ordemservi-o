@@ -1956,6 +1956,9 @@
     <div class="modal-actions">
       <button class="btn" onclick="closeModal('laudo-view-overlay')">Fechar</button>
       <button class="btn" id="laudo-cancelar-btn" style="color:var(--red)">Cancelar laudo</button>
+      <button class="btn" id="laudo-editar-btn" style="display:none;">Editar aparelhos</button>
+      <button class="btn" id="laudo-salvar-edicao-btn" style="display:none;">Salvar alterações</button>
+      <button class="btn" id="laudo-cancelar-edicao-btn" style="display:none;">Cancelar edição</button>
       <button class="btn" onclick="printLaudo(document.getElementById('laudo-view-overlay').dataset.laudoId)">Imprimir / PDF</button>
     </div>
   </div>
@@ -6852,6 +6855,34 @@ function renderLaudoAparelhoCard(l, a, index){
   </div>`;
 }
 
+function renderLaudoAparelhoCardEdit(a, index){
+  return `
+  <div class="card laudo-edit-card" data-idx="${index}" style="margin-bottom:10px;">
+    <div class="field-row">
+      <div class="field">
+        <label>Marca/Modelo</label>
+        <input type="text" class="le-modelo" value="${escapeHtml(a.modelo||'')}">
+      </div>
+      <div class="field">
+        <label>IMEI/Série</label>
+        <input type="text" class="le-imei" value="${escapeHtml(a.imei||'')}">
+      </div>
+      <div class="field">
+        <label>Patrimônio</label>
+        <input type="text" class="le-patrimonio" value="${escapeHtml(a.patrimonio||'')}">
+      </div>
+    </div>
+    <div class="field">
+      <label>Defeito</label>
+      <input type="text" class="le-defeito" value="${escapeHtml(a.defeito||'')}">
+    </div>
+    <div class="field">
+      <label>Diagnóstico</label>
+      <input type="text" class="le-diagnostico" value="${escapeHtml(a.diagnostico||'')}">
+    </div>
+  </div>`;
+}
+
 function addLaudoHistorico(l, text){
   const historico = [...(l.historico||[]), { date: new Date().toISOString().slice(0,10), text }];
   l.historico = historico;
@@ -6868,6 +6899,17 @@ function viewLaudo(laudoId){
   const cancelBtn = document.getElementById('laudo-cancelar-btn');
   cancelBtn.style.display = ESTADOS_FINAIS.includes(l.status) ? 'none' : 'inline-flex';
   cancelBtn.onclick = () => cancelarLaudo(laudoId);
+
+  const editarBtn = document.getElementById('laudo-editar-btn');
+  const salvarBtn = document.getElementById('laudo-salvar-edicao-btn');
+  const cancelarEdicaoBtn = document.getElementById('laudo-cancelar-edicao-btn');
+  const podeEditar = l.status === 'Aguardando autorização';
+  editarBtn.style.display = podeEditar ? 'inline-flex' : 'none';
+  salvarBtn.style.display = 'none';
+  cancelarEdicaoBtn.style.display = 'none';
+  editarBtn.onclick = () => entrarModoEdicaoLaudo(laudoId);
+  salvarBtn.onclick = () => salvarEdicaoLaudo(laudoId);
+  cancelarEdicaoBtn.onclick = () => viewLaudo(laudoId);
 
   const aparelhosHtml = (l.aparelhos||[]).map((a,i) => renderLaudoAparelhoCard(l, a, i)).join('');
 
@@ -6937,13 +6979,53 @@ function viewLaudo(laudoId){
       <div class="kv-row"><span class="kv-label">Aberto em</span><span class="kv-value">${formatDate((l.createdAt||'').slice(0,10))}</span></div>
     </div>
     <div class="section-title">Aparelho(s)</div>
-    ${aparelhosHtml}
+    <div id="laudo-aparelhos-container">${aparelhosHtml}</div>
     ${autorizacaoHtml}
     <div class="section-title" style="margin-top:14px;">Histórico</div>
     <div class="card"><div class="timeline">${histHtml || '<p class="text-faint">Sem histórico.</p>'}</div></div>
   `;
 
   openModal('laudo-view-overlay');
+}
+
+function entrarModoEdicaoLaudo(laudoId){
+  const l = state.laudos.find(x => x.id === laudoId);
+  if(!l) return;
+  const container = document.getElementById('laudo-aparelhos-container');
+  container.innerHTML = (l.aparelhos||[]).map((a,i) => renderLaudoAparelhoCardEdit(a, i)).join('');
+  document.getElementById('laudo-editar-btn').style.display = 'none';
+  document.getElementById('laudo-salvar-edicao-btn').style.display = 'inline-flex';
+  document.getElementById('laudo-cancelar-edicao-btn').style.display = 'inline-flex';
+  document.getElementById('laudo-cancelar-btn').style.display = 'none';
+}
+
+async function salvarEdicaoLaudo(laudoId){
+  const l = state.laudos.find(x => x.id === laudoId);
+  if(!l) return;
+  const cards = document.querySelectorAll('#laudo-aparelhos-container .laudo-edit-card');
+  const novosAparelhos = (l.aparelhos||[]).map((a, i) => a);
+  cards.forEach(card => {
+    const idx = parseInt(card.dataset.idx, 10);
+    const orig = novosAparelhos[idx] || {};
+    novosAparelhos[idx] = {
+      ...orig,
+      modelo: card.querySelector('.le-modelo').value.trim(),
+      imei: card.querySelector('.le-imei').value.trim(),
+      patrimonio: card.querySelector('.le-patrimonio').value.trim(),
+      defeito: card.querySelector('.le-defeito').value.trim(),
+      diagnostico: card.querySelector('.le-diagnostico').value.trim()
+    };
+  });
+  try {
+    const historico = addLaudoHistorico(l, 'Dados do(s) aparelho(s) editados.');
+    await sbPatch('laudos_descarte', 'id', laudoId, { aparelhos: novosAparelhos, historico });
+    l.aparelhos = novosAparelhos;
+    showToast('Alterações salvas.');
+    renderLaudosTable();
+    viewLaudo(laudoId);
+  } catch(e){
+    showToast('Erro ao salvar alterações: ' + e.message, true);
+  }
 }
 
 async function autorizarLaudo(laudoId){
