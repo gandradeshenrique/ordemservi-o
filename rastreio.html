@@ -216,6 +216,31 @@
 
     <button class="btn" id="btn-imprimir-os" style="display:none; margin-bottom:14px;" onclick="imprimirOSCliente()">🖨️ Imprimir / salvar OS</button>
 
+    <!-- ===== LAUDO DE DESCARTE PENDENTE ===== -->
+    <div class="card" id="card-laudo-descarte" style="display:none; border-color:rgba(248,113,113,0.35);">
+      <div class="section-title" style="color:var(--red);">⚠ Laudo de descarte pendente</div>
+      <p style="font-size:12.5px; color:var(--text-dim); margin:0 0 12px;">
+        O(s) aparelho(s) abaixo foi(ram) avaliado(s) tecnicamente e o reparo não é economicamente viável.
+        Confira os dados e autorize o descarte definitivo.
+      </p>
+      <div id="laudo-descarte-aparelhos"></div>
+      <div style="font-size:12px; color:var(--text-dim); line-height:1.5; background:var(--panel-2); border:1px solid var(--border); border-radius:8px; padding:10px 12px; margin:10px 0 14px;">
+        Ao autorizar, você declara estar ciente de que <strong>não haverá devolução</strong> do(s) aparelho(s) após o descarte,
+        e que eventuais dados pessoais ainda presentes em aparelho(s) não funcional(is) são de sua responsabilidade.
+      </div>
+      <div style="margin-bottom:12px;">
+        <label style="display:block; font-size:11px; color:var(--text-faint); text-transform:uppercase; letter-spacing:0.4px; margin-bottom:6px;">Nome de quem autoriza</label>
+        <input type="text" id="laudo-descarte-nome" placeholder="Seu nome completo"
+          style="width:100%; background:var(--panel-2); border:1px solid var(--border); border-radius:8px; padding:11px 12px; font-size:14px; color:var(--text); outline:none;">
+      </div>
+      <label style="display:flex; align-items:flex-start; gap:8px; font-size:12.5px; color:var(--text-dim); margin-bottom:14px; cursor:pointer;">
+        <input type="checkbox" id="laudo-descarte-ciente" style="width:17px; height:17px; margin-top:1px; accent-color:var(--red); flex-shrink:0; cursor:pointer;">
+        Estou ciente e autorizo o descarte definitivo do(s) aparelho(s) acima.
+      </label>
+      <button class="btn" id="btn-autorizar-laudo" style="background:var(--red); border-color:var(--red);" onclick="autorizarLaudoDescarte()">Autorizar descarte</button>
+      <div class="erro" id="laudo-descarte-erro"></div>
+    </div>
+
     <div class="card">
       <div class="section-title">Histórico</div>
       <div class="timeline" id="os-timeline"></div>
@@ -428,6 +453,8 @@ function mostrarAcompanhamento(o){
   badge.textContent = o.status;
   document.getElementById('btn-imprimir-os').style.display = (o.status === 'Concluído') ? 'flex' : 'none';
 
+  carregarLaudoDescarte(o);
+
   // Histórico
   const hist = (o.historico || []).slice().reverse();
   document.getElementById('os-timeline').innerHTML = hist.length
@@ -527,6 +554,91 @@ function mostrarAcompanhamento(o){
     document.getElementById('os-obs').textContent = o.observacoes;
   } else {
     document.getElementById('card-obs').style.display = 'none';
+  }
+}
+
+/* =========================================================
+   LAUDO DE DESCARTE — autorização pelo cliente
+   ========================================================= */
+// Laudo em aberto atualmente mostrado nessa aba (evita apagar o que o cliente já
+// digitou quando o polling atualiza a tela em segundo plano)
+let laudoDescarteAtual = null;
+
+async function carregarLaudoDescarte(o){
+  try {
+    const statusFiltro = encodeURIComponent('Aguardando autorização');
+    const r = await fetch(`${SB_URL}/rest/v1/laudos_descarte?os_numero=eq.${o.numero}&status=eq.${statusFiltro}&order=created_at.desc&limit=1`, {
+      headers: { apikey: SB_KEY, Authorization: 'Bearer ' + SB_KEY }
+    });
+    if(!r.ok) return; // tabela pode não existir ainda — não trava o acompanhamento normal
+    const rows = await r.json();
+    const laudo = rows && rows[0];
+
+    if(!laudo){
+      laudoDescarteAtual = null;
+      document.getElementById('card-laudo-descarte').style.display = 'none';
+      return;
+    }
+
+    // Já mostrando esse mesmo laudo? Não re-renderiza (preserva o que o cliente digitou)
+    if(laudoDescarteAtual && laudoDescarteAtual.id === laudo.id) return;
+
+    laudoDescarteAtual = laudo;
+    renderLaudoDescarteCard(laudo, o);
+  } catch(e){ /* falha pontual de rede — tenta de novo no próximo ciclo */ }
+}
+
+function renderLaudoDescarteCard(laudo, o){
+  const aparelhos = laudo.aparelhos || [];
+  document.getElementById('laudo-descarte-aparelhos').innerHTML = aparelhos.map((a, i) => `
+    <div style="padding:10px 0; ${i < aparelhos.length-1 ? 'border-bottom:1px solid var(--border);' : ''}">
+      <div style="font-weight:700; font-size:13.5px;">${escapeHtml(a.modelo||'Aparelho')}</div>
+      ${a.imei ? `<div style="font-size:11.5px; color:var(--text-dim);">IMEI/Série: ${escapeHtml(a.imei)}</div>` : ''}
+      ${a.defeito ? `<div style="font-size:12px; color:var(--text-dim); margin-top:3px;">${escapeHtml(a.defeito)}</div>` : ''}
+    </div>
+  `).join('');
+
+  document.getElementById('laudo-descarte-nome').value = o.cliente_nome || '';
+  document.getElementById('laudo-descarte-ciente').checked = false;
+  const erro = document.getElementById('laudo-descarte-erro');
+  erro.classList.remove('show');
+  const btn = document.getElementById('btn-autorizar-laudo');
+  btn.disabled = false; btn.textContent = 'Autorizar descarte';
+
+  document.getElementById('card-laudo-descarte').style.display = 'block';
+}
+
+async function autorizarLaudoDescarte(){
+  const laudo = laudoDescarteAtual;
+  if(!laudo) return;
+  const nome = document.getElementById('laudo-descarte-nome').value.trim();
+  const ciente = document.getElementById('laudo-descarte-ciente').checked;
+  const erro = document.getElementById('laudo-descarte-erro');
+  erro.classList.remove('show');
+
+  if(!nome){ erro.textContent = 'Informe seu nome.'; erro.classList.add('show'); return; }
+  if(!ciente){ erro.textContent = 'Marque que está ciente e autoriza o descarte.'; erro.classList.add('show'); return; }
+
+  const btn = document.getElementById('btn-autorizar-laudo');
+  btn.disabled = true; btn.textContent = 'Enviando...';
+
+  const hoje = new Date().toISOString().slice(0,10);
+  const historico = [...(laudo.historico||[]), { date: hoje, text: `Descarte autorizado por ${nome} (via link de acompanhamento).` }];
+
+  try {
+    const r = await fetch(`${SB_URL}/rest/v1/laudos_descarte?id=eq.${laudo.id}`, {
+      method: 'PATCH',
+      headers: { apikey: SB_KEY, Authorization: 'Bearer ' + SB_KEY, 'Content-Type': 'application/json', Prefer: 'return=minimal' },
+      body: JSON.stringify({ status: 'Autorizado', autorizado_nome: nome, autorizado_data: hoje, historico })
+    });
+    if(!r.ok) throw new Error(`Erro ${r.status}`);
+
+    laudoDescarteAtual = null;
+    document.getElementById('card-laudo-descarte').style.display = 'none';
+  } catch(e){
+    erro.textContent = 'Não foi possível registrar a autorização agora. Tente novamente em instantes.';
+    erro.classList.add('show');
+    btn.disabled = false; btn.textContent = 'Autorizar descarte';
   }
 }
 
