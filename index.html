@@ -6857,11 +6857,16 @@ function renderLaudoAparelhoCard(l, a, index){
 
 function renderLaudoAparelhoCardEdit(a, index){
   return `
-  <div class="card laudo-edit-card" data-idx="${index}" style="margin-bottom:10px;">
+  <div class="card laudo-edit-card" data-idx="${index}">
     <div class="field-row">
       <div class="field">
         <label>Marca/Modelo</label>
-        <input type="text" class="le-modelo" value="${escapeHtml(a.modelo||'')}">
+        <div class="ac-wrap la-ac-wrap" style="position:relative;">
+          <input type="text" class="le-modelo la-modelo ac-input" autocomplete="off" value="${escapeHtml(a.modelo||'')}"
+            oninput="laAcFilter(this)" onfocus="laAcFilter(this)"
+            onblur="setTimeout(()=>{ const l=this.closest('.la-ac-wrap').querySelector('.la-ac-list'); if(l) l.classList.remove('open'); },150)">
+          <div class="ac-dropdown la-ac-list"></div>
+        </div>
       </div>
       <div class="field">
         <label>IMEI/Série</label>
