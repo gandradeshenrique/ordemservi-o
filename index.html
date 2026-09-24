@@ -3646,25 +3646,55 @@ function closeModal(id){ document.getElementById(id).classList.remove('open'); }
    ========================================================= */
 const MODELOS = [
   // Samsung
-  'Samsung Galaxy S24 Ultra','Samsung Galaxy S24+','Samsung Galaxy S24',
-  'Samsung Galaxy S23 Ultra','Samsung Galaxy S23+','Samsung Galaxy S23',
+  'Samsung Galaxy S25 Ultra','Samsung Galaxy S25+','Samsung Galaxy S25',
+  'Samsung Galaxy S24 Ultra','Samsung Galaxy S24+','Samsung Galaxy S24','Samsung Galaxy S24 FE',
+  'Samsung Galaxy S23 Ultra','Samsung Galaxy S23+','Samsung Galaxy S23','Samsung Galaxy S23 FE',
   'Samsung Galaxy S22 Ultra','Samsung Galaxy S22+','Samsung Galaxy S22',
   'Samsung Galaxy S21 Ultra','Samsung Galaxy S21+','Samsung Galaxy S21','Samsung Galaxy S21 FE',
   'Samsung Galaxy S20 Ultra','Samsung Galaxy S20+','Samsung Galaxy S20','Samsung Galaxy S20 FE',
-  'Samsung Galaxy S10+','Samsung Galaxy S10','Samsung Galaxy S10e',
+  'Samsung Galaxy S10+','Samsung Galaxy S10','Samsung Galaxy S10e','Samsung Galaxy S10 Lite',
   'Samsung Galaxy S9+','Samsung Galaxy S9',
+  'Samsung Galaxy S8+','Samsung Galaxy S8',
   'Samsung Galaxy Note 20 Ultra','Samsung Galaxy Note 20',
   'Samsung Galaxy Note 10+','Samsung Galaxy Note 10',
   'Samsung Galaxy Note 9','Samsung Galaxy Note 8',
-  'Samsung Galaxy Z Fold 5','Samsung Galaxy Z Fold 4','Samsung Galaxy Z Fold 3',
-  'Samsung Galaxy Z Flip 5','Samsung Galaxy Z Flip 4','Samsung Galaxy Z Flip 3',
-  'Samsung Galaxy A55','Samsung Galaxy A54','Samsung Galaxy A53','Samsung Galaxy A52','Samsung Galaxy A52s',
-  'Samsung Galaxy A35','Samsung Galaxy A34','Samsung Galaxy A33','Samsung Galaxy A32',
-  'Samsung Galaxy A25','Samsung Galaxy A24','Samsung Galaxy A23','Samsung Galaxy A22',
-  'Samsung Galaxy A15','Samsung Galaxy A14','Samsung Galaxy A13','Samsung Galaxy A12',
-  'Samsung Galaxy A05s','Samsung Galaxy A05',
-  'Samsung Galaxy M54','Samsung Galaxy M53','Samsung Galaxy M34','Samsung Galaxy M14',
+  'Samsung Galaxy Z Fold 6','Samsung Galaxy Z Fold 5','Samsung Galaxy Z Fold 4','Samsung Galaxy Z Fold 3','Samsung Galaxy Z Fold 2',
+  'Samsung Galaxy Z Flip 6','Samsung Galaxy Z Flip 5','Samsung Galaxy Z Flip 4','Samsung Galaxy Z Flip 3',
+  'Samsung Galaxy A55','Samsung Galaxy A54','Samsung Galaxy A53','Samsung Galaxy A52','Samsung Galaxy A52s','Samsung Galaxy A51',
+  'Samsung Galaxy A35','Samsung Galaxy A34','Samsung Galaxy A33','Samsung Galaxy A32','Samsung Galaxy A31','Samsung Galaxy A30','Samsung Galaxy A30s',
+  'Samsung Galaxy A25','Samsung Galaxy A24','Samsung Galaxy A23','Samsung Galaxy A22','Samsung Galaxy A21s','Samsung Galaxy A20','Samsung Galaxy A20s',
+  'Samsung Galaxy A15','Samsung Galaxy A14','Samsung Galaxy A13','Samsung Galaxy A12','Samsung Galaxy A11','Samsung Galaxy A10','Samsung Galaxy A10s',
+  'Samsung Galaxy A05s','Samsung Galaxy A05','Samsung Galaxy A03','Samsung Galaxy A03s','Samsung Galaxy A03 Core','Samsung Galaxy A02','Samsung Galaxy A01',
+  'Samsung Galaxy A8','Samsung Galaxy A7','Samsung Galaxy A6+','Samsung Galaxy A6',
+  'Samsung Galaxy M55','Samsung Galaxy M54','Samsung Galaxy M53','Samsung Galaxy M34','Samsung Galaxy M33','Samsung Galaxy M32','Samsung Galaxy M14','Samsung Galaxy M12',
+  'Samsung Galaxy J8','Samsung Galaxy J7','Samsung Galaxy J6','Samsung Galaxy J5','Samsung Galaxy J4','Samsung Galaxy J2 Core','Samsung Galaxy J1',
+  // Motorola
+  'Motorola Edge 50 Ultra','Motorola Edge 50 Pro','Motorola Edge 50 Fusion','Motorola Edge 50 Neo','Motorola Edge 50',
+  'Motorola Edge 40 Pro','Motorola Edge 40 Neo','Motorola Edge 40',
+  'Motorola Edge 30 Ultra','Motorola Edge 30 Pro','Motorola Edge 30 Fusion','Motorola Edge 30 Neo','Motorola Edge 30',
+  'Motorola Edge 20 Pro','Motorola Edge 20 Lite','Motorola Edge 20',
+  'Motorola Edge+','Motorola Edge',
+  'Motorola Razr 50 Ultra','Motorola Razr 50','Motorola Razr 40 Ultra','Motorola Razr 40',
+  'Motorola Moto G85','Motorola Moto G75','Motorola Moto G73','Motorola Moto G72','Motorola Moto G71','Motorola Moto G70',
+  'Motorola Moto G65','Motorola Moto G64','Motorola Moto G62','Motorola Moto G60','Motorola Moto G60s',
+  'Motorola Moto G54','Motorola Moto G53','Motorola Moto G52','Motorola Moto G51','Motorola Moto G50',
+  'Motorola Moto G45','Motorola Moto G34','Motorola Moto G32','Motorola Moto G31','Motorola Moto G30',
+  'Motorola Moto G24','Motorola Moto G23','Motorola Moto G22','Motorola Moto G21','Motorola Moto G20',
+  'Motorola Moto G15','Motorola Moto G14','Motorola Moto G13','Motorola Moto G12','Motorola Moto G11','Motorola Moto G10',
+  'Motorola Moto G9 Plus','Motorola Moto G9 Play','Motorola Moto G9',
+  'Motorola Moto G8 Plus','Motorola Moto G8 Play','Motorola Moto G8',
+  'Motorola Moto G7 Plus','Motorola Moto G7 Play','Motorola Moto G7 Power','Motorola Moto G7',
+  'Motorola Moto G6 Plus','Motorola Moto G6 Play','Motorola Moto G6',
+  'Motorola Moto G5S Plus','Motorola Moto G5S','Motorola Moto G5 Plus','Motorola Moto G5',
+  'Motorola Moto G4 Plus','Motorola Moto G4',
+  'Motorola Moto E40','Motorola Moto E32','Motorola Moto E22','Motorola Moto E20','Motorola Moto E13',
+  'Motorola Moto E7 Plus','Motorola Moto E7','Motorola Moto E6 Plus','Motorola Moto E6',
+  'Motorola Moto E5 Plus','Motorola Moto E5',
+  'Motorola Moto Z4','Motorola Moto Z3','Motorola Moto Z2 Play','Motorola Moto Z',
+  'Motorola Moto X4','Motorola Moto X Play',
+  'Motorola Moto One Fusion+','Motorola Moto One Action','Motorola Moto One Vision','Motorola Moto One Macro','Motorola Moto One',
   // Apple
+  'iPhone 16 Pro Max','iPhone 16 Pro','iPhone 16 Plus','iPhone 16',
   'iPhone 15 Pro Max','iPhone 15 Pro','iPhone 15 Plus','iPhone 15',
   'iPhone 14 Pro Max','iPhone 14 Pro','iPhone 14 Plus','iPhone 14',
   'iPhone 13 Pro Max','iPhone 13 Pro','iPhone 13','iPhone 13 mini',
@@ -3718,12 +3748,14 @@ function acFilter(tipo){
     const filtered = q
       ? MODELOS.filter(m => m.toLowerCase().includes(q))
       : MODELOS;
-    const samsung = filtered.filter(m => m.startsWith('Samsung'));
-    const apple   = filtered.filter(m => m.startsWith('iPhone'));
+    const samsung  = filtered.filter(m => m.startsWith('Samsung'));
+    const motorola = filtered.filter(m => m.startsWith('Motorola'));
+    const apple    = filtered.filter(m => m.startsWith('iPhone'));
 
     let html = '';
-    if(samsung.length){ html += `<div class="ac-group">Samsung</div>` + samsung.map((m,i)=>`<div class="ac-item" data-val="${m}" onmousedown="acSelectAparelho('${m}')" onmouseover="acSetActive('aparelho',${i})">${m}</div>`).join(''); }
-    if(apple.length){   html += `<div class="ac-group">Apple</div>`   + apple.map((m,i)=>`<div class="ac-item" data-val="${m}" onmousedown="acSelectAparelho('${m}')" onmouseover="acSetActive('aparelho',${samsung.length+i})">${m}</div>`).join(''); }
+    if(samsung.length){  html += `<div class="ac-group">Samsung</div>`  + samsung.map((m,i)=>`<div class="ac-item" data-val="${m}" onmousedown="acSelectAparelho('${m}')" onmouseover="acSetActive('aparelho',${i})">${m}</div>`).join(''); }
+    if(motorola.length){ html += `<div class="ac-group">Motorola</div>` + motorola.map((m,i)=>`<div class="ac-item" data-val="${m}" onmousedown="acSelectAparelho('${m}')" onmouseover="acSetActive('aparelho',${samsung.length+i})">${m}</div>`).join(''); }
+    if(apple.length){    html += `<div class="ac-group">Apple</div>`    + apple.map((m,i)=>`<div class="ac-item" data-val="${m}" onmousedown="acSelectAparelho('${m}')" onmouseover="acSetActive('aparelho',${samsung.length+motorola.length+i})">${m}</div>`).join(''); }
     html += `<div class="ac-item ac-item-outro" onmousedown="acSelectAparelho(input.value)">✏ Usar "${input.value || '...'}" como está</div>`;
 
     if(!html){ list.classList.remove('open'); return; }
@@ -3822,12 +3854,14 @@ function aeAcFilter(input){
   const q = input.value.toLowerCase().trim();
 
   const filtered = q ? MODELOS.filter(m => m.toLowerCase().includes(q)) : MODELOS;
-  const samsung = filtered.filter(m => m.startsWith('Samsung'));
-  const apple   = filtered.filter(m => m.startsWith('iPhone'));
+  const samsung  = filtered.filter(m => m.startsWith('Samsung'));
+  const motorola = filtered.filter(m => m.startsWith('Motorola'));
+  const apple    = filtered.filter(m => m.startsWith('iPhone'));
 
   let html = '';
-  if(samsung.length) html += `<div class="ac-group">Samsung</div>` + samsung.map(m => `<div class="ac-item" onmousedown="aeAcSelect(this,'${m.replace(/'/g,"&#39;")}')">${m}</div>`).join('');
-  if(apple.length)   html += `<div class="ac-group">Apple</div>`   + apple.map(m => `<div class="ac-item" onmousedown="aeAcSelect(this,'${m.replace(/'/g,"&#39;")}')">${m}</div>`).join('');
+  if(samsung.length)  html += `<div class="ac-group">Samsung</div>`  + samsung.map(m => `<div class="ac-item" onmousedown="aeAcSelect(this,'${m.replace(/'/g,"&#39;")}')">${m}</div>`).join('');
+  if(motorola.length) html += `<div class="ac-group">Motorola</div>` + motorola.map(m => `<div class="ac-item" onmousedown="aeAcSelect(this,'${m.replace(/'/g,"&#39;")}')">${m}</div>`).join('');
+  if(apple.length)    html += `<div class="ac-group">Apple</div>`    + apple.map(m => `<div class="ac-item" onmousedown="aeAcSelect(this,'${m.replace(/'/g,"&#39;")}')">${m}</div>`).join('');
   html += `<div class="ac-item ac-item-outro" onmousedown="aeAcSelect(this,null)">✏ Usar "${input.value || '...'}" como está</div>`;
 
   list.innerHTML = html;
@@ -7169,12 +7203,14 @@ function laAcFilter(input){
   const q = input.value.toLowerCase().trim();
 
   const filtered = q ? MODELOS.filter(m => m.toLowerCase().includes(q)) : MODELOS;
-  const samsung = filtered.filter(m => m.startsWith('Samsung'));
-  const apple   = filtered.filter(m => m.startsWith('iPhone'));
+  const samsung  = filtered.filter(m => m.startsWith('Samsung'));
+  const motorola = filtered.filter(m => m.startsWith('Motorola'));
+  const apple    = filtered.filter(m => m.startsWith('iPhone'));
 
   let html = '';
-  if(samsung.length) html += `<div class="ac-group">Samsung</div>` + samsung.map(m => `<div class="ac-item" onmousedown="laAcSelect(this,'${m.replace(/'/g,"&#39;")}')">${m}</div>`).join('');
-  if(apple.length)   html += `<div class="ac-group">Apple</div>`   + apple.map(m => `<div class="ac-item" onmousedown="laAcSelect(this,'${m.replace(/'/g,"&#39;")}')">${m}</div>`).join('');
+  if(samsung.length)  html += `<div class="ac-group">Samsung</div>`  + samsung.map(m => `<div class="ac-item" onmousedown="laAcSelect(this,'${m.replace(/'/g,"&#39;")}')">${m}</div>`).join('');
+  if(motorola.length) html += `<div class="ac-group">Motorola</div>` + motorola.map(m => `<div class="ac-item" onmousedown="laAcSelect(this,'${m.replace(/'/g,"&#39;")}')">${m}</div>`).join('');
+  if(apple.length)    html += `<div class="ac-group">Apple</div>`    + apple.map(m => `<div class="ac-item" onmousedown="laAcSelect(this,'${m.replace(/'/g,"&#39;")}')">${m}</div>`).join('');
   html += `<div class="ac-item ac-item-outro" onmousedown="laAcSelect(this,null)">✏ Usar "${input.value || '...'}" como está</div>`;
 
   list.innerHTML = html;
