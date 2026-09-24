@@ -1,0 +1,830 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>MobitOS — Mobit Soluções</title>
+<link rel="icon" type="image/png" href="logo.png">
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Rajdhani:wght@400;500;600;700&family=Inter:wght@300;400;500;600&display=swap');
+
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --navy:      #020d1c;
+    --navy-mid:  #041428;
+    --navy-card: rgba(4, 22, 48, 0.82);
+    --cyan:      #00c8f8;
+    --cyan-dim:  rgba(0, 200, 248, 0.18);
+    --cyan-glow: rgba(0, 200, 248, 0.45);
+    --cyan-deep: #0094d4;
+    --orbit:     rgba(0, 200, 248, 0.7);
+    --purple:    rgba(160, 80, 255, 0.55);
+    --white:     #ffffff;
+    --text-dim:  rgba(255,255,255,0.55);
+    --border:    rgba(0, 200, 248, 0.22);
+    --error:     #ff5f6d;
+  }
+
+  html, body {
+    width: 100%; height: 100%;
+    background: var(--navy);
+    font-family: 'Inter', sans-serif;
+    overflow: hidden;
+  }
+
+  /* ── Canvas plexo ── */
+  #plexo { position: fixed; inset: 0; z-index: 0; }
+
+  /* ── Gradiente de fundo ── */
+  .bg-gradient {
+    position: fixed; inset: 0; z-index: 1;
+    background:
+      radial-gradient(ellipse 55% 60% at 28% 60%, rgba(0,80,160,0.38) 0%, transparent 70%),
+      radial-gradient(ellipse 40% 50% at 72% 45%, rgba(0,30,80,0.5) 0%, transparent 65%),
+      radial-gradient(ellipse 80% 40% at 50% 100%, rgba(0,148,212,0.12) 0%, transparent 60%);
+  }
+
+  /* ── Layout principal ── */
+  .page {
+    position: relative; z-index: 2;
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    height: 100vh;
+    width: 100%;
+  }
+
+  /* ══════════════════════════════
+     LADO ESQUERDO — Logo + Orbe
+  ══════════════════════════════ */
+  .left {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 40px;
+    position: relative;
+  }
+
+  /* Orbe orbital */
+  .orb-wrap {
+    position: relative;
+    width: 340px; height: 340px;
+    display: flex; align-items: center; justify-content: center;
+  }
+
+  .orb-ring {
+    position: absolute;
+    inset: 0;
+    border-radius: 50%;
+    border: 1.5px solid var(--orbit);
+    box-shadow: 0 0 18px var(--cyan-glow), inset 0 0 18px rgba(0,200,248,0.08);
+    animation: spin-ring 8s linear infinite;
+    transform-origin: center;
+  }
+  .orb-ring.ring2 {
+    inset: 18px;
+    border-color: rgba(160,80,255,0.5);
+    box-shadow: 0 0 14px rgba(160,80,255,0.4);
+    animation: spin-ring 12s linear infinite reverse;
+  }
+  .orb-ring.ring3 {
+    inset: 36px;
+    border-color: rgba(0,200,248,0.25);
+    animation: spin-ring 20s linear infinite;
+  }
+
+  /* Anel oval inclinado (órbita equatorial) */
+  .orb-orbit {
+    position: absolute;
+    width: 110%; height: 38%;
+    border-radius: 50%;
+    border: 2px solid var(--orbit);
+    box-shadow: 0 0 16px var(--cyan-glow);
+    animation: orbit-pulse 3s ease-in-out infinite alternate;
+  }
+  .orb-orbit.orbit2 {
+    width: 80%; height: 110%;
+    border-color: rgba(160,80,255,0.6);
+    box-shadow: 0 0 20px rgba(160,80,255,0.5);
+    animation: orbit-pulse2 4s ease-in-out infinite alternate;
+  }
+
+  @keyframes spin-ring  { to { transform: rotate(360deg); } }
+  @keyframes orbit-pulse  { from { opacity: .6; } to { opacity: 1; } }
+  @keyframes orbit-pulse2 { from { opacity: .4; } to { opacity: .9; } }
+
+  /* Logo SVG dentro do orbe */
+  .orb-logo {
+    position: relative; z-index: 2;
+    display: flex; flex-direction: column;
+    align-items: center; gap: 2px;
+    filter: drop-shadow(0 0 18px rgba(0,200,248,0.6));
+  }
+  .logo-arrows {
+    display: flex; gap: 4px; margin-bottom: 2px;
+  }
+  .logo-arrow {
+    width: 0; height: 0;
+    border-top: 14px solid transparent;
+    border-bottom: 14px solid transparent;
+    border-left: 18px solid var(--white);
+  }
+  .logo-arrow.a2 { border-left-color: var(--cyan); }
+
+  .logo-text {
+    font-family: 'Rajdhani', sans-serif;
+    font-size: 52px; font-weight: 700;
+    letter-spacing: 2px;
+    line-height: 1;
+    display: flex; align-items: baseline;
+    color: var(--white);
+  }
+  .logo-text .it {
+    color: var(--cyan);
+    font-family: monospace;
+    font-size: 46px;
+    letter-spacing: -1px;
+  }
+  .logo-sub {
+    font-family: 'Rajdhani', sans-serif;
+    font-size: 15px; font-weight: 500;
+    letter-spacing: 6px;
+    color: var(--text-dim);
+    text-transform: uppercase;
+    margin-top: 2px;
+  }
+
+  /* Tagline abaixo do orbe */
+  .left-tagline {
+    margin-top: 36px; text-align: center;
+  }
+  .left-tagline h1 {
+    font-family: 'Rajdhani', sans-serif;
+    font-size: 22px; font-weight: 600;
+    color: var(--white);
+    letter-spacing: 1px;
+  }
+  .left-tagline p {
+    font-size: 13px; color: var(--text-dim);
+    margin-top: 6px; letter-spacing: 0.5px;
+    line-height: 1.6;
+  }
+
+  /* Partícula de luz cursor no orbe */
+  .orb-dot {
+    position: absolute;
+    width: 8px; height: 8px;
+    border-radius: 50%;
+    background: var(--cyan);
+    box-shadow: 0 0 12px var(--cyan), 0 0 4px #fff;
+    top: 2px; left: 50%;
+    transform: translateX(-50%);
+    animation: dot-spin 8s linear infinite;
+    transform-origin: 0 168px;
+  }
+  .orb-dot.d2 {
+    background: rgba(160,80,255,0.9);
+    box-shadow: 0 0 12px rgba(160,80,255,0.9);
+    animation: dot-spin2 12s linear infinite reverse;
+    transform-origin: 0 152px;
+  }
+  @keyframes dot-spin  { to { rotate: 360deg; } }
+  @keyframes dot-spin2 { to { rotate: -360deg; } }
+
+  /* ══════════════════════════════
+     LADO DIREITO — Formulário
+  ══════════════════════════════ */
+  .right {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 40px 60px;
+  }
+
+  .login-header {
+    text-align: center;
+    margin-bottom: 32px;
+  }
+  .login-header h2 {
+    font-family: 'Rajdhani', sans-serif;
+    font-size: 32px; font-weight: 700;
+    color: var(--white);
+    letter-spacing: 2px;
+  }
+  .login-header p {
+    font-size: 11px;
+    letter-spacing: 5px;
+    color: var(--cyan);
+    text-transform: uppercase;
+    margin-top: 4px;
+    opacity: 0.8;
+  }
+
+  /* Card de login */
+  .login-card {
+    width: 100%; max-width: 380px;
+    background: var(--navy-card);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 36px 32px;
+    backdrop-filter: blur(16px);
+    box-shadow:
+      0 0 40px rgba(0,200,248,0.08),
+      0 4px 40px rgba(0,0,0,0.5),
+      inset 0 1px 0 rgba(0,200,248,0.12);
+    position: relative;
+    overflow: hidden;
+  }
+
+  /* Brilho canto superior esquerdo do card */
+  .login-card::before {
+    content: '';
+    position: absolute;
+    top: -1px; left: -1px;
+    width: 80px; height: 2px;
+    background: linear-gradient(90deg, var(--cyan), transparent);
+  }
+  .login-card::after {
+    content: '';
+    position: absolute;
+    top: -1px; left: -1px;
+    width: 2px; height: 80px;
+    background: linear-gradient(180deg, var(--cyan), transparent);
+  }
+
+  .card-title {
+    text-align: center;
+    font-family: 'Rajdhani', sans-serif;
+    font-size: 15px; font-weight: 600;
+    color: var(--cyan);
+    letter-spacing: 4px;
+    text-transform: uppercase;
+    margin-bottom: 28px;
+    padding-bottom: 14px;
+    border-bottom: 1px solid var(--border);
+  }
+
+  /* Campos */
+  .input-group {
+    position: relative; margin-bottom: 16px;
+  }
+  .input-group svg {
+    position: absolute; left: 14px; top: 50%; transform: translateY(-50%);
+    color: var(--cyan-deep); opacity: 0.7; pointer-events: none;
+  }
+  .input-group input {
+    width: 100%;
+    background: rgba(0,200,248,0.05);
+    border: 1px solid var(--border);
+    border-radius: 3px;
+    padding: 13px 14px 13px 42px;
+    font-size: 14px; color: var(--white);
+    font-family: 'Inter', sans-serif;
+    outline: none;
+    transition: border-color .2s, box-shadow .2s, background .2s;
+  }
+  .input-group input::placeholder { color: rgba(255,255,255,0.3); font-size: 13px; }
+  .input-group input:focus {
+    border-color: var(--cyan);
+    background: rgba(0,200,248,0.09);
+    box-shadow: 0 0 0 3px rgba(0,200,248,0.1), 0 0 12px rgba(0,200,248,0.15);
+  }
+
+  /* Linha opções */
+  .login-opts {
+    display: flex; justify-content: space-between; align-items: center;
+    margin-bottom: 24px; margin-top: 4px;
+  }
+  .remember {
+    display: flex; align-items: center; gap: 7px;
+    font-size: 12px; color: var(--text-dim); cursor: pointer;
+  }
+  .remember input[type=checkbox] {
+    accent-color: var(--cyan); width: 14px; height: 14px; cursor: pointer;
+  }
+  .forgot {
+    font-size: 12px; color: var(--cyan); text-decoration: none; opacity: 0.8;
+    transition: opacity .2s;
+  }
+  .forgot:hover { opacity: 1; }
+
+  /* Botão */
+  .btn-login {
+    width: 100%; padding: 14px;
+    background: linear-gradient(90deg, #0077c2, var(--cyan-deep), #00b4e8);
+    background-size: 200% 100%;
+    border: none; border-radius: 3px;
+    font-family: 'Rajdhani', sans-serif;
+    font-size: 16px; font-weight: 700;
+    letter-spacing: 4px; text-transform: uppercase;
+    color: var(--white);
+    cursor: pointer;
+    transition: background-position .4s, box-shadow .3s, transform .1s;
+    box-shadow: 0 0 18px rgba(0,148,212,0.4);
+  }
+  .btn-login:hover {
+    background-position: right center;
+    box-shadow: 0 0 28px rgba(0,200,248,0.55);
+  }
+  .btn-login:active { transform: scale(0.99); }
+
+  /* Mensagem de erro */
+  .login-error {
+    display: none; margin-top: 14px;
+    background: rgba(255,95,109,0.12);
+    border: 1px solid rgba(255,95,109,0.3);
+    border-radius: 3px; padding: 9px 14px;
+    font-size: 13px; color: var(--error);
+    text-align: center;
+  }
+  .login-error.show { display: block; }
+
+  /* Rodapé do card */
+  .card-footer {
+    margin-top: 22px; text-align: center;
+    font-size: 11px; color: rgba(255,255,255,0.2);
+    letter-spacing: 0.5px;
+  }
+
+  /* Linha separadora brilhante vertical */
+  .divider {
+    position: absolute;
+    left: 50%; top: 10%; bottom: 10%;
+    width: 1px;
+    background: linear-gradient(
+      to bottom,
+      transparent,
+      rgba(0,200,248,0.25) 20%,
+      rgba(0,200,248,0.25) 80%,
+      transparent
+    );
+  }
+
+  /* Partículas flutuantes decorativas */
+  .particle {
+    position: fixed;
+    border-radius: 50%;
+    pointer-events: none;
+    z-index: 1;
+    animation: float-up linear infinite;
+    opacity: 0;
+  }
+  @keyframes float-up {
+    0%   { transform: translateY(0) scale(1);  opacity: 0; }
+    10%  { opacity: .7; }
+    90%  { opacity: .3; }
+    100% { transform: translateY(-100vh) scale(.4); opacity: 0; }
+  }
+
+  /* Responsivo */
+  @media (max-width: 900px) {
+    .left { padding: 30px 20px; }
+    .orb-wrap { width: 260px; height: 260px; }
+    .right { padding: 30px 24px; }
+    .login-card { padding: 28px 22px; }
+  }
+
+  @media (max-width: 768px) {
+    .page { grid-template-columns: 1fr; }
+    .left { display: none; }
+    .right {
+      padding: 40px 20px;
+      justify-content: center;
+    }
+    .divider { display: none; }
+    .login-header h2 { font-size: 24px; }
+    .login-card { padding: 24px 18px; max-width: 100%; }
+    .btn-login { padding: 13px; font-size: 14px; }
+  }
+
+  @media (max-width: 420px) {
+    .right { padding: 24px 14px; }
+    .login-card { padding: 20px 14px; }
+    .login-header h2 { font-size: 20px; }
+    .login-opts { flex-direction: column; gap: 8px; align-items: flex-start; }
+  }
+</style>
+</head>
+<body>
+
+<canvas id="plexo"></canvas>
+<div class="bg-gradient"></div>
+
+<div class="page">
+
+  <!-- ── ESQUERDA ── -->
+  <div class="left">
+    <div class="orb-wrap">
+      <div class="orb-ring"></div>
+      <div class="orb-ring ring2"></div>
+      <div class="orb-ring ring3"></div>
+      <div class="orb-orbit"></div>
+      <div class="orb-orbit orbit2"></div>
+      <div class="orb-dot"></div>
+      <div class="orb-dot d2"></div>
+
+      <div class="orb-logo">
+        <img src="logo.png" alt="Mobit Soluções" style="
+          width: 170px;
+          filter: brightness(0) invert(1) drop-shadow(0 0 14px rgba(0,200,248,0.7));
+        ">
+      </div>
+    </div>
+
+    <div class="left-tagline">
+      <h1>MobitOS</h1>
+      <p>Gestão inteligente de ordens de serviço<br>Mobit Soluções — Assistência Técnica</p>
+    </div>
+  </div>
+
+  <div class="divider"></div>
+
+  <!-- ── DIREITA ── -->
+  <div class="right">
+    <div class="login-header">
+      <h2>MobitOS</h2>
+      <p>Mobit &nbsp;·&nbsp; Assistência Técnica</p>
+    </div>
+
+    <!-- Card troca de senha (primeiro acesso) -->
+    <div class="login-card" id="card-troca-senha" style="display:none;">
+      <div class="card-title" style="color:#fbbf24; border-bottom-color:rgba(251,191,36,0.2);">
+        ⚠ Defina sua nova senha
+      </div>
+      <p style="font-size:12px; color:rgba(255,255,255,0.5); text-align:center; margin-bottom:20px; line-height:1.6;">
+        Este é seu primeiro acesso.<br>Crie uma senha pessoal para continuar.
+      </p>
+
+      <div class="input-group">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/>
+        </svg>
+        <input type="password" id="inp-nova-senha" placeholder="Nova senha (mín. 6 caracteres)"
+               oninput="validarSenhas()">
+      </div>
+
+      <div class="input-group">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/>
+        </svg>
+        <input type="password" id="inp-confirma-senha" placeholder="Confirme a nova senha"
+               oninput="validarSenhas()"
+               onkeydown="if(event.key==='Enter') trocarSenha()">
+      </div>
+
+      <!-- Requisitos da senha -->
+      <div id="senha-requisitos" style="display:none; background:rgba(0,0,0,0.2); border:1px solid rgba(255,255,255,0.07);
+        border-radius:4px; padding:10px 14px; margin:-4px 0 14px; display:none; flex-direction:column; gap:5px;">
+      </div>
+
+      <!-- Indicador de força da senha -->
+      <div id="senha-forca-wrap" style="margin:-8px 0 14px; display:none;">
+        <div style="display:flex; gap:4px; margin-bottom:4px;">
+          <div id="forca-b1" style="height:3px; flex:1; border-radius:2px; background:var(--border);"></div>
+          <div id="forca-b2" style="height:3px; flex:1; border-radius:2px; background:var(--border);"></div>
+          <div id="forca-b3" style="height:3px; flex:1; border-radius:2px; background:var(--border);"></div>
+          <div id="forca-b4" style="height:3px; flex:1; border-radius:2px; background:var(--border);"></div>
+        </div>
+        <span id="forca-label" style="font-size:11px; color:var(--text-dim);"></span>
+      </div>
+
+      <div id="troca-error" style="display:none; margin-bottom:14px; background:rgba(255,95,109,0.12);
+        border:1px solid rgba(255,95,109,0.3); border-radius:3px; padding:9px 14px;
+        font-size:13px; color:#ff5f6d; text-align:center;"></div>
+
+      <button class="btn-login" id="btn-trocar" onclick="trocarSenha()">Salvar nova senha</button>
+
+      <div class="card-footer" style="margin-top:16px;">Você não pode pular esta etapa.</div>
+    </div>
+
+    <!-- Card de login normal -->
+    <div class="login-card" id="card-login">
+      <div class="card-title">Acesso ao sistema</div>
+
+      <div class="input-group">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/>
+          <circle cx="12" cy="7" r="4"/>
+        </svg>
+        <input type="text" id="inp-user" placeholder="Usuário" autocomplete="username" autofocus>
+      </div>
+
+      <div class="input-group">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <rect x="3" y="11" width="18" height="11" rx="2" ry="2"/>
+          <path d="M7 11V7a5 5 0 0 1 10 0v4"/>
+        </svg>
+        <input type="password" id="inp-pass" placeholder="Senha" autocomplete="current-password"
+               onkeydown="if(event.key==='Enter') doLogin()">
+      </div>
+
+      <div class="login-opts">
+        <label class="remember">
+          <input type="checkbox" id="chk-remember"> Lembrar acesso
+        </label>
+        <a href="#" class="forgot">Esqueceu a senha?</a>
+      </div>
+
+      <button class="btn-login" onclick="doLogin()">Entrar</button>
+
+      <div class="login-error" id="login-error">Usuário ou senha incorretos.</div>
+
+      <div class="card-footer">MobitOS v1.0 &nbsp;·&nbsp; Mobit Soluções</div>
+    </div><!-- fim #card-login -->
+  </div>
+</div>
+
+<!-- Partículas -->
+<script>
+// ── Plexo (rede de pontos conectados) ──────────────────────────────
+const canvas = document.getElementById('plexo');
+const ctx    = canvas.getContext('2d');
+
+function resize(){
+  canvas.width  = window.innerWidth;
+  canvas.height = window.innerHeight;
+}
+resize();
+window.addEventListener('resize', resize);
+
+const NPTS = 90;
+const pts  = [];
+for(let i=0;i<NPTS;i++){
+  pts.push({
+    x:  Math.random() * window.innerWidth,
+    y:  Math.random() * window.innerHeight,
+    vx: (Math.random()-.5) * .45,
+    vy: (Math.random()-.5) * .45,
+    r:  Math.random()*2+1,
+  });
+}
+
+const mouse = {x:-9999,y:-9999};
+window.addEventListener('mousemove', e=>{ mouse.x=e.clientX; mouse.y=e.clientY; });
+
+function drawPlexo(){
+  ctx.clearRect(0,0,canvas.width,canvas.height);
+
+  for(const p of pts){
+    p.x += p.vx; p.y += p.vy;
+    if(p.x<0) p.x=canvas.width;
+    if(p.x>canvas.width) p.x=0;
+    if(p.y<0) p.y=canvas.height;
+    if(p.y>canvas.height) p.y=0;
+
+    // Reação ao mouse
+    const dx=p.x-mouse.x, dy=p.y-mouse.y;
+    const d=Math.sqrt(dx*dx+dy*dy);
+    if(d<120){ p.x+=dx/d*.8; p.y+=dy/d*.8; }
+
+    // Ponto
+    ctx.beginPath();
+    ctx.arc(p.x,p.y,p.r,0,Math.PI*2);
+    ctx.fillStyle='rgba(0,200,248,0.7)';
+    ctx.fill();
+  }
+
+  // Linhas
+  for(let i=0;i<pts.length;i++){
+    for(let j=i+1;j<pts.length;j++){
+      const dx=pts[i].x-pts[j].x, dy=pts[i].y-pts[j].y;
+      const d=Math.sqrt(dx*dx+dy*dy);
+      if(d<140){
+        ctx.beginPath();
+        ctx.moveTo(pts[i].x,pts[i].y);
+        ctx.lineTo(pts[j].x,pts[j].y);
+        const a=(1-d/140)*.35;
+        ctx.strokeStyle=`rgba(0,200,248,${a})`;
+        ctx.lineWidth=.7;
+        ctx.stroke();
+      }
+    }
+  }
+
+  requestAnimationFrame(drawPlexo);
+}
+drawPlexo();
+
+// ── Partículas flutuantes ──────────────────────────────────────────
+for(let i=0;i<18;i++){
+  const el=document.createElement('div');
+  el.className='particle';
+  const s=Math.random()*3+1;
+  el.style.cssText=`
+    width:${s}px; height:${s}px;
+    left:${Math.random()*100}%;
+    bottom:${Math.random()*20}%;
+    background: rgba(0,200,248,${Math.random()*.6+.2});
+    animation-duration: ${Math.random()*12+8}s;
+    animation-delay: ${Math.random()*10}s;
+    box-shadow: 0 0 ${s*3}px rgba(0,200,248,.5);
+  `;
+  document.body.appendChild(el);
+}
+
+// ── Login ──────────────────────────────────────────────────────────
+const SB_URL = 'https://zrghmwdzxslpuyglsvnq.supabase.co';
+const SB_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InpyZ2htd2R6eHNscHV5Z2xzdm5xIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODIwOTE0NzksImV4cCI6MjA5NzY2NzQ3OX0.l2KE4vTA7CsXBGdRIfuBFqiHBACSueXUO8neEKXsOX4';
+
+async function doLogin(){
+  const usuario = document.getElementById('inp-user').value.trim();
+  const senha   = document.getElementById('inp-pass').value;
+  const err     = document.getElementById('login-error');
+  const btn     = document.querySelector('.btn-login');
+
+  if(!usuario || !senha){
+    err.textContent = 'Preencha usuário e senha.';
+    err.classList.add('show'); return;
+  }
+
+  btn.textContent = 'Verificando...';
+  btn.style.opacity = '.7';
+  btn.disabled = true;
+
+  try {
+    const res = await fetch(
+      `${SB_URL}/rest/v1/usuarios?usuario=eq.${encodeURIComponent(usuario)}&senha_hash=eq.${encodeURIComponent(senha)}&ativo=eq.true&select=id,usuario,nome,perfil,primeiro_acesso`,
+      { headers: { apikey: SB_KEY, Authorization: 'Bearer ' + SB_KEY } }
+    );
+    const rows = await res.json();
+
+    if(rows && rows.length > 0){
+      const user = rows[0];
+      if(document.getElementById('chk-remember').checked){
+        localStorage.setItem('mobit_remember', usuario);
+      }
+      err.classList.remove('show');
+      btn.textContent = 'Entrando...';
+      btn.disabled = false;
+      btn.style.opacity = '1';
+
+      if(user.primeiro_acesso){
+        // Guardar usuário temporariamente para usar na troca de senha
+        sessionStorage.setItem('mobit_temp_user', JSON.stringify(user));
+        // Mostrar card de troca de senha
+        document.getElementById('card-login').style.display = 'none';
+        document.getElementById('card-troca-senha').style.display = 'block';
+        document.getElementById('inp-nova-senha').focus();
+      } else {
+        sessionStorage.setItem('mobit_user', JSON.stringify(user));
+        setTimeout(()=>{ window.location.href='index.html'; }, 600);
+      }
+    } else {
+      throw new Error('Credenciais inválidas');
+    }
+  } catch(e) {
+    err.textContent = 'Usuário ou senha incorretos.';
+    err.classList.add('show');
+    document.getElementById('inp-pass').value='';
+    document.getElementById('inp-pass').focus();
+    btn.textContent = 'Entrar';
+    btn.style.opacity = '1';
+    btn.disabled = false;
+    // Tremer card
+    const card = document.querySelector('.login-card');
+    card.style.transform='translateX(6px)';
+    setTimeout(()=>{ card.style.transform='translateX(-6px)'; },80);
+    setTimeout(()=>{ card.style.transform='translateX(4px)'; },160);
+    setTimeout(()=>{ card.style.transform='translateX(0)';card.style.transition='transform .15s'; },240);
+  }
+}
+
+// ── Força da senha ─────────────────────────────────────────────────
+function calcularForca(senha){
+  let score = 0;
+  if(senha.length >= 8)                          score++;
+  if(senha.length >= 12)                         score++;
+  if(/[A-Z]/.test(senha) && /[a-z]/.test(senha)) score++;
+  if(/[0-9]/.test(senha))                        score++;
+  if(/[^A-Za-z0-9]/.test(senha))                score++;
+  return Math.min(score, 4);
+}
+
+function validarRequisitos(senha, usuario){
+  return [
+    { ok: senha.length >= 8,              texto: 'Mínimo de 8 caracteres' },
+    { ok: /[A-Z]/.test(senha),            texto: 'Pelo menos 1 letra maiúscula' },
+    { ok: /[a-z]/.test(senha),            texto: 'Pelo menos 1 letra minúscula' },
+    { ok: /[0-9]/.test(senha),            texto: 'Pelo menos 1 número' },
+    { ok: /[^A-Za-z0-9]/.test(senha),    texto: 'Pelo menos 1 caractere especial (!@#$...)' },
+    { ok: !senha.toLowerCase().includes((usuario||'').toLowerCase()) || !(usuario||''), texto: 'Não pode conter seu nome de usuário' },
+  ];
+}
+
+function validarSenhas(){
+  const nova     = document.getElementById('inp-nova-senha').value;
+  const confirma = document.getElementById('inp-confirma-senha').value;
+  const wrap     = document.getElementById('senha-forca-wrap');
+  const label    = document.getElementById('forca-label');
+  const bars     = [1,2,3,4].map(i => document.getElementById('forca-b'+i));
+  const err      = document.getElementById('troca-error');
+  const reqWrap  = document.getElementById('senha-requisitos');
+
+  const user = (() => { try { return JSON.parse(sessionStorage.getItem('mobit_temp_user')||'{}').usuario||''; } catch{ return ''; } })();
+
+  if(nova.length > 0){
+    wrap.style.display = 'block';
+    reqWrap.style.display = 'block';
+
+    // Força
+    const forca  = calcularForca(nova);
+    const cores  = ['#ff5f6d','#fbbf24','#fbbf24','#4ade80','#4ade80'];
+    const labels = ['','Fraca','Razoável','Boa','Forte'];
+    bars.forEach((b,i) => { b.style.background = i < forca ? cores[forca] : 'var(--border)'; });
+    label.textContent = labels[forca];
+    label.style.color = cores[forca];
+
+    // Requisitos
+    const reqs = validarRequisitos(nova, user);
+    reqWrap.innerHTML = reqs.map(r => `
+      <div style="display:flex;align-items:center;gap:7px;font-size:11.5px;color:${r.ok ? '#4ade80' : 'rgba(255,255,255,0.4)'};">
+        <span style="font-size:13px;">${r.ok ? '✓' : '○'}</span> ${r.texto}
+      </div>
+    `).join('');
+  } else {
+    wrap.style.display = 'none';
+    reqWrap.style.display = 'none';
+  }
+
+  if(confirma && nova !== confirma){
+    err.textContent = 'As senhas não coincidem.';
+    err.style.display = 'block';
+  } else {
+    err.style.display = 'none';
+  }
+}
+
+async function trocarSenha(){
+  const nova     = document.getElementById('inp-nova-senha').value;
+  const confirma = document.getElementById('inp-confirma-senha').value;
+  const err      = document.getElementById('troca-error');
+  const btn      = document.getElementById('btn-trocar');
+
+  const user = (() => { try { return JSON.parse(sessionStorage.getItem('mobit_temp_user')||'{}').usuario||''; } catch{ return ''; } })();
+  const reqs = validarRequisitos(nova, user);
+  const reprovados = reqs.filter(r => !r.ok);
+
+  if(reprovados.length > 0){
+    err.textContent = 'Corrija os requisitos destacados antes de continuar.';
+    err.style.display = 'block';
+    validarSenhas(); // atualizar visual
+    return;
+  }
+  if(nova !== confirma){
+    err.textContent = 'As senhas não coincidem.';
+    err.style.display = 'block'; return;
+  }
+
+  btn.textContent = 'Salvando...';
+  btn.disabled = true;
+
+  try {
+    const user = JSON.parse(sessionStorage.getItem('mobit_temp_user'));
+
+    // Atualizar senha e marcar primeiro_acesso como false
+    const res = await fetch(
+      `https://zrghmwdzxslpuyglsvnq.supabase.co/rest/v1/usuarios?id=eq.${user.id}`,
+      {
+        method: 'PATCH',
+        headers: {
+          apikey: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InpyZ2htd2R6eHNscHV5Z2xzdm5xIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODIwOTE0NzksImV4cCI6MjA5NzY2NzQ3OX0.l2KE4vTA7CsXBGdRIfuBFqiHBACSueXUO8neEKXsOX4',
+          Authorization: 'Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InpyZ2htd2R6eHNscHV5Z2xzdm5xIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODIwOTE0NzksImV4cCI6MjA5NzY2NzQ3OX0.l2KE4vTA7CsXBGdRIfuBFqiHBACSueXUO8neEKXsOX4',
+          'Content-Type': 'application/json',
+          Prefer: 'return=representation'
+        },
+        body: JSON.stringify({ senha_hash: nova, primeiro_acesso: false })
+      }
+    );
+
+    if(!res.ok) throw new Error('Erro ao salvar');
+
+    // Limpar temp e gravar sessão definitiva
+    sessionStorage.removeItem('mobit_temp_user');
+    user.primeiro_acesso = false;
+    sessionStorage.setItem('mobit_user', JSON.stringify(user));
+
+    btn.textContent = 'Senha salva! Entrando...';
+    setTimeout(()=>{ window.location.href='index.html'; }, 800);
+
+  } catch(e) {
+    err.textContent = 'Erro ao salvar senha. Tente novamente.';
+    err.style.display = 'block';
+    btn.textContent = 'Salvar nova senha';
+    btn.disabled = false;
+  }
+}
+
+// Preencher usuário lembrado
+window.addEventListener('load', ()=>{
+  const saved = localStorage.getItem('mobit_remember');
+  if(saved){
+    document.getElementById('inp-user').value = saved;
+    document.getElementById('chk-remember').checked = true;
+    document.getElementById('inp-pass').focus();
+  }
+});
+</script>
+</body>
+</html>

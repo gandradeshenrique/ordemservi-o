@@ -1,0 +1,1274 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1">
+<title>Acompanhe sua OS — Mobit Soluções</title>
+<style>
+  :root{
+    --bg: #15181c;
+    --bg-soft: #1c2126;
+    --panel: #20262c;
+    --panel-2: #262d34;
+    --border: #343c45;
+    --text: #e8ebee;
+    --text-dim: #9aa5b1;
+    --text-faint: #6b7682;
+    --accent: #2da0e0;
+    --accent-bg: rgba(45,160,224,0.12);
+    --green: #4ade80;
+    --green-bg: rgba(74,222,128,0.12);
+    --red: #f87171;
+    --red-bg: rgba(248,113,113,0.12);
+    --blue: #60a5fa;
+    --blue-bg: rgba(96,165,250,0.12);
+    --yellow: #fbbf24;
+    --yellow-bg: rgba(251,191,36,0.12);
+    --purple: #a78bfa;
+    --purple-bg: rgba(167,139,250,0.12);
+    --radius: 10px;
+    --mono: 'JetBrains Mono', 'Roboto Mono', monospace;
+    --sans: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  }
+  *{ box-sizing:border-box; margin:0; padding:0; }
+  body{
+    font-family: var(--sans);
+    background: var(--bg);
+    color: var(--text);
+    min-height: 100vh;
+    font-size: 14px;
+    line-height: 1.5;
+    padding: 16px;
+  }
+  .wrap{ max-width: 560px; margin: 0 auto; }
+  .topbar{ display:flex; align-items:center; justify-content:space-between; margin-bottom:18px; }
+  .topbar img{ height:28px; }
+  .topbar .sair{ font-size:12px; color:var(--text-faint); text-decoration:none; cursor:pointer; }
+  .topbar .sair:hover{ color:var(--text-dim); }
+
+  .card{
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 18px;
+    margin-bottom: 14px;
+  }
+  .section-title{
+    font-size: 11px;
+    font-weight: 700;
+    color: var(--text-faint);
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    margin: 18px 0 8px;
+  }
+  .section-title:first-child{ margin-top:0; }
+
+  /* ---- Login ---- */
+  #login-view{ display:flex; align-items:center; justify-content:center; min-height:70vh; }
+  .login-card{ width:100%; max-width:360px; text-align:center; }
+  .login-card h1{ font-size:18px; margin-bottom:6px; }
+  .login-card p{ color:var(--text-dim); font-size:13px; margin-bottom:20px; }
+  .senha-input{
+    width:100%;
+    background: var(--panel-2);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 14px;
+    font-size: 22px;
+    text-align: center;
+    letter-spacing: 6px;
+    color: var(--text);
+    font-family: var(--mono);
+    outline: none;
+    margin-bottom: 14px;
+  }
+  .senha-input:focus{ border-color: var(--accent); }
+  .btn{
+    display:inline-flex; align-items:center; justify-content:center;
+    width:100%;
+    padding: 13px;
+    background: var(--accent);
+    border: 1px solid var(--accent);
+    border-radius: 8px;
+    color: #fff;
+    font-size: 14px;
+    font-weight: 600;
+    cursor: pointer;
+  }
+  .btn:disabled{ opacity:0.6; cursor:default; }
+  .btn:hover:not(:disabled){ filter:brightness(1.08); }
+  .erro{
+    display:none;
+    margin-top: 12px;
+    background: var(--red-bg);
+    border: 1px solid rgba(248,113,113,0.3);
+    border-radius: 8px;
+    padding: 10px 14px;
+    font-size: 13px;
+    color: var(--red);
+  }
+  .erro.show{ display:block; }
+
+  /* ---- Tracking view ---- */
+  #track-view{ display:none; }
+  .os-header{ display:flex; align-items:flex-start; justify-content:space-between; gap:10px; flex-wrap:wrap; margin-bottom:14px; }
+  .os-header h2{ font-size:17px; font-weight:700; }
+  .os-header .sub{ color:var(--text-dim); font-size:12.5px; margin-top:2px; }
+  .live{ display:flex; align-items:center; gap:6px; font-size:11px; color:var(--text-faint); margin-top:4px; }
+  .live .dot{ width:6px; height:6px; border-radius:50%; background:var(--green); box-shadow:0 0 6px var(--green); animation:pulse 1.6s infinite; }
+  @keyframes pulse{ 0%,100%{opacity:1;} 50%{opacity:.35;} }
+
+  .badge{
+    display:inline-flex; align-items:center; gap:5px;
+    padding: 4px 10px; border-radius: 100px;
+    font-size: 11.5px; font-weight:600; white-space:nowrap;
+  }
+  .badge::before{ content:''; width:6px; height:6px; border-radius:50%; background:currentColor; flex-shrink:0; }
+  .badge-aberto{ background: var(--blue-bg); color: var(--blue); }
+  .badge-andamento{ background: var(--yellow-bg); color: var(--yellow); }
+  .badge-aguardando{ background: var(--purple-bg); color: var(--purple); }
+  .badge-concluido{ background: var(--green-bg); color: var(--green); }
+  .badge-entregue{ background: rgba(255,255,255,0.08); color: var(--text-dim); }
+  .badge-cancelado{ background: var(--red-bg); color: var(--red); }
+
+  .timeline{ display:flex; flex-direction:column; gap:14px; }
+  .timeline-item{ display:flex; gap:12px; }
+  .timeline-dot{ width:9px; height:9px; border-radius:50%; background:var(--accent); margin-top:5px; flex-shrink:0; box-shadow:0 0 0 3px var(--accent-bg); }
+  .timeline-content small{ display:block; color:var(--text-faint); font-size:11px; margin-bottom:2px; }
+
+  .kv-list{ display:grid; grid-template-columns:1fr 1fr; gap:8px 16px; }
+  .kv-row{ display:flex; flex-direction:column; gap:2px; }
+  .kv-label{ font-size:11px; color:var(--text-faint); }
+  .kv-value{ font-size:13.5px; }
+  .mono{ font-family:var(--mono); }
+
+  table{ width:100%; border-collapse:collapse; font-size:13px; }
+  th{ text-align:left; font-size:11px; color:var(--text-faint); text-transform:uppercase; padding:0 0 8px; border-bottom:1px solid var(--border); }
+  td{ padding:8px 0; border-bottom:1px solid var(--border); }
+  tr:last-child td{ border-bottom:none; }
+  .checklist-grid{ display:grid; grid-template-columns:1fr 1fr; gap:4px 12px; font-size:12px; }
+  .cl-row{ display:flex; justify-content:space-between; padding:5px 8px; background:var(--panel-2); border-radius:5px; }
+
+  .fotos-grid{ display:flex; gap:6px; flex-wrap:wrap; margin:6px 0 10px; }
+  .fotos-grid img{ width:64px; height:64px; object-fit:cover; border-radius:6px; border:1px solid var(--border); cursor:pointer; }
+
+  .text-faint{ color:var(--text-faint); }
+  .text-dim{ color:var(--text-dim); }
+  .footer-note{ text-align:center; color:var(--text-faint); font-size:11px; margin-top:20px; }
+
+  /* ---- Aprovação do orçamento ---- */
+  #aprovacao-view{ display:none; }
+  .aprov-hint{ font-size:12.5px; color:var(--text-dim); margin-bottom:14px; }
+  .aprov-block{ padding:12px 0; border-bottom:1px solid var(--border); }
+  .aprov-block:last-child{ border-bottom:none; }
+  .aprov-item{ display:flex; align-items:center; gap:12px; padding:0; border-bottom:none; }
+  .aprov-item input[type=checkbox]{ width:20px; height:20px; accent-color:var(--green); flex-shrink:0; cursor:pointer; }
+  .aprov-item-info{ flex:1; min-width:0; }
+  .aprov-item-nome{ font-weight:700; font-size:13.5px; }
+  .aprov-item-imei{ font-weight:400; font-size:11.5px; color:var(--text-dim); }
+  .aprov-item-diag{ font-size:12px; color:var(--text-dim); margin-top:2px; }
+  .aprov-item-valor{ font-weight:700; font-size:13.5px; white-space:nowrap; }
+  .aprov-item-valor-label{ font-size:10px; color:var(--text-faint); text-transform:uppercase; letter-spacing:0.4px; margin-bottom:2px; }
+  .aprov-sub{ margin:8px 0 0 32px; display:flex; flex-direction:column; gap:6px; }
+  .aprov-sub-item{ display:flex; align-items:center; gap:8px; font-size:12.5px; color:var(--text-dim); cursor:pointer; }
+  .aprov-sub-item input[type=checkbox]{ width:16px; height:16px; accent-color:var(--green); flex-shrink:0; cursor:pointer; }
+  .aprov-sub-item input[type=checkbox]:disabled{ cursor:default; opacity:0.5; }
+  .aprov-sub-valor{ margin-left:auto; }
+  .aprov-sub-reparo{ cursor:default; padding-bottom:4px; margin-bottom:2px; border-bottom:1px dashed var(--border); color:var(--text-faint); }
+  .aprov-total-line{ display:flex; justify-content:space-between; align-items:center; padding-top:12px; margin-top:6px; border-top:1.5px solid var(--border); font-weight:700; font-size:15px; }
+
+  @media (max-width:420px){
+    .kv-list, .checklist-grid{ grid-template-columns:1fr; }
+  }
+</style>
+</head>
+<body>
+
+<div class="wrap">
+
+  <!-- ===== LOGIN ===== -->
+  <div id="login-view">
+    <div class="login-card">
+      <img src="logo.png" alt="Mobit Soluções" style="height:40px; margin-bottom:18px;" onerror="this.style.display='none'">
+      <h1 id="login-title">Acompanhar ordem de serviço</h1>
+      <p>Digite a senha de acesso que você recebeu pra ver o andamento da sua OS.</p>
+      <input type="text" inputmode="numeric" pattern="[0-9]*" maxlength="6" class="senha-input" id="inp-senha" placeholder="••••••" autofocus>
+      <button class="btn" id="btn-entrar" onclick="tentarAcesso()">Ver andamento</button>
+      <div class="erro" id="login-erro"></div>
+    </div>
+  </div>
+
+  <!-- ===== ACOMPANHAMENTO ===== -->
+  <div id="track-view">
+    <div class="topbar">
+      <img src="logo.png" alt="Mobit Soluções" onerror="this.style.display='none'">
+      <a class="sair" onclick="sair()">Sair</a>
+    </div>
+
+    <div class="os-header">
+      <div>
+        <h2 id="os-titulo">OS #0000</h2>
+        <div class="sub" id="os-cliente"></div>
+        <div class="live"><span class="dot"></span><span id="os-atualizado">acompanhando em tempo real</span></div>
+      </div>
+      <span class="badge" id="os-badge"></span>
+    </div>
+
+    <button class="btn" id="btn-imprimir-os" style="display:none; margin-bottom:14px;" onclick="imprimirOSCliente()">🖨️ Imprimir / salvar OS</button>
+    <button class="btn" id="btn-baixar-laudo" style="display:none; margin-bottom:14px;" onclick="imprimirLaudoCliente()">🖨️ Baixar laudo de descarte</button>
+
+    <div class="card">
+      <div class="section-title">Histórico</div>
+      <div class="timeline" id="os-timeline"></div>
+    </div>
+
+    <div class="card">
+      <div class="section-title">Detalhes do reparo</div>
+      <div class="kv-list" id="os-detalhes"></div>
+    </div>
+
+    <div class="card" id="card-checklist" style="display:none;">
+      <div class="section-title">Checklist de recebimento</div>
+      <div class="checklist-grid" id="os-checklist"></div>
+    </div>
+
+    <div class="card" id="card-fotos" style="display:none;">
+      <div class="section-title">Fotos</div>
+      <div id="os-fotos"></div>
+    </div>
+
+    <div class="card" id="card-pecas" style="display:none;">
+      <div class="section-title">Peças e serviços</div>
+      <div id="os-pecas"></div>
+      <div style="text-align:right; font-weight:700; font-size:15px; color:var(--accent); padding-top:10px;">
+        Total: <span id="os-total"></span>
+      </div>
+    </div>
+
+    <div class="card" id="card-obs" style="display:none;">
+      <div class="section-title">Observações</div>
+      <p id="os-obs" style="font-size:13px;"></p>
+    </div>
+
+    <div class="erro" id="track-erro"></div>
+    <div class="footer-note">Mobit Soluções · página de acompanhamento</div>
+  </div>
+
+  <!-- ===== APROVAÇÃO DO ORÇAMENTO ===== -->
+  <div id="aprovacao-view">
+    <div class="topbar">
+      <img src="logo.png" alt="Mobit Soluções" onerror="this.style.display='none'">
+      <a class="sair" onclick="sair()">Sair</a>
+    </div>
+
+    <div class="os-header">
+      <div>
+        <h2 id="aprov-titulo">OS #0000</h2>
+        <div class="sub" id="aprov-cliente"></div>
+      </div>
+      <span class="badge badge-aguardando">Aguardando aprovação</span>
+    </div>
+
+    <div class="card">
+      <div class="section-title">Orçamento</div>
+      <p class="aprov-hint">Confira o diagnóstico e o valor de cada aparelho abaixo. Desmarque os que você <strong>não</strong> quer aprovar — as peças desses aparelhos não serão instaladas.</p>
+      <div id="aprov-itens"></div>
+      <div class="aprov-total-line">
+        <span>Total aprovado</span>
+        <span id="aprov-total" class="mono">R$ 0,00</span>
+      </div>
+    </div>
+
+    <button class="btn" id="btn-confirmar-aprovacao" onclick="confirmarAprovacao()">Confirmar decisão</button>
+    <div class="erro" id="aprov-erro"></div>
+
+    <div class="footer-note">Mobit Soluções · página de acompanhamento</div>
+  </div>
+
+  <!-- ===== LAUDO DE DESCARTE ===== -->
+  <div id="laudo-descarte-view" style="display:none;">
+    <div class="topbar">
+      <img src="logo.png" alt="Mobit Soluções" onerror="this.style.display='none'">
+      <a class="sair" onclick="sair()">Sair</a>
+    </div>
+
+    <div class="os-header">
+      <div>
+        <h2 id="laudo-descarte-titulo">OS #0000</h2>
+        <div class="sub" id="laudo-descarte-cliente"></div>
+      </div>
+      <span class="badge" style="background:var(--red-bg); color:var(--red);">Laudo de descarte</span>
+    </div>
+
+    <div class="card">
+      <div class="section-title" style="color:var(--red);">⚠ Aparelho(s) sem reparo viável</div>
+      <p style="font-size:12.5px; color:var(--text-dim); margin:0 0 4px;">
+        O(s) aparelho(s) abaixo foi(ram) avaliado(s) tecnicamente e o reparo não é economicamente viável.
+        Escolha uma das opções abaixo pra seguirmos.
+      </p>
+      <div id="laudo-descarte-aparelhos"></div>
+    </div>
+
+    <div class="card">
+      <div class="section-title">Autorizar descarte</div>
+      <div style="font-size:12px; color:var(--text-dim); line-height:1.5; background:var(--panel-2); border:1px solid var(--border); border-radius:8px; padding:10px 12px; margin-bottom:14px;">
+        Ao autorizar, você declara estar ciente de que <strong>não haverá devolução</strong> do(s) aparelho(s) após o descarte,
+        e que eventuais dados pessoais ainda presentes em aparelho(s) não funcional(is) são de sua responsabilidade.
+      </div>
+      <div style="margin-bottom:12px;">
+        <label style="display:block; font-size:11px; color:var(--text-faint); text-transform:uppercase; letter-spacing:0.4px; margin-bottom:6px;">Nome de quem autoriza</label>
+        <input type="text" id="laudo-descarte-nome" placeholder="Seu nome completo"
+          style="width:100%; background:var(--panel-2); border:1px solid var(--border); border-radius:8px; padding:11px 12px; font-size:14px; color:var(--text); outline:none;">
+      </div>
+      <label style="display:flex; align-items:flex-start; gap:8px; font-size:12.5px; color:var(--text-dim); margin-bottom:14px; cursor:pointer;">
+        <input type="checkbox" id="laudo-descarte-ciente" style="width:17px; height:17px; margin-top:1px; accent-color:var(--red); flex-shrink:0; cursor:pointer;">
+        Estou ciente e autorizo o descarte definitivo do(s) aparelho(s) acima.
+      </label>
+      <button class="btn" id="btn-autorizar-laudo" style="background:var(--red); border-color:var(--red);" onclick="autorizarLaudoDescarte()">Autorizar descarte</button>
+    </div>
+
+    <div class="card">
+      <div class="section-title">Prefere não descartar?</div>
+      <p style="font-size:12.5px; color:var(--text-dim); margin:0 0 12px;">
+        Se você não quer autorizar o descarte, pode solicitar que devolvamos o(s) aparelho(s).
+      </p>
+      <button class="btn" id="btn-solicitar-devolucao" onclick="solicitarDevolucaoLaudo()">Solicito a devolução dos equipamentos</button>
+    </div>
+
+    <div class="erro" id="laudo-descarte-erro"></div>
+    <div class="footer-note">Mobit Soluções · página de acompanhamento</div>
+  </div>
+
+</div>
+
+<script>
+const SB_URL = 'https://zrghmwdzxslpuyglsvnq.supabase.co';
+const SB_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InpyZ2htd2R6eHNscHV5Z2xzdm5xIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODIwOTE0NzksImV4cCI6MjA5NzY2NzQ3OX0.l2KE4vTA7CsXBGdRIfuBFqiHBACSueXUO8neEKXsOX4';
+
+const token = new URLSearchParams(location.search).get('t');
+let pollTimer = null;
+
+function escapeHtml(str){
+  if(str == null) return '';
+  return String(str).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+}
+function formatCurrency(v){
+  return 'R$ ' + (Number(v)||0).toLocaleString('pt-BR', {minimumFractionDigits:2, maximumFractionDigits:2});
+}
+function formatDate(dStr){
+  if(!dStr) return '—';
+  const [y,m,d] = dStr.split('-');
+  return `${d}/${m}/${y}`;
+}
+function statusBadgeClass(status){
+  const map = {
+    'Aberto':'badge-aberto', 'Aguardando aparelho':'badge-aguardando', 'Em andamento':'badge-andamento',
+    'Aguardando peça':'badge-aguardando', 'Aguardando aprovação':'badge-aguardando',
+    'Concluído':'badge-concluido', 'Entregue':'badge-entregue', 'Cancelado':'badge-cancelado'
+  };
+  return map[status] || 'badge-aberto';
+}
+
+if(!token){
+  document.getElementById('login-title').textContent = 'Link inválido';
+  document.querySelector('#login-view p').textContent = 'Esse link de acompanhamento está incompleto ou incorreto. Confira com a assistência técnica.';
+  document.getElementById('inp-senha').style.display = 'none';
+  document.getElementById('btn-entrar').style.display = 'none';
+}
+
+document.getElementById('inp-senha').addEventListener('keydown', e => { if(e.key === 'Enter') tentarAcesso(); });
+
+async function verificarAcesso(senha){
+  const r = await fetch(`${SB_URL}/rest/v1/rpc/verificar_acesso_rastreio`, {
+    method: 'POST',
+    headers: { apikey: SB_KEY, Authorization: 'Bearer ' + SB_KEY, 'Content-Type': 'application/json' },
+    body: JSON.stringify({ p_token: token, p_senha: senha })
+  });
+  if(!r.ok){
+    let detalhe = '';
+    try { const j = await r.json(); detalhe = j.message || j.hint || j.code || ''; } catch(e){}
+    console.error('verificar_acesso_rastreio falhou:', r.status, detalhe);
+    throw new Error(`Erro ${r.status}${detalhe ? ' — ' + detalhe : ''}`);
+  }
+  return r.json();
+}
+
+async function tentarAcesso(){
+  const senha = document.getElementById('inp-senha').value.trim();
+  const erro = document.getElementById('login-erro');
+  const btn = document.getElementById('btn-entrar');
+  erro.classList.remove('show');
+  if(!senha){ erro.textContent = 'Digite a senha de acesso.'; erro.classList.add('show'); return; }
+
+  btn.disabled = true; btn.textContent = 'Verificando...';
+  try {
+    const rows = await verificarAcesso(senha);
+    if(!rows || !rows.length){
+      erro.textContent = 'Senha incorreta. Confira o código enviado pra você.';
+      erro.classList.add('show');
+      btn.disabled = false; btn.textContent = 'Ver andamento';
+      return;
+    }
+    sessionStorage.setItem('rastreio_senha_' + token, senha);
+    mostrarAcompanhamento(rows[0]);
+    iniciarPolling(senha);
+  } catch(e){
+    erro.textContent = 'Não foi possível verificar agora (' + e.message + '). Se persistir, confirme se o sql_rastreio_os.sql foi executado no Supabase.';
+    erro.classList.add('show');
+    btn.disabled = false; btn.textContent = 'Ver andamento';
+  }
+}
+
+function sair(){
+  sessionStorage.removeItem('rastreio_senha_' + token);
+  if(pollTimer) clearInterval(pollTimer);
+  document.getElementById('track-view').style.display = 'none';
+  document.getElementById('login-view').style.display = 'flex';
+  document.getElementById('inp-senha').value = '';
+}
+
+function iniciarPolling(senha){
+  if(pollTimer) clearInterval(pollTimer);
+  pollTimer = setInterval(async () => {
+    if(document.visibilityState !== 'visible') return;
+    try {
+      const rows = await verificarAcesso(senha);
+      if(!rows || !rows.length){
+        clearInterval(pollTimer);
+        document.getElementById('track-erro').textContent = 'Esse link parou de funcionar (provavelmente foi gerado um novo). Peça um link atualizado à assistência técnica.';
+        document.getElementById('track-erro').classList.add('show');
+        return;
+      }
+      mostrarAcompanhamento(rows[0]);
+    } catch(e){ /* falha de rede pontual — tenta de novo no próximo ciclo */ }
+  }, 8000);
+}
+
+// Ao voltar pra aba, atualiza na hora em vez de esperar o próximo ciclo
+document.addEventListener('visibilitychange', () => {
+  if(document.visibilityState === 'visible' && pollTimer){
+    const senha = sessionStorage.getItem('rastreio_senha_' + token);
+    if(senha) verificarAcesso(senha).then(rows => { if(rows && rows.length) mostrarAcompanhamento(rows[0]); }).catch(()=>{});
+  }
+});
+
+let ultimoOS = null;
+let aprovacaoAtiva = false;
+let laudoDescarteAtivo = null;
+let laudoParaBaixar = null;
+
+async function mostrarAcompanhamento(o){
+  ultimoOS = o;
+  document.getElementById('login-view').style.display = 'none';
+
+  // Orçamento aguardando resposta do cliente: mostra a tela de aprovação em vez do acompanhamento normal
+  if(o.status === 'Aguardando aprovação'){
+    document.getElementById('track-view').style.display = 'none';
+    document.getElementById('laudo-descarte-view').style.display = 'none';
+    document.getElementById('aprovacao-view').style.display = 'block';
+    // Só reconstrói a lista/checkboxes na primeira vez que a tela aparece — evita apagar
+    // uma seleção que o cliente já esteja fazendo quando o polling atualiza em segundo plano
+    if(!aprovacaoAtiva){
+      aprovacaoAtiva = true;
+      renderAprovacaoView(o);
+    }
+    return;
+  }
+  aprovacaoAtiva = false;
+  document.getElementById('aprovacao-view').style.display = 'none';
+
+  // Uma consulta só traz os laudos recentes dessa OS: um em "Aguardando autorização"
+  // (se houver) bloqueia o acompanhamento normal; um já "Autorizado"/"Descartado"
+  // libera o botão de baixar o laudo lá embaixo.
+  const laudos = await buscarLaudosDaOS(o);
+  const laudoPendente = laudos.find(l => l.status === 'Aguardando autorização');
+
+  if(laudoPendente){
+    document.getElementById('track-view').style.display = 'none';
+    document.getElementById('laudo-descarte-view').style.display = 'block';
+    if(!laudoDescarteAtivo || laudoDescarteAtivo.id !== laudoPendente.id){
+      laudoDescarteAtivo = laudoPendente;
+      renderLaudoDescarteView(laudoPendente, o);
+    }
+    return;
+  }
+  laudoDescarteAtivo = null;
+  document.getElementById('laudo-descarte-view').style.display = 'none';
+  document.getElementById('track-view').style.display = 'block';
+
+  laudoParaBaixar = laudos.find(l => l.status === 'Autorizado' || l.status === 'Descartado') || null;
+  document.getElementById('btn-baixar-laudo').style.display = laudoParaBaixar ? 'flex' : 'none';
+
+  document.getElementById('os-titulo').textContent = `OS #${o.numero} — ${o.aparelho || ''}`;
+  document.getElementById('os-cliente').textContent = o.cliente_nome || '';
+  document.getElementById('os-atualizado').textContent = 'atualizado às ' + new Date().toLocaleTimeString('pt-BR', {hour:'2-digit', minute:'2-digit', second:'2-digit'});
+  const badge = document.getElementById('os-badge');
+  badge.className = 'badge ' + statusBadgeClass(o.status);
+  badge.textContent = o.status;
+  document.getElementById('btn-imprimir-os').style.display = (o.status === 'Concluído') ? 'flex' : 'none';
+
+  // Histórico
+  const hist = (o.historico || []).slice().reverse();
+  document.getElementById('os-timeline').innerHTML = hist.length
+    ? hist.map(h => `
+        <div class="timeline-item">
+          <div class="timeline-dot"></div>
+          <div class="timeline-content">
+            <small>${formatDate(h.date)}</small>
+            ${escapeHtml(h.text)}
+          </div>
+        </div>`).join('')
+    : `<p class="text-faint">Nenhum histórico registrado ainda.</p>`;
+
+  // Detalhes
+  const det = [];
+  if(o.defeito) det.push(['Defeito relatado', escapeHtml(o.defeito)]);
+  if(o.diagnostico) det.push(['Diagnóstico técnico', escapeHtml(o.diagnostico)]);
+  det.push(['Entrada', formatDate(o.data_entrada)]);
+  det.push(['Previsão', formatDate(o.data_prevista)]);
+  if(o.pagamento) det.push(['Forma de pagamento', escapeHtml(o.pagamento)]);
+  if(o.garantia) det.push(['Garantia', escapeHtml(String(o.garantia)) + ' dias']);
+  if(o.acessorios) det.push(['Acessórios', escapeHtml(o.acessorios)]);
+  document.getElementById('os-detalhes').innerHTML = det.map(([l,v]) =>
+    `<div class="kv-row"><span class="kv-label">${l}</span><span class="kv-value">${v}</span></div>`
+  ).join('');
+
+  // Checklist
+  const clLabels = [
+    ['cl-liga','Liga?'],['cl-carrega','Carrega?'],['cl-display','Display'],['cl-touch','Touch'],
+    ['cl-vidro','Vidro'],['cl-tampa','Tampa Traseira'],['cl-camtraseira','Câmera Traseira'],['cl-camfrontal','Câmera Frontal'],
+    ['cl-faceid','Face ID'],['cl-biometria','Biometria'],['cl-microfone','Microfone'],['cl-altofalante','Alto Falante'],
+    ['cl-auricular','Auricular'],['cl-sinal','Sinal Operadora'],['cl-wifi','Wifi'],['cl-bluetooth','Bluetooth'],
+    ['cl-sensor','Sensor de Proximidade'],['cl-gaveta','Gaveta de Chip'],['cl-power','Botão Power'],['cl-volume','Botão Volume']
+  ];
+  const cl = o.checklist || {};
+  if(Object.keys(cl).length){
+    document.getElementById('card-checklist').style.display = 'block';
+    document.getElementById('os-checklist').innerHTML = clLabels.map(([k,label]) => {
+      const v = cl[k] || '—';
+      const color = v === 'Sim' ? 'var(--green)' : v === 'Não' ? 'var(--red)' : 'var(--text-faint)';
+      return `<div class="cl-row"><span class="text-dim">${label}</span><span style="font-weight:600; color:${color};">${v}</span></div>`;
+    }).join('');
+  } else {
+    document.getElementById('card-checklist').style.display = 'none';
+  }
+
+  // Fotos
+  const devs = [{ id:'principal', n:1, nome:o.aparelho }].concat((o.aparelhos_extras || []).map((a,i) => ({ id:a.id || ('x'+i), n:i+2, nome:a.modelo })));
+  const ap = (o.fotos && o.fotos.ap) || {};
+  const temFotos = devs.some(d => ((ap[d.id]||{}).entrada||[]).length || ((ap[d.id]||{}).saida||[]).length);
+  if(temFotos){
+    document.getElementById('card-fotos').style.display = 'block';
+    const col = (d, stage, label) => {
+      const fs = (ap[d.id]||{})[stage] || [];
+      if(!fs.length) return '';
+      return `<div style="margin-bottom:10px;">
+        <div style="font-size:11px; color:var(--text-faint); margin-bottom:4px;">Aparelho ${d.n} — ${label}</div>
+        <div class="fotos-grid">${fs.map(f => `<img src="${f.url}" alt="" loading="lazy" onclick="window.open('${f.url}','_blank')">`).join('')}</div>
+      </div>`;
+    };
+    document.getElementById('os-fotos').innerHTML = devs.map(d => col(d,'entrada','Entrada') + col(d,'saida','Saída')).join('');
+  } else {
+    document.getElementById('card-fotos').style.display = 'none';
+  }
+
+  // Peças e serviços
+  const parts = o.parts || [];
+  const extras = o.aparelhos_extras || [];
+  const temPecas = parts.length || o.mao_obra || extras.length;
+  if(temPecas){
+    document.getElementById('card-pecas').style.display = 'block';
+    const tabelaPecas = (lista, maoObra) => {
+      const subtotal = lista.reduce((s,p) => s + p.qtd*p.preco, 0) + (maoObra || 0);
+      return `
+      <table style="margin-bottom:10px;">
+        <thead><tr><th>Item</th><th>Qtd.</th><th>Preço</th><th>Subtotal</th></tr></thead>
+        <tbody>
+          ${lista.map(p => `<tr><td>${escapeHtml(p.nome)}</td><td class="mono">${p.qtd}</td><td class="mono">${formatCurrency(p.preco)}</td><td class="mono">${formatCurrency(p.qtd*p.preco)}</td></tr>`).join('')}
+          ${maoObra ? `<tr><td colspan="3" style="text-align:right; font-weight:600;">Mão de obra</td><td class="mono">${formatCurrency(maoObra)}</td></tr>` : ''}
+        </tbody>
+        <tfoot><tr><td colspan="3" style="text-align:right; font-weight:700;">Subtotal do aparelho</td><td class="mono" style="font-weight:700; color:var(--accent);">${formatCurrency(subtotal)}</td></tr></tfoot>
+      </table>`;
+    };
+    let html = `<div style="font-size:12px; font-weight:700; color:var(--accent); margin-bottom:6px;">Aparelho 1 — ${escapeHtml(o.aparelho||'')}${o.imei ? ` <span style="font-weight:400; color:var(--text-dim); font-size:11px;">(IMEI: ${escapeHtml(o.imei)})</span>` : ''}</div>` + tabelaPecas(parts, o.mao_obra);
+    extras.forEach((a,i) => {
+      html += `<div style="font-size:12px; font-weight:700; color:var(--accent); margin:12px 0 6px;">Aparelho ${i+2} — ${escapeHtml(a.modelo||'')}${a.imei ? ` <span style="font-weight:400; color:var(--text-dim); font-size:11px;">(IMEI: ${escapeHtml(a.imei)})</span>` : ''}</div>` + tabelaPecas(a.parts||[], a.maoObra);
+    });
+    document.getElementById('os-pecas').innerHTML = html;
+    document.getElementById('os-total').textContent = formatCurrency(o.total);
+  } else {
+    document.getElementById('card-pecas').style.display = 'none';
+  }
+
+  // Observações
+  if(o.observacoes){
+    document.getElementById('card-obs').style.display = 'block';
+    document.getElementById('os-obs').textContent = o.observacoes;
+  } else {
+    document.getElementById('card-obs').style.display = 'none';
+  }
+}
+
+/* =========================================================
+   LAUDO DE DESCARTE — decisão do cliente (autorizar ou devolver)
+   ========================================================= */
+async function buscarLaudosDaOS(o){
+  try {
+    const r = await fetch(`${SB_URL}/rest/v1/laudos_descarte?os_numero=eq.${o.numero}&order=created_at.desc&limit=5`, {
+      headers: { apikey: SB_KEY, Authorization: 'Bearer ' + SB_KEY }
+    });
+    if(!r.ok) return []; // tabela pode não existir ainda — não trava o acompanhamento normal
+    return await r.json();
+  } catch(e){ return []; } // falha pontual de rede — tenta de novo no próximo ciclo
+}
+
+function renderLaudoDescarteView(laudo, o){
+  document.getElementById('laudo-descarte-titulo').textContent = `OS #${o.numero}`;
+  document.getElementById('laudo-descarte-cliente').textContent = o.cliente_nome || '';
+
+  const aparelhos = laudo.aparelhos || [];
+  document.getElementById('laudo-descarte-aparelhos').innerHTML = aparelhos.map((a, i) => `
+    <div style="padding:10px 0; ${i < aparelhos.length-1 ? 'border-bottom:1px solid var(--border);' : ''}">
+      <div style="font-weight:700; font-size:13.5px;">${escapeHtml(a.modelo||'Aparelho')}</div>
+      ${a.imei ? `<div style="font-size:11.5px; color:var(--text-dim);">IMEI/Série: ${escapeHtml(a.imei)}</div>` : ''}
+      ${a.defeito ? `<div style="font-size:12px; color:var(--text-dim); margin-top:3px;">${escapeHtml(a.defeito)}</div>` : ''}
+    </div>
+  `).join('');
+
+  document.getElementById('laudo-descarte-nome').value = o.cliente_nome || '';
+  document.getElementById('laudo-descarte-ciente').checked = false;
+
+  const erro = document.getElementById('laudo-descarte-erro');
+  erro.classList.remove('show');
+  const btnA = document.getElementById('btn-autorizar-laudo');
+  btnA.disabled = false; btnA.textContent = 'Autorizar descarte';
+  const btnD = document.getElementById('btn-solicitar-devolucao');
+  btnD.disabled = false; btnD.textContent = 'Solicito a devolução dos equipamentos';
+}
+
+// Depois que o cliente decide (autoriza ou pede devolução), busca o estado atual da
+// OS de novo e deixa o mostrarAcompanhamento decidir a próxima tela (não há mais
+// laudo pendente, então ele mesmo libera o acompanhamento normal)
+async function avancarAposDecisaoLaudo(){
+  laudoDescarteAtivo = null;
+  const senha = sessionStorage.getItem('rastreio_senha_' + token);
+  if(!senha) return;
+  try {
+    const rows = await verificarAcesso(senha);
+    if(rows && rows.length) mostrarAcompanhamento(rows[0]);
+  } catch(e){ /* próximo polling tenta de novo */ }
+}
+
+async function autorizarLaudoDescarte(){
+  const laudo = laudoDescarteAtivo;
+  if(!laudo) return;
+  const nome = document.getElementById('laudo-descarte-nome').value.trim();
+  const ciente = document.getElementById('laudo-descarte-ciente').checked;
+  const erro = document.getElementById('laudo-descarte-erro');
+  erro.classList.remove('show');
+
+  if(!nome){ erro.textContent = 'Informe seu nome.'; erro.classList.add('show'); return; }
+  if(!ciente){ erro.textContent = 'Marque que está ciente e autoriza o descarte.'; erro.classList.add('show'); return; }
+
+  const btnA = document.getElementById('btn-autorizar-laudo');
+  const btnD = document.getElementById('btn-solicitar-devolucao');
+  btnA.disabled = true; btnD.disabled = true; btnA.textContent = 'Enviando...';
+
+  const hoje = new Date().toISOString().slice(0,10);
+  const historico = [...(laudo.historico||[]), { date: hoje, text: `Descarte autorizado por ${nome} (via link de acompanhamento).` }];
+
+  try {
+    const r = await fetch(`${SB_URL}/rest/v1/laudos_descarte?id=eq.${laudo.id}`, {
+      method: 'PATCH',
+      headers: { apikey: SB_KEY, Authorization: 'Bearer ' + SB_KEY, 'Content-Type': 'application/json', Prefer: 'return=minimal' },
+      body: JSON.stringify({ status: 'Autorizado', autorizado_nome: nome, autorizado_data: hoje, historico })
+    });
+    if(!r.ok) throw new Error(`Erro ${r.status}`);
+    await avancarAposDecisaoLaudo();
+  } catch(e){
+    erro.textContent = 'Não foi possível registrar a autorização agora. Tente novamente em instantes.';
+    erro.classList.add('show');
+    btnA.disabled = false; btnD.disabled = false; btnA.textContent = 'Autorizar descarte';
+  }
+}
+
+async function solicitarDevolucaoLaudo(){
+  const laudo = laudoDescarteAtivo;
+  if(!laudo) return;
+  if(!confirm('Confirmar que você quer a devolução do(s) aparelho(s) em vez do descarte?')) return;
+
+  const btnA = document.getElementById('btn-autorizar-laudo');
+  const btnD = document.getElementById('btn-solicitar-devolucao');
+  const erro = document.getElementById('laudo-descarte-erro');
+  erro.classList.remove('show');
+  btnA.disabled = true; btnD.disabled = true; btnD.textContent = 'Enviando...';
+
+  const hoje = new Date().toISOString().slice(0,10);
+  const historico = [...(laudo.historico||[]), { date: hoje, text: 'Cliente solicitou a devolução do(s) aparelho(s) em vez do descarte (via link de acompanhamento).' }];
+
+  try {
+    const r = await fetch(`${SB_URL}/rest/v1/laudos_descarte?id=eq.${laudo.id}`, {
+      method: 'PATCH',
+      headers: { apikey: SB_KEY, Authorization: 'Bearer ' + SB_KEY, 'Content-Type': 'application/json', Prefer: 'return=minimal' },
+      body: JSON.stringify({ status: 'Devolução solicitada', historico })
+    });
+    if(!r.ok) throw new Error(`Erro ${r.status}`);
+    await avancarAposDecisaoLaudo();
+  } catch(e){
+    erro.textContent = 'Não foi possível registrar sua solicitação agora. Tente novamente em instantes.';
+    erro.classList.add('show');
+    btnA.disabled = false; btnD.disabled = false; btnD.textContent = 'Solicito a devolução dos equipamentos';
+  }
+}
+
+// Mesmo layout de impressão do laudo usado no painel interno — só libera pro cliente
+// quando o laudo já está Autorizado ou Descartado (mostrarAcompanhamento controla isso)
+function imprimirLaudoCliente(){
+  const laudo = laudoParaBaixar;
+  if(!laudo) return;
+
+  const numero = laudo.os_numero ? ('OS #' + laudo.os_numero) : ('LD-' + String(laudo.numero_avulso||0).padStart(4,'0'));
+  const aparelhos = laudo.aparelhos || [];
+  const aparelhosHtml = aparelhos.map((a,i) => `
+    <div style="margin-bottom:8pt; padding-bottom:8pt; ${i < aparelhos.length-1 ? 'border-bottom:0.5pt solid #ccc;' : ''}">
+      <div style="font-weight:700; font-size:10.5pt;">${i+1}. ${escapeHtml(a.modelo||'')}</div>
+      <div style="font-size:9.5pt; color:#333;">
+        ${a.imei ? 'IMEI/Série: '+escapeHtml(a.imei)+' &nbsp; ' : ''}${a.patrimonio ? 'Patrimônio: '+escapeHtml(a.patrimonio) : ''}
+      </div>
+      ${a.defeito ? `<div style="font-size:9.5pt; margin-top:2pt;"><strong>Defeito:</strong> ${escapeHtml(a.defeito)}</div>` : ''}
+      ${a.diagnostico ? `<div style="font-size:9.5pt; margin-top:2pt;"><strong>Diagnóstico técnico:</strong> ${escapeHtml(a.diagnostico)}</div>` : ''}
+    </div>
+  `).join('');
+
+  const html = `<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<title>Laudo de Descarte ${numero} — Mobit Soluções</title>
+<style>
+  *{ box-sizing:border-box; margin:0; padding:0; }
+  body{ font-family: Arial, Helvetica, sans-serif; font-size:11pt; color:#111; background:#fff; }
+  .p-wrap{ width:100%; max-width:210mm; margin:0 auto; padding:14mm 14mm 10mm; }
+  .p-header{ display:flex; justify-content:space-between; align-items:flex-start; margin-bottom:8pt; }
+  .p-logo img{ filter: brightness(0) saturate(100%) invert(38%) sepia(99%) saturate(600%) hue-rotate(172deg) brightness(97%) contrast(102%); width:90pt; }
+  .p-company{ text-align:center; }
+  .p-company h1{ font-size:13pt; font-weight:700; letter-spacing:0.3px; }
+  .p-company p{ font-size:9pt; color:#333; margin-top:2pt; line-height:1.4; }
+  .p-num{ text-align:right; }
+  .p-num .p-num-label{ font-size:9pt; color:#555; }
+  .p-num .p-num-val{ font-size:15pt; font-weight:700; color:#0094d4; font-family:monospace; }
+  hr.p-hr{ border:none; border-top:1.5pt solid #111; margin:7pt 0; }
+  .p-title{ text-align:center; font-size:13pt; font-weight:700; margin:10pt 0 4pt; text-transform:uppercase; letter-spacing:0.5px; }
+  .p-fields{ display:grid; grid-template-columns:1fr 1fr; gap:3pt 20pt; margin-bottom:8pt; }
+  .p-field{ display:flex; align-items:baseline; gap:4pt; border-bottom:0.5pt solid #aaa; padding-bottom:2pt; font-size:10pt; }
+  .p-field-label{ font-weight:700; white-space:nowrap; font-size:9.5pt; }
+  .p-section-label{ font-size:10pt; font-weight:700; margin-top:10pt; margin-bottom:4pt; text-transform:uppercase; border-bottom:0.5pt solid #0094d4; padding-bottom:3pt; color:#0094d4; }
+  .p-termo{ font-size:9.5pt; text-align:justify; margin-top:6pt; line-height:1.5; border:0.5pt solid #bbb; border-radius:3pt; padding:8pt; }
+  .p-assinaturas{ display:flex; justify-content:space-between; margin-top:26pt; }
+  .p-assinatura{ flex:1; max-width:45%; text-align:center; }
+  .p-assinatura .p-ass-line{ border-top:0.75pt solid #111; margin-bottom:2pt; }
+  @media print{ body{ -webkit-print-color-adjust:exact; print-color-adjust:exact; } .p-wrap{ padding:10mm 12mm 8mm; } }
+</style>
+</head>
+<body>
+<div class="p-wrap">
+  <div class="p-header">
+    <div class="p-logo"><img src="logo.png" alt="Mobit Soluções"></div>
+    <div class="p-company">
+      <h1>MOBIT SOLUÇÕES</h1>
+      <p>(11)3500-4088 &nbsp;|&nbsp; backoffice@mobitsolucoes.com<br>
+      Av. Marquês de São Vicente, 182, Sala 53A — Várzea da Barra Funda<br>
+      São Paulo/SP — CEP: 01139-000</p>
+    </div>
+    <div class="p-num"><div class="p-num-label">Laudo de Descarte</div><div class="p-num-val">${numero}</div></div>
+  </div>
+  <hr class="p-hr">
+  <div class="p-title">Laudo de Descarte de Equipamento</div>
+
+  <div class="p-fields">
+    <div class="p-field"><span class="p-field-label">Cliente:</span><span>${escapeHtml(laudo.cliente_nome||'')}</span></div>
+    <div class="p-field"><span class="p-field-label">CPF/CNPJ:</span><span>${escapeHtml(laudo.cliente_cpfcnpj||'')}</span></div>
+    <div class="p-field"><span class="p-field-label">Endereço:</span><span>${escapeHtml(laudo.cliente_endereco||'')}</span></div>
+    <div class="p-field"><span class="p-field-label">Telefone:</span><span>${escapeHtml(laudo.cliente_telefone||'')}</span></div>
+    <div class="p-field"><span class="p-field-label">E-mail:</span><span>${escapeHtml(laudo.cliente_email||'')}</span></div>
+    <div class="p-field"><span class="p-field-label">OS vinculada:</span><span>${laudo.os_numero ? '#'+laudo.os_numero : '— (laudo avulso)'}</span></div>
+    <div class="p-field"><span class="p-field-label">Data de emissão:</span><span>${formatDate((laudo.created_at||'').slice(0,10))}</span></div>
+  </div>
+
+  <div class="p-section-label">Aparelho(s) avaliado(s)</div>
+  ${aparelhosHtml}
+
+  <div class="p-section-label">Termo de autorização</div>
+  <div class="p-termo">
+    Declaro estar ciente de que o(s) aparelho(s) descrito(s) acima foi(ram) avaliado(s) tecnicamente pela Mobit Soluções
+    e apresenta(m) defeito(s) que inviabiliza(m) o reparo economicamente, e <strong>autorizo o descarte definitivo</strong>
+    do(s) equipamento(s), estando ciente de que:<br><br>
+    (a) não haverá devolução do(s) aparelho(s) após o descarte;<br>
+    (b) eventuais dados pessoais ainda presentes no(s) aparelho(s) não funcional(is) são de minha responsabilidade,
+    tendo a Mobit Soluções realizado a remoção de dados (reset de fábrica) sempre que o aparelho estava em condições
+    de funcionamento para tal.
+  </div>
+
+  <div class="p-assinaturas">
+    <div class="p-assinatura">
+      <div class="p-ass-line"></div>
+      ${escapeHtml(laudo.autorizado_nome || laudo.cliente_nome || '')}<br>
+      Assinatura do cliente ${laudo.autorizado_data ? '— ' + formatDate(laudo.autorizado_data) : ''}
+    </div>
+  </div>
+</div>
+</body>
+</html>`;
+
+  const win = window.open('', '_blank', 'width=900,height=750');
+  if(!win){ alert('Seu navegador bloqueou a janela de impressão. Permita pop-ups pra esse site e tente de novo.'); return; }
+  win.document.write(html);
+  win.document.close();
+  win.onload = () => { win.focus(); win.print(); };
+}
+
+/* =========================================================
+   APROVAÇÃO DO ORÇAMENTO
+   ========================================================= */
+// Capa/Película/Carregador são itens universais no Estoque (um único item de cada
+// categoria pra todos os modelos) — verificar_acesso_rastreio devolve o id de cada um
+// desses 3 itens; comparamos com o stockId de cada peça do aparelho pra saber se ele
+// está no orçamento e montar os checkboxes individuais.
+const ACESSORIO_CATEGORIAS = [
+  { key:'capa', label:'Capa' },
+  { key:'pelicula', label:'Película' },
+  { key:'carregador', label:'Carregador' }
+];
+
+// Lista unificada dos aparelhos (principal + extras) com nome, diagnóstico, valor e os
+// itens opcionais (capa/película/carregador) que estiverem no orçamento de cada um —
+// mesma lógica usada no app interno (index.html) pra montar o orçamento por aparelho.
+function orcamentoDispositivos(o){
+  const acessorioIds = { capa:o.estoque_capa_id || null, pelicula:o.estoque_pelicula_id || null, carregador:o.estoque_carregador_id || null };
+  function acessoriosDoAparelho(parts){
+    const out = [];
+    ACESSORIO_CATEGORIAS.forEach(c => {
+      const id = acessorioIds[c.key];
+      if(!id) return;
+      const p = (parts || []).find(x => x.stockId === id);
+      if(p) out.push({ categoria:c.key, label:c.label, valor:(p.qtd||0)*(p.preco||0) });
+    });
+    return out;
+  }
+
+  const principalTotal = (o.parts || []).reduce((s,p) => s + p.qtd*p.preco, 0) + (o.mao_obra || 0);
+  const lista = [{ id:'principal', nome:o.aparelho || 'Aparelho 1', imei:o.imei || '', diagnostico:o.diagnostico || '', valor:principalTotal, acessorios:acessoriosDoAparelho(o.parts) }];
+  (o.aparelhos_extras || []).forEach((a,i) => {
+    const partsTotal = (a.parts || []).reduce((s,p) => s + p.qtd*p.preco, 0);
+    lista.push({ id:a.id || ('x'+i), nome:a.modelo || `Aparelho ${i+2}`, imei:a.imei || '', diagnostico:a.diagnostico || '', valor:partsTotal + (a.maoObra || 0), acessorios:acessoriosDoAparelho(a.parts) });
+  });
+  return lista;
+}
+
+function renderAprovacaoView(o){
+  document.getElementById('aprov-titulo').textContent = `OS #${o.numero} — ${o.aparelho || ''}`;
+  document.getElementById('aprov-cliente').textContent = o.cliente_nome || '';
+
+  const lista = orcamentoDispositivos(o);
+  const decisoesAtuais = o.aprovacoes_dispositivos || {};
+
+  document.getElementById('aprov-itens').innerHTML = lista.map(d => {
+    // Já reprovado manualmente pelo técnico antes do cliente entrar: vem desmarcado.
+    // Qualquer outro estado (pendente ou já aprovado manualmente) vem marcado por padrão.
+    const marcado = decisoesAtuais[d.id] !== 'reprovado';
+    const acessoriosTotal = d.acessorios.reduce((s,a) => s + a.valor, 0);
+    const reparoValor = d.valor - acessoriosTotal;
+    const acessoriosHtml = d.acessorios.length ? `
+      <div class="aprov-sub">
+        <div class="aprov-sub-item aprov-sub-reparo">
+          <span>Reparo (peças + mão de obra)</span>
+          <span class="mono aprov-sub-valor">${formatCurrency(reparoValor)}</span>
+        </div>
+        ${d.acessorios.map(a => `
+          <label class="aprov-sub-item">
+            <input type="checkbox" class="aprov-ac-check" data-dev="${escapeHtml(d.id)}" data-cat="${a.categoria}" checked ${marcado ? '' : 'disabled'} onchange="atualizarTotalAprovacao()">
+            <span>${a.label}</span>
+            <span class="mono aprov-sub-valor">${formatCurrency(a.valor)}</span>
+          </label>`).join('')}
+      </div>` : '';
+    return `
+    <div class="aprov-block">
+      <label class="aprov-item">
+        <input type="checkbox" class="aprov-check" data-dev="${escapeHtml(d.id)}" ${marcado ? 'checked' : ''} onchange="toggleAprovDispositivo(this)">
+        <div class="aprov-item-info">
+          <div class="aprov-item-nome">${escapeHtml(d.nome)}${d.imei ? ` <span class="aprov-item-imei">(IMEI: ${escapeHtml(d.imei)})</span>` : ''}</div>
+          ${d.diagnostico ? `<div class="aprov-item-diag">${escapeHtml(d.diagnostico)}</div>` : ''}
+        </div>
+        <div style="text-align:right;">
+          <div class="aprov-item-valor-label">Total do aparelho</div>
+          <div class="aprov-item-valor mono" data-dev-valor="${escapeHtml(d.id)}">${formatCurrency(d.valor)}</div>
+        </div>
+      </label>
+      ${acessoriosHtml}
+    </div>`;
+  }).join('');
+
+  const erro = document.getElementById('aprov-erro');
+  erro.classList.remove('show');
+  const btn = document.getElementById('btn-confirmar-aprovacao');
+  btn.disabled = false; btn.textContent = 'Confirmar decisão';
+
+  atualizarTotalAprovacao();
+}
+
+// Desmarcar o aparelho inteiro desabilita (e não conta) os itens opcionais dele —
+// reprovar o aparelho já devolve tudo pro estoque, incluindo capa/película/carregador.
+function toggleAprovDispositivo(checkbox){
+  const bloco = checkbox.closest('.aprov-block');
+  if(bloco){
+    bloco.querySelectorAll('.aprov-ac-check').forEach(cb => { cb.disabled = !checkbox.checked; });
+  }
+  atualizarTotalAprovacao();
+}
+
+function atualizarTotalAprovacao(){
+  const o = ultimoOS;
+  if(!o) return;
+  const lista = orcamentoDispositivos(o);
+  const checks = [...document.querySelectorAll('.aprov-check')];
+  let total = 0, aprovados = 0;
+  checks.forEach(c => {
+    const d = lista.find(x => x.id === c.dataset.dev);
+    if(!d || !c.checked) return;
+    aprovados++;
+    let valorDev = d.valor;
+    document.querySelectorAll('.aprov-ac-check').forEach(ac => {
+      if(ac.dataset.dev === c.dataset.dev && !ac.checked){
+        const item = d.acessorios.find(a => a.categoria === ac.dataset.cat);
+        if(item) valorDev -= item.valor;
+      }
+    });
+    const valorEl = document.querySelector(`.aprov-item-valor[data-dev-valor="${CSS.escape(c.dataset.dev)}"]`);
+    if(valorEl) valorEl.textContent = formatCurrency(valorDev);
+    total += valorDev;
+  });
+  document.getElementById('aprov-total').textContent = formatCurrency(total);
+  const btn = document.getElementById('btn-confirmar-aprovacao');
+  if(!btn.disabled) btn.textContent = aprovados === 0 ? 'Reprovar todos os aparelhos' : 'Confirmar decisão';
+}
+
+async function confirmarAprovacao(){
+  const senha = sessionStorage.getItem('rastreio_senha_' + token);
+  if(!senha){ sair(); return; }
+  const o = ultimoOS;
+  if(!o) return;
+  const lista = orcamentoDispositivos(o);
+  const checks = [...document.querySelectorAll('.aprov-check')];
+  if(!checks.length) return;
+
+  const algumDesmarcado = checks.some(c => !c.checked);
+  const algumItemOpcionalDesmarcado = [...document.querySelectorAll('.aprov-ac-check')].some(c => !c.disabled && !c.checked);
+  if((algumDesmarcado || algumItemOpcionalDesmarcado) && !confirm('Os itens desmarcados serão removidos do orçamento — aparelhos reprovados têm as peças devolvidas ao estoque, e o mesmo vale para capa/película/carregador desmarcados individualmente. Confirmar?')) return;
+
+  const decisoes = {};
+  checks.forEach(c => {
+    const devId = c.dataset.dev;
+    const d = lista.find(x => x.id === devId);
+    const obj = { aprovado: c.checked };
+    if(d){
+      document.querySelectorAll('.aprov-ac-check').forEach(ac => {
+        if(ac.dataset.dev === devId) obj[ac.dataset.cat] = ac.checked;
+      });
+    }
+    decisoes[devId] = obj;
+  });
+
+  const btn = document.getElementById('btn-confirmar-aprovacao');
+  const erro = document.getElementById('aprov-erro');
+  erro.classList.remove('show');
+  btn.disabled = true; btn.textContent = 'Enviando...';
+
+  try {
+    const r = await fetch(`${SB_URL}/rest/v1/rpc/responder_orcamento_rastreio`, {
+      method: 'POST',
+      headers: { apikey: SB_KEY, Authorization: 'Bearer ' + SB_KEY, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ p_token: token, p_senha: senha, p_decisoes: decisoes })
+    });
+    if(!r.ok){
+      let detalhe = '';
+      try { const j = await r.json(); detalhe = j.message || j.hint || j.code || ''; } catch(e){}
+      throw new Error(`Erro ${r.status}${detalhe ? ' — ' + detalhe : ''}`);
+    }
+    const rows = await r.json();
+    const resultado = rows && rows[0];
+
+    if(!resultado || !resultado.ok){
+      const motivo = resultado ? resultado.motivo : '';
+      if(motivo === 'ja_respondido'){
+        erro.textContent = 'Esse orçamento já foi respondido antes. Atualizando a tela...';
+      } else if(motivo === 'senha_invalida' || motivo === 'token_invalido'){
+        erro.textContent = 'Sua sessão expirou. Saia e entre novamente com a senha de acesso.';
+      } else {
+        erro.textContent = 'Não foi possível registrar sua decisão agora. Tente novamente.';
+      }
+      erro.classList.add('show');
+      btn.disabled = false; btn.textContent = 'Confirmar decisão';
+      // Recarrega o estado real da OS — pode já ter mudado (ex: técnico decidiu antes)
+      verificarAcesso(senha).then(rr => { if(rr && rr.length) mostrarAcompanhamento(rr[0]); }).catch(()=>{});
+      return;
+    }
+
+    aprovacaoAtiva = false;
+    const rows2 = await verificarAcesso(senha);
+    if(rows2 && rows2.length) mostrarAcompanhamento(rows2[0]);
+  } catch(e){
+    erro.textContent = 'Não foi possível enviar sua decisão (' + e.message + '). Tente novamente em instantes.';
+    erro.classList.add('show');
+    btn.disabled = false; btn.textContent = 'Confirmar decisão';
+  }
+}
+
+/* =========================================================
+   IMPRESSÃO — mesmo layout do printOS() interno (só libera quando Concluído)
+   ========================================================= */
+function imprimirOSCliente(){
+  const o = ultimoOS;
+  if(!o || o.status !== 'Concluído') return;
+
+  const CL_LEFT = [
+    ['cl-liga','Liga?'],['cl-carrega','Carrega?'],['cl-display','Display'],['cl-touch','Touch'],
+    ['cl-vidro','Vidro'],['cl-tampa','Tampa Traseira'],['cl-camtraseira','Câmera Traseira'],['cl-camfrontal','Câmera Frontal'],
+    ['cl-faceid','Face ID'],['cl-biometria','Biometria'],['cl-microfone','Microfone'],
+  ];
+  const CL_RIGHT = [
+    ['cl-altofalante','Alto Falante'],['cl-auricular','Auricular'],['cl-sinal','Sinal Operadora'],['cl-wifi','Wifi'],
+    ['cl-bluetooth','Bluetooth'],['cl-sensor','Sensor de Proximidade'],['cl-gaveta','Gaveta de Chip'],
+    ['cl-power','Botão Power'],['cl-volume','Botão Volume'],
+  ];
+
+  function clBox(key, cl){
+    const v = (cl || o.checklist || {})[key];
+    const sim = v === 'Sim', nao = v === 'Não';
+    return `<span class="p-cb${sim?' p-cb-sim':''}">${sim?'✔':''}</span>Sim&nbsp;&nbsp;<span class="p-cb${nao?' p-cb-nao':''}">${nao?'✔':''}</span>Não`;
+  }
+  function clRow(pair, cl){ return `<tr><td class="p-cl-label">${pair[1]}</td><td class="p-cl-opts">${clBox(pair[0], cl)}</td></tr>`; }
+  function clBloco(cl, acsStr, titulo){
+    const acs = acsStr ? acsStr.split(',').map(a => a.trim()).filter(Boolean) : [];
+    return `
+  ${titulo ? '<div style="font-size:8.5pt; font-weight:700; color:#0094d4; border-bottom:0.5pt solid #0094d4; padding-bottom:2pt; margin:5pt 0 4pt;">'+titulo+'</div>' : ''}
+  <div class="p-cl-grid">
+    <div class="p-cl-col"><table>${CL_LEFT.map(x => clRow(x, cl)).join('')}</table></div>
+    <div class="p-cl-col"><table>${CL_RIGHT.map(x => clRow(x, cl)).join('')}
+      ${['Capa','Chip','Carregador'].map(a => { const m = acs.includes(a); return '<tr><td class="p-cl-label">'+a+'</td><td class="p-cl-opts"><span class="p-cb'+(m?' p-cb-sim':'')+'">'+(m?'✔':'')+'</span>Sim&nbsp;&nbsp;<span class="p-cb'+(!m?' p-cb-nao':'')+'">'+((!m)?'✔':'')+'</span>Não</td></tr>'; }).join('')}
+    </table></div>
+  </div>`;
+  }
+  function clTodos(){
+    const extras = o.aparelhos_extras || [];
+    if(!extras.length) return clBloco(o.checklist, o.acessorios, '');
+    const devs = [{ cl:o.checklist, acs:o.acessorios, t:'Aparelho 1: '+escapeHtml(o.aparelho) }]
+      .concat(extras.map((a,i) => ({ cl:a.checklist, acs:a.acessorios, t:'Aparelho '+(i+2)+': '+escapeHtml(a.modelo) })));
+    return devs.filter(d => d.cl && Object.keys(d.cl).length).map(d => clBloco(d.cl, d.acs, d.t)).join('');
+  }
+
+  const partsRows = (o.parts||[]).length
+    ? o.parts.map(p => `<tr><td>${escapeHtml(p.nome)}</td><td style="text-align:center">${p.qtd}</td><td style="text-align:right">${formatCurrency(p.preco)}</td><td style="text-align:right">${formatCurrency(p.qtd*p.preco)}</td></tr>`).join('')
+    : '';
+
+  const html = `<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<title>OS #${o.numero} — Mobit Soluções</title>
+<style>
+  *{ box-sizing:border-box; margin:0; padding:0; }
+  body{ font-family: Arial, Helvetica, sans-serif; font-size:11pt; color:#111; background:#fff; }
+  .p-wrap{ width:100%; max-width:210mm; margin:0 auto; padding:14mm 14mm 10mm; }
+  .p-header{ display:flex; justify-content:space-between; align-items:flex-start; margin-bottom:8pt; }
+  .p-logo-area{ display:flex; align-items:center; gap:10pt; }
+  .p-logo img{ filter: brightness(0) saturate(100%) invert(38%) sepia(99%) saturate(600%) hue-rotate(172deg) brightness(97%) contrast(102%); width:90pt; }
+  .p-company{ text-align:center; }
+  .p-company h1{ font-size:13pt; font-weight:700; letter-spacing:0.3px; }
+  .p-company h2{ font-size:11pt; font-weight:700; margin-top:1pt; }
+  .p-company p{ font-size:9pt; color:#333; margin-top:2pt; line-height:1.4; }
+  .p-os-num{ text-align:right; }
+  .p-os-num .p-os-label{ font-size:9pt; color:#555; }
+  .p-os-num .p-os-val{ font-size:18pt; font-weight:700; color:#0094d4; font-family:monospace; }
+  hr.p-hr{ border:none; border-top:1.5pt solid #111; margin:7pt 0; }
+  hr.p-hr-thin{ border:none; border-top:0.5pt solid #888; margin:6pt 0; }
+  .p-fields{ display:grid; grid-template-columns:1fr 1fr; gap:3pt 20pt; margin-bottom:6pt; }
+  .p-field{ display:flex; align-items:baseline; gap:4pt; border-bottom:0.5pt solid #aaa; padding-bottom:2pt; font-size:10pt; }
+  .p-field-label{ font-weight:700; white-space:nowrap; font-size:9.5pt; }
+  .p-field-value{ flex:1; min-height:13pt; }
+  .p-cl-title{ text-align:center; font-size:11pt; font-weight:700; margin:8pt 0 2pt; letter-spacing:0.2px; }
+  .p-cl-sub{ text-align:center; font-size:9pt; font-weight:600; margin-bottom:5pt; }
+  .p-cl-grid{ display:grid; grid-template-columns:1fr 1fr; gap:0 20pt; }
+  .p-cl-col table{ width:100%; border-collapse:collapse; }
+  .p-cl-col table tr td{ padding:2pt 3pt; font-size:9.5pt; border-bottom:0.3pt solid #ddd; }
+  .p-cl-label{ width:55%; } .p-cl-opts{ width:45%; white-space:nowrap; }
+  .p-cb{ display:inline-block; width:10pt; height:10pt; border:1pt solid #333; text-align:center; line-height:9pt; font-size:8pt; margin-right:1pt; vertical-align:middle; }
+  .p-cb-sim{ background:#d4edda; border-color:#28a745; color:#28a745; font-weight:700; }
+  .p-cb-nao{ background:#f8d7da; border-color:#dc3545; color:#dc3545; font-weight:700; }
+  .p-section-label{ font-size:9.5pt; font-weight:700; margin-top:8pt; margin-bottom:2pt; }
+  .p-text-area{ border:0.5pt solid #bbb; border-radius:3pt; min-height:32pt; padding:4pt 6pt; font-size:10pt; width:100%; margin-bottom:4pt; }
+  .p-parts-table{ width:100%; border-collapse:collapse; font-size:9.5pt; margin:5pt 0; }
+  .p-parts-table th{ background:#f0f0f0; border:0.5pt solid #aaa; padding:3pt 5pt; text-align:left; font-weight:700; }
+  .p-parts-table td{ border:0.5pt solid #aaa; padding:3pt 5pt; }
+  .p-parts-table .p-total-row td{ font-weight:700; background:#f9f9f9; }
+  .p-valor-box{ text-align:center; margin:8pt 0; }
+  .p-valor-box .p-valor-label{ font-size:15pt; font-weight:700; letter-spacing:1px; }
+  .p-valor-box .p-valor-num{ font-size:15pt; font-weight:700; }
+  .p-garantia{ font-size:9pt; text-align:center; margin:6pt 0 4pt; }
+  .p-garantia strong{ font-weight:700; }
+  .p-garantia p{ margin-top:2pt; }
+  .p-garantia-ciente{ font-size:9pt; text-align:center; margin-top:4pt; }
+  .p-assinaturas{ display:flex; justify-content:space-between; margin-top:14pt; }
+  .p-assinatura{ flex:1; max-width:45%; }
+  .p-assinatura .p-ass-label{ font-size:9pt; font-weight:700; }
+  .p-assinatura .p-ass-line{ border-top:0.75pt solid #111; margin-top:18pt; margin-bottom:2pt; }
+  @media print{ body{ -webkit-print-color-adjust:exact; print-color-adjust:exact; } .p-wrap{ padding:10mm 12mm 8mm; } }
+</style>
+</head>
+<body>
+<div class="p-wrap">
+  <div class="p-header">
+    <div class="p-logo-area"><div class="p-logo"><img src="logo.png" alt="Mobit Soluções"></div></div>
+    <div class="p-company">
+      <h1>MOBIT SOLUÇÕES</h1>
+      <h2>ASSISTÊNCIA TÉCNICA</h2>
+      <p>(11)3500-4088 &nbsp;|&nbsp; @MOBITSOLUÇÕES_<br>
+      Av. Marquês de São Vicente, 182<br>
+      5º Andar, Sala 53 - Barra Funda - São Paulo - SP</p>
+    </div>
+    <div class="p-os-num"><div class="p-os-label">Ordem de Serviço</div><div class="p-os-val">#${String(o.numero).padStart(4,'0')}</div></div>
+  </div>
+  <hr class="p-hr">
+  <div class="p-fields">
+    <div class="p-field"><span class="p-field-label">Chamado:</span><span class="p-field-value">${escapeHtml(o.chamado||'')}</span></div>
+    <div class="p-field"><span class="p-field-label">Modelo:</span><span class="p-field-value">${escapeHtml(o.aparelho||'')}</span></div>
+    <div class="p-field"><span class="p-field-label">Cliente:</span><span class="p-field-value">${escapeHtml(o.cliente_nome||'')}</span></div>
+    <div class="p-field"><span class="p-field-label">IMEI:</span><span class="p-field-value">${escapeHtml(o.imei||'')}</span></div>
+    <div class="p-field"><span class="p-field-label">CPF:</span><span class="p-field-value">${escapeHtml(o.cliente_cpfcnpj||'')}</span></div>
+    <div class="p-field"><span class="p-field-label">Senha:</span><span class="p-field-value">${escapeHtml(o.senha||'')}</span></div>
+    <div class="p-field"><span class="p-field-label">Fone:</span><span class="p-field-value">${escapeHtml(o.cliente_telefone||'')}</span></div>
+    <div class="p-field"><span class="p-field-label">Forma de pagamento:</span><span class="p-field-value">${escapeHtml(o.pagamento||'')}</span></div>
+    <div class="p-field"><span class="p-field-label">End:</span><span class="p-field-value">${escapeHtml(o.cliente_endereco||'')}</span></div>
+    <div class="p-field"><span class="p-field-label">Data de Retirada:</span><span class="p-field-value">${formatDate(o.data_prevista)||''}</span></div>
+    <div class="p-field"><span class="p-field-label">Data de Entrada:</span><span class="p-field-value">${formatDate(o.data_entrada)||''}</span></div>
+    <div class="p-field"></div>
+    ${(o.centro_custo||o.chamado_cliente||o.solicitante) ? `
+    <div class="p-field" style="grid-column:1/-1; border-bottom:0.5pt solid #0094d4; padding-bottom:3pt; margin-bottom:3pt;">
+      <span class="p-field-label" style="color:#0094d4;">🏢 Dados corporativos</span>
+    </div>
+    ${o.centro_custo ? '<div class="p-field"><span class="p-field-label">Centro de custo:</span><span class="p-field-value">'+escapeHtml(o.centro_custo)+'</span></div>' : ''}
+    ${o.chamado_cliente ? '<div class="p-field"><span class="p-field-label">Chamado cliente:</span><span class="p-field-value">'+escapeHtml(o.chamado_cliente)+'</span></div>' : ''}
+    ${o.solicitante ? '<div class="p-field"><span class="p-field-label">Solicitante:</span><span class="p-field-value">'+escapeHtml(o.solicitante)+'</span></div>' : ''}
+    ` : ''}
+  </div>
+
+  ${(o.aparelhos_extras && o.aparelhos_extras.length) ? `
+  <div style="margin-bottom:6pt;">
+    <div style="font-size:10pt; font-weight:700; color:#0094d4; border-bottom:1pt solid #0094d4; padding-bottom:3pt; margin-bottom:5pt; text-transform:uppercase; letter-spacing:0.5px;">Aparelhos adicionais</div>
+    <table style="width:100%; border-collapse:collapse; font-size:9.5pt;">
+      <thead><tr style="background:#f0f0f0;">
+        <th style="border:0.5pt solid #aaa; padding:3pt 6pt; text-align:left;">#</th>
+        <th style="border:0.5pt solid #aaa; padding:3pt 6pt; text-align:left;">Modelo</th>
+        <th style="border:0.5pt solid #aaa; padding:3pt 6pt; text-align:left;">IMEI / Série</th>
+        <th style="border:0.5pt solid #aaa; padding:3pt 6pt; text-align:left;">Defeito relatado</th>
+        <th style="border:0.5pt solid #aaa; padding:3pt 6pt; text-align:left;">Senha</th>
+        <th style="border:0.5pt solid #aaa; padding:3pt 6pt; text-align:left;">Acessórios</th>
+      </tr></thead>
+      <tbody>
+        ${o.aparelhos_extras.map((a,i) => `
+          <tr>
+            <td style="border:0.5pt solid #aaa; padding:3pt 6pt; text-align:center; color:#0094d4; font-weight:700;">${i+2}</td>
+            <td style="border:0.5pt solid #aaa; padding:3pt 6pt;">${escapeHtml(a.modelo)}</td>
+            <td style="border:0.5pt solid #aaa; padding:3pt 6pt; font-family:monospace;">${escapeHtml(a.imei||'—')}</td>
+            <td style="border:0.5pt solid #aaa; padding:3pt 6pt;">${escapeHtml(a.defeito||'—')}</td>
+            <td style="border:0.5pt solid #aaa; padding:3pt 6pt; font-family:monospace;">${escapeHtml(a.senha||'—')}</td>
+            <td style="border:0.5pt solid #aaa; padding:3pt 6pt;">${escapeHtml(a.acessorios||'—')}</td>
+          </tr>`).join('')}
+      </tbody>
+    </table>
+  </div>` : ''}
+
+  <hr class="p-hr">
+
+  ${(() => { const blocos = clTodos(); return blocos ? `
+  <div class="p-cl-title">LISTA DE CHECAGEM (CHECK LIST)</div>
+  <div class="p-cl-sub">Os itens abaixo estão em condições de utilização?</div>
+  ${blocos}
+  <hr class="p-hr-thin">` : ''; })()}
+
+  <div class="p-section-label">Observações sobre o aparelho:</div>
+  <div class="p-text-area">${escapeHtml(o.defeito||'')}${o.diagnostico ? '<br><br>Diagnóstico: '+escapeHtml(o.diagnostico) : ''}</div>
+
+  <div class="p-section-label">Manutenção Realizada:</div>
+  <div class="p-text-area" style="min-height:40pt;">
+    ${(() => {
+      const temExtras = o.aparelhos_extras && o.aparelhos_extras.length;
+      const sub1 = (o.parts||[]).reduce((s,p)=>s+p.qtd*p.preco,0) + (o.mao_obra||0);
+      const bloco1 = ((o.parts||[]).length || o.mao_obra) ? `
+        ${temExtras ? '<div style="font-size:8.5pt; font-weight:700; color:#0094d4; border-bottom:0.5pt solid #0094d4; padding-bottom:2pt; margin-bottom:4pt;">Aparelho 1: '+escapeHtml(o.aparelho)+'</div>' : ''}
+        <table class="p-parts-table">
+          <thead><tr><th>Item / Serviço</th><th style="text-align:center">Qtd.</th><th style="text-align:right">Preço unit.</th><th style="text-align:right">Subtotal</th></tr></thead>
+          <tbody>
+            ${partsRows}
+            ${o.mao_obra ? '<tr><td>Mão de obra</td><td style="text-align:center">—</td><td style="text-align:right">'+formatCurrency(o.mao_obra)+'</td><td style="text-align:right">'+formatCurrency(o.mao_obra)+'</td></tr>' : ''}
+          </tbody>
+          ${temExtras ? '<tfoot><tr class="p-total-row"><td colspan="3" style="text-align:right;">Subtotal Aparelho 1</td><td style="text-align:right; color:#0094d4;">'+formatCurrency(sub1)+'</td></tr></tfoot>' : ''}
+        </table>` : '';
+      const blocosExtras = temExtras ? o.aparelhos_extras.map((a,i) => {
+        const aSub = (a.parts||[]).reduce((s,p)=>s+p.qtd*p.preco,0) + (a.maoObra||0);
+        return `
+        <div style="margin-top:8pt;">
+          <div style="font-size:8.5pt; font-weight:700; color:#0094d4; border-bottom:0.5pt solid #0094d4; padding-bottom:2pt; margin-bottom:4pt;">Aparelho ${i+2}: ${escapeHtml(a.modelo)}${a.imei ? ' &nbsp;|&nbsp; IMEI: '+escapeHtml(a.imei) : ''}${a.defeito ? ' &nbsp;|&nbsp; Defeito: '+escapeHtml(a.defeito) : ''}</div>
+          ${a.diagnostico ? '<div style="font-size:8.5pt; margin-bottom:3pt;">Diagnóstico: '+escapeHtml(a.diagnostico)+'</div>' : ''}
+          ${(a.parts && a.parts.length) || a.maoObra ? `
+          <table class="p-parts-table">
+            <thead><tr><th>Item / Serviço</th><th style="text-align:center">Qtd.</th><th style="text-align:right">Preço unit.</th><th style="text-align:right">Subtotal</th></tr></thead>
+            <tbody>
+              ${(a.parts||[]).map(p=>'<tr><td>'+escapeHtml(p.nome)+'</td><td style="text-align:center">'+p.qtd+'</td><td style="text-align:right">'+formatCurrency(p.preco)+'</td><td style="text-align:right">'+formatCurrency(p.qtd*p.preco)+'</td></tr>').join('')}
+              ${a.maoObra ? '<tr><td>Mão de obra</td><td style="text-align:center">—</td><td style="text-align:right">'+formatCurrency(a.maoObra)+'</td><td style="text-align:right">'+formatCurrency(a.maoObra)+'</td></tr>' : ''}
+            </tbody>
+            <tfoot><tr class="p-total-row"><td colspan="3" style="text-align:right;">Subtotal Aparelho ${i+2}</td><td style="text-align:right; color:#0094d4;">${formatCurrency(aSub)}</td></tr></tfoot>
+          </table>` : '<p style="font-size:8.5pt; color:#888;">Nenhuma peça registrada.</p>'}
+        </div>`;
+      }).join('') : '';
+      return bloco1 + blocosExtras;
+    })()}
+  </div>
+
+  <hr class="p-hr-thin">
+  <div class="p-valor-box"><span class="p-valor-label">VALOR: R$ </span><span class="p-valor-num">${(o.total||0).toLocaleString('pt-BR',{minimumFractionDigits:2,maximumFractionDigits:2})}</span></div>
+  <hr class="p-hr">
+
+  <div class="p-garantia">
+    <strong>OS REPAROS REALIZADOS SÃO GARANTIDOS POR ${o.garantia ? o.garantia + ' ' : '_____'} DIAS</strong>
+    <p><strong>A GARANTIA DAS PEÇAS TROCADAS NÃO COBRE MAU USO, QUEDAS, TRINCOS, UMIDADE OU ABERTURA POR TERCEIROS.</strong></p>
+  </div>
+  ${o.observacoes ? `<div style="font-size:9pt;text-align:center;margin-top:3pt;">${escapeHtml(o.observacoes)}</div>` : ''}
+  <div class="p-garantia-ciente">Ciente e de acordo com as condições acima.</div>
+
+  <div class="p-assinaturas">
+    <div class="p-assinatura"><div class="p-ass-line"></div><div class="p-ass-label">Assinatura Técnico:</div></div>
+    <div class="p-assinatura" style="text-align:right"><div class="p-ass-line"></div><div class="p-ass-label">Assinatura Cliente:</div></div>
+  </div>
+</div>
+</body>
+</html>`;
+
+  const win = window.open('', '_blank', 'width=900,height=750');
+  if(!win){ alert('Seu navegador bloqueou a janela de impressão. Permita pop-ups pra esse site e tente de novo.'); return; }
+  win.document.write(html);
+  win.document.close();
+  win.onload = () => { win.focus(); win.print(); };
+}
+
+// Se já tem senha salva nessa aba pra esse token, entra direto sem pedir de novo
+(function autoEntrar(){
+  if(!token) return;
+  const senhaSalva = sessionStorage.getItem('rastreio_senha_' + token);
+  if(!senhaSalva) return;
+  verificarAcesso(senhaSalva).then(rows => {
+    if(rows && rows.length){ mostrarAcompanhamento(rows[0]); iniciarPolling(senhaSalva); }
+  }).catch(()=>{});
+})();
+</script>
+</body>
+</html>
