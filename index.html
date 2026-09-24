@@ -3802,6 +3802,13 @@ document.addEventListener('click', e => {
       wrap.querySelector('.ae-ac-list').classList.remove('open');
     }
   });
+
+  // Idem pros aparelhos do laudo avulso
+  document.querySelectorAll('.la-ac-wrap').forEach(wrap => {
+    if(!wrap.contains(e.target)){
+      wrap.querySelector('.la-ac-list').classList.remove('open');
+    }
+  });
 });
 
 function aeAcFilter(input){
@@ -7020,32 +7027,51 @@ let laudoAvulsoContador = 0;
 
 function laudoAvulsoAparelhoHtml(n){
   return `
-  <div class="card laudo-avulso-row" data-row="${n}" style="margin-bottom:10px; position:relative;">
-    <button type="button" class="btn btn-sm" style="position:absolute; top:10px; right:10px; border-color:var(--red); color:var(--red);" onclick="removeLaudoAvulsoAparelho(${n})" title="Remover aparelho">&times;</button>
-    <div class="field" style="margin-bottom:10px;">
-      <label>Aparelho / marca / modelo</label>
-      <input type="text" class="la-modelo" placeholder="Ex: Samsung Galaxy A10">
+  <div class="laudo-avulso-row" data-row="${n}" style="border:1px solid var(--border); border-radius:var(--radius); overflow:hidden; background:var(--panel-2); margin-bottom:10px;">
+    <div style="display:flex; justify-content:space-between; align-items:center; padding:10px 14px; background:var(--panel-2); border-bottom:1px solid var(--border);">
+      <span class="la-numero-label" style="font-size:12px; font-weight:700; color:var(--accent); text-transform:uppercase; letter-spacing:0.05em;">Aparelho ${n}</span>
+      <button type="button" onclick="removeLaudoAvulsoAparelho(${n})"
+        style="background:none;border:none;color:var(--text-faint);font-size:18px;cursor:pointer;line-height:1;padding:0 2px;" title="Remover aparelho">&times;</button>
     </div>
-    <div class="field-row">
-      <div class="field">
-        <label>IMEI / série</label>
-        <input type="text" class="la-imei">
+    <div style="padding:14px 16px;">
+      <div class="field-row">
+        <div class="field">
+          <label>Marca / Modelo *</label>
+          <div class="ac-wrap la-ac-wrap" style="position:relative;">
+            <input type="text" class="la-modelo ac-input" placeholder="Ex: iPhone 13, Galaxy A54..." autocomplete="off"
+              oninput="laAcFilter(this)" onfocus="laAcFilter(this)"
+              onblur="setTimeout(()=>{ const l=this.closest('.la-ac-wrap').querySelector('.la-ac-list'); if(l) l.classList.remove('open'); },150)">
+            <div class="ac-dropdown la-ac-list"></div>
+          </div>
+        </div>
+        <div class="field">
+          <label>IMEI / série</label>
+          <input type="text" class="la-imei">
+        </div>
       </div>
       <div class="field">
         <label>Patrimônio (opcional)</label>
         <input type="text" class="la-patrimonio">
       </div>
-    </div>
-    <div class="field mb-0">
-      <label>Defeito / motivo do descarte</label>
-      <textarea class="la-defeito" placeholder="Ex: Placa queimada, sem reparo viável"></textarea>
+      <div class="field mb-0">
+        <label>Defeito / motivo do descarte</label>
+        <textarea class="la-defeito" placeholder="Ex: Placa queimada, sem reparo viável"></textarea>
+      </div>
     </div>
   </div>`;
+}
+
+function reindexLaudoAvulsoAparelhos(){
+  document.querySelectorAll('#laudo-avulso-aparelhos-list .laudo-avulso-row').forEach((row, i) => {
+    const label = row.querySelector('.la-numero-label');
+    if(label) label.textContent = 'Aparelho ' + (i + 1);
+  });
 }
 
 function addLaudoAvulsoAparelho(){
   laudoAvulsoContador++;
   document.getElementById('laudo-avulso-aparelhos-list').insertAdjacentHTML('beforeend', laudoAvulsoAparelhoHtml(laudoAvulsoContador));
+  reindexLaudoAvulsoAparelhos();
 }
 
 function removeLaudoAvulsoAparelho(n){
@@ -7055,6 +7081,35 @@ function removeLaudoAvulsoAparelho(n){
     return;
   }
   list.querySelector(`.laudo-avulso-row[data-row="${n}"]`)?.remove();
+  reindexLaudoAvulsoAparelhos();
+}
+
+// Autocomplete de marca/modelo do laudo avulso — mesma lista (MODELOS) e mesmo
+// comportamento usado nos aparelhos extras da OS (ae-ac-wrap)
+function laAcFilter(input){
+  const wrap = input.closest('.la-ac-wrap');
+  const list = wrap.querySelector('.la-ac-list');
+  const q = input.value.toLowerCase().trim();
+
+  const filtered = q ? MODELOS.filter(m => m.toLowerCase().includes(q)) : MODELOS;
+  const samsung = filtered.filter(m => m.startsWith('Samsung'));
+  const apple   = filtered.filter(m => m.startsWith('iPhone'));
+
+  let html = '';
+  if(samsung.length) html += `<div class="ac-group">Samsung</div>` + samsung.map(m => `<div class="ac-item" onmousedown="laAcSelect(this,'${m.replace(/'/g,"&#39;")}')">${m}</div>`).join('');
+  if(apple.length)   html += `<div class="ac-group">Apple</div>`   + apple.map(m => `<div class="ac-item" onmousedown="laAcSelect(this,'${m.replace(/'/g,"&#39;")}')">${m}</div>`).join('');
+  html += `<div class="ac-item ac-item-outro" onmousedown="laAcSelect(this,null)">✏ Usar "${input.value || '...'}" como está</div>`;
+
+  list.innerHTML = html;
+  list.classList.add('open');
+}
+
+function laAcSelect(el, modelo){
+  const wrap = el.closest('.la-ac-wrap');
+  const input = wrap.querySelector('.la-modelo');
+  const list  = wrap.querySelector('.la-ac-list');
+  if(modelo) input.value = modelo;
+  list.classList.remove('open');
 }
 
 function openLaudoAvulsoModal(){
