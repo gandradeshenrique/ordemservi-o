@@ -1971,24 +1971,9 @@
         <label>Cliente</label>
         <select id="laudo-avulso-cliente"><option value="">— Selecione —</option></select>
       </div>
-      <div class="field">
-        <label>Aparelho / marca / modelo</label>
-        <input type="text" id="laudo-avulso-modelo" placeholder="Ex: Samsung Galaxy A10">
-      </div>
-      <div class="field-row">
-        <div class="field">
-          <label>IMEI / série</label>
-          <input type="text" id="laudo-avulso-imei">
-        </div>
-        <div class="field">
-          <label>Patrimônio (opcional)</label>
-          <input type="text" id="laudo-avulso-patrimonio">
-        </div>
-      </div>
-      <div class="field">
-        <label>Defeito / motivo do descarte</label>
-        <textarea id="laudo-avulso-defeito" placeholder="Ex: Placa queimada, sem reparo viável"></textarea>
-      </div>
+      <label>Aparelhos</label>
+      <div id="laudo-avulso-aparelhos-list"></div>
+      <button type="button" class="btn btn-sm" onclick="addLaudoAvulsoAparelho()">+ Adicionar aparelho</button>
     </div>
     <div class="modal-actions">
       <button class="btn" onclick="closeModal('laudo-avulso-modal-overlay')">Cancelar</button>
@@ -7031,38 +7016,80 @@ async function cancelarLaudo(laudoId){
 }
 
 /* ---------- Laudo avulso ---------- */
+let laudoAvulsoContador = 0;
+
+function laudoAvulsoAparelhoHtml(n){
+  return `
+  <div class="card laudo-avulso-row" data-row="${n}" style="margin-bottom:10px; position:relative;">
+    <button type="button" class="btn btn-sm" style="position:absolute; top:10px; right:10px; border-color:var(--red); color:var(--red);" onclick="removeLaudoAvulsoAparelho(${n})" title="Remover aparelho">&times;</button>
+    <div class="field" style="margin-bottom:10px;">
+      <label>Aparelho / marca / modelo</label>
+      <input type="text" class="la-modelo" placeholder="Ex: Samsung Galaxy A10">
+    </div>
+    <div class="field-row">
+      <div class="field">
+        <label>IMEI / série</label>
+        <input type="text" class="la-imei">
+      </div>
+      <div class="field">
+        <label>Patrimônio (opcional)</label>
+        <input type="text" class="la-patrimonio">
+      </div>
+    </div>
+    <div class="field mb-0">
+      <label>Defeito / motivo do descarte</label>
+      <textarea class="la-defeito" placeholder="Ex: Placa queimada, sem reparo viável"></textarea>
+    </div>
+  </div>`;
+}
+
+function addLaudoAvulsoAparelho(){
+  laudoAvulsoContador++;
+  document.getElementById('laudo-avulso-aparelhos-list').insertAdjacentHTML('beforeend', laudoAvulsoAparelhoHtml(laudoAvulsoContador));
+}
+
+function removeLaudoAvulsoAparelho(n){
+  const list = document.getElementById('laudo-avulso-aparelhos-list');
+  if(list.querySelectorAll('.laudo-avulso-row').length <= 1){
+    showToast('O laudo precisa de ao menos um aparelho.', true);
+    return;
+  }
+  list.querySelector(`.laudo-avulso-row[data-row="${n}"]`)?.remove();
+}
+
 function openLaudoAvulsoModal(){
   if(!state.tabelaLaudos){ showToast('Módulo ainda não instalado no banco de dados. Rode o sql_laudo_descarte.sql.', true); return; }
   const sel = document.getElementById('laudo-avulso-cliente');
   sel.innerHTML = '<option value="">— Selecione —</option>' +
     state.clients.map(c => `<option value="${c.id}">${escapeHtml(c.nome)}${c.cpfcnpj ? ' — ' + escapeHtml(c.cpfcnpj) : ''}</option>`).join('');
-  document.getElementById('laudo-avulso-modelo').value = '';
-  document.getElementById('laudo-avulso-imei').value = '';
-  document.getElementById('laudo-avulso-patrimonio').value = '';
-  document.getElementById('laudo-avulso-defeito').value = '';
+  document.getElementById('laudo-avulso-aparelhos-list').innerHTML = '';
+  laudoAvulsoContador = 0;
+  addLaudoAvulsoAparelho();
   openModal('laudo-avulso-modal-overlay');
 }
 
 async function saveLaudoAvulso(){
   const clienteId = document.getElementById('laudo-avulso-cliente').value;
-  const modelo = document.getElementById('laudo-avulso-modelo').value.trim();
-  if(!clienteId || !modelo){ showToast('Selecione o cliente e informe o aparelho.', true); return; }
   const cliente = state.clients.find(c => c.id === clienteId);
 
-  const aparelho = {
-    device_id: 'avulso1', modelo,
-    imei: document.getElementById('laudo-avulso-imei').value.trim(),
-    patrimonio: document.getElementById('laudo-avulso-patrimonio').value.trim(),
-    defeito: document.getElementById('laudo-avulso-defeito').value.trim(),
+  const linhas = [...document.querySelectorAll('#laudo-avulso-aparelhos-list .laudo-avulso-row')];
+  const aparelhos = linhas.map((row, i) => ({
+    device_id: 'avulso' + (i + 1),
+    modelo: row.querySelector('.la-modelo').value.trim(),
+    imei: row.querySelector('.la-imei').value.trim(),
+    patrimonio: row.querySelector('.la-patrimonio').value.trim(),
+    defeito: row.querySelector('.la-defeito').value.trim(),
     diagnostico: '', funcionando: null, reset_efetuado: false, chip_sd_devolvido: false
-  };
+  })).filter(a => a.modelo);
+
+  if(!clienteId || !aparelhos.length){ showToast('Selecione o cliente e informe pelo menos um aparelho.', true); return; }
 
   const payload = {
     os_id: null, cliente_id: clienteId, cliente_nome: cliente ? cliente.nome : '',
     cliente_cpfcnpj: cliente ? cliente.cpfcnpj : '', cliente_endereco: cliente ? cliente.endereco : '',
     cliente_telefone: cliente ? cliente.telefone : '', cliente_email: cliente ? cliente.email : '',
-    aparelhos: [aparelho], status: 'Aguardando autorização', origem: 'avulso',
-    historico: [{ date: new Date().toISOString().slice(0,10), text: 'Laudo avulso criado.' }]
+    aparelhos, status: 'Aguardando autorização', origem: 'avulso',
+    historico: [{ date: new Date().toISOString().slice(0,10), text: `Laudo avulso criado com ${aparelhos.length} aparelho(s).` }]
   };
 
   try {
