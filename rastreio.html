@@ -282,7 +282,7 @@
     <div class="card">
       <div class="section-title">Confirme quem está aprovando</div>
       <div style="font-size:12px; color:var(--text-dim); line-height:1.5; background:var(--panel-2); border:1px solid var(--border); border-radius:8px; padding:10px 12px; margin-bottom:14px;">
-        Pra sua tranquilidade e a nossa, pedimos seu nome e um documento antes de confirmar — assim fica registrado que foi você quem aprovou, caso precise consultar isso depois.
+        Pensando na sua segurança, pedimos seu nome completo e CPF/RG antes de confirmar, para evitar aprovações indevidas.
       </div>
       <div style="margin-bottom:12px;">
         <label style="display:block; font-size:11px; color:var(--text-faint); text-transform:uppercase; letter-spacing:0.4px; margin-bottom:6px;">Nome completo</label>
@@ -296,7 +296,7 @@
       </div>
     </div>
 
-    <button class="btn" id="btn-confirmar-aprovacao" onclick="confirmarAprovacao()">Confirmar decisão</button>
+    <button class="btn" id="btn-confirmar-aprovacao" onclick="confirmarAprovacao()">Aprovar reparo</button>
     <div class="erro" id="aprov-erro"></div>
 
     <div class="footer-note">Mobit Soluções · página de acompanhamento</div>
@@ -933,7 +933,7 @@ function renderAprovacaoView(o){
   const erro = document.getElementById('aprov-erro');
   erro.classList.remove('show');
   const btn = document.getElementById('btn-confirmar-aprovacao');
-  btn.disabled = false; btn.textContent = 'Confirmar decisão';
+  btn.disabled = false; btn.textContent = 'Aprovar reparo';
 
   atualizarTotalAprovacao();
 }
@@ -971,7 +971,7 @@ function atualizarTotalAprovacao(){
   });
   document.getElementById('aprov-total').textContent = formatCurrency(total);
   const btn = document.getElementById('btn-confirmar-aprovacao');
-  if(!btn.disabled) btn.textContent = aprovados === 0 ? 'Reprovar todos os aparelhos' : 'Confirmar decisão';
+  if(!btn.disabled) btn.textContent = aprovados === 0 ? 'Reprovar todos os aparelhos' : 'Aprovar reparo';
 }
 
 async function confirmarAprovacao(){
@@ -1038,7 +1038,7 @@ async function confirmarAprovacao(){
     if(!resultadoProva || !resultadoProva.ok){
       erro.textContent = 'Sua sessão expirou. Saia e entre novamente com a senha de acesso.';
       erro.classList.add('show');
-      btn.disabled = false; btn.textContent = 'Confirmar decisão';
+      btn.disabled = false; btn.textContent = 'Aprovar reparo';
       return;
     }
 
@@ -1065,7 +1065,7 @@ async function confirmarAprovacao(){
         erro.textContent = 'Não foi possível registrar sua decisão agora. Tente novamente.';
       }
       erro.classList.add('show');
-      btn.disabled = false; btn.textContent = 'Confirmar decisão';
+      btn.disabled = false; btn.textContent = 'Aprovar reparo';
       // Recarrega o estado real da OS — pode já ter mudado (ex: técnico decidiu antes)
       verificarAcesso(senha).then(rr => { if(rr && rr.length) mostrarAcompanhamento(rr[0]); }).catch(()=>{});
       return;
@@ -1077,7 +1077,7 @@ async function confirmarAprovacao(){
   } catch(e){
     erro.textContent = 'Não foi possível enviar sua decisão (' + e.message + '). Tente novamente em instantes.';
     erro.classList.add('show');
-    btn.disabled = false; btn.textContent = 'Confirmar decisão';
+    btn.disabled = false; btn.textContent = 'Aprovar reparo';
   }
 }
 
