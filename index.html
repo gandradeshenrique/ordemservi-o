@@ -1286,6 +1286,10 @@
           <option value="Entregue">Entregue</option>
           <option value="Cancelado">Cancelado</option>
         </select>
+        <label style="display:flex; align-items:center; gap:6px; font-size:13px; color:var(--text-dim); cursor:pointer; white-space:nowrap; padding:0 4px;">
+          <input type="checkbox" id="os-filter-paradas" onchange="renderOSTable()" style="width:15px; height:15px; cursor:pointer; accent-color:var(--red);">
+          ⚠ Só paradas <span id="os-paradas-count" class="text-faint"></span>
+        </label>
       </div>
 
       <div class="table-wrap">
@@ -3590,9 +3594,41 @@ function stockPill(item){
 /* =========================================================
    ORDENS DE SERVIÇO — TABELA
    ========================================================= */
+// Status finais — não contam como "parada" mesmo sem mudança recente
+const STATUS_TERMINAIS_OS = ['Concluído', 'Entregue', 'Cancelado'];
+
+// Dias desde a última mudança de status (procura no histórico a última entrada
+// gerada por uma troca de status; se não houver nenhuma, usa a data de entrada).
+// Retorna null pra OS em status final (não faz sentido alertar essas).
+function diasSemMudarStatus(o){
+  if(STATUS_TERMINAIS_OS.includes(o.status)) return null;
+  const hist = state.history[o.id] || o.historico || [];
+  let dataBase = o.dataEntrada;
+  for(let i = hist.length - 1; i >= 0; i--){
+    if(hist[i] && hist[i].text && hist[i].text.startsWith('Status alterado')){
+      dataBase = hist[i].date;
+      break;
+    }
+  }
+  if(!dataBase) return null;
+  const ms = new Date(todayISO() + 'T00:00:00') - new Date(dataBase + 'T00:00:00');
+  return Math.floor(ms / 86400000);
+}
+
+const OS_DIAS_PARADA_LIMITE = 3;
+
 function renderOSTable(){
   const search = (document.getElementById('os-search').value || '').toLowerCase();
   const filterStatus = document.getElementById('os-filter-status').value;
+  const soParadas = document.getElementById('os-filter-paradas').checked;
+
+  // Contagem de paradas sempre sobre a base completa, independente dos filtros ativos
+  const totalParadas = state.os.filter(o => {
+    const d = diasSemMudarStatus(o);
+    return d !== null && d >= OS_DIAS_PARADA_LIMITE;
+  }).length;
+  const paradasCountEl = document.getElementById('os-paradas-count');
+  if(paradasCountEl) paradasCountEl.textContent = totalParadas ? `(${totalParadas})` : '';
 
   let list = [...state.os].sort((a,b) => b.numero - a.numero);
 
@@ -3607,6 +3643,12 @@ function renderOSTable(){
   if(filterStatus){
     list = list.filter(o => o.status === filterStatus);
   }
+  if(soParadas){
+    list = list.filter(o => {
+      const d = diasSemMudarStatus(o);
+      return d !== null && d >= OS_DIAS_PARADA_LIMITE;
+    });
+  }
 
   const body = document.getElementById('os-table-body');
   if(list.length === 0){
@@ -3614,14 +3656,19 @@ function renderOSTable(){
     return;
   }
 
-  body.innerHTML = list.map(o => `
+  body.innerHTML = list.map(o => {
+    const diasParada = diasSemMudarStatus(o);
+    const alertaParada = (diasParada !== null && diasParada >= OS_DIAS_PARADA_LIMITE)
+      ? `<div style="margin-top:4px; font-size:11px; color:var(--red); font-weight:600; white-space:nowrap;" title="Sem mudança de status há ${diasParada} dia(s)">⚠ ${diasParada}d parada</div>`
+      : '';
+    return `
     <tr>
       <td class="mono cell-strong" style="cursor:pointer" onclick="viewOS('${o.id}')">#${o.numero}</td>
       <td class="mono text-faint" style="cursor:pointer" onclick="viewOS('${o.id}')">${o.chamado ? escapeHtml(o.chamado) : '—'}</td>
       <td style="cursor:pointer" onclick="viewOS('${o.id}')">${escapeHtml(o.clienteNome)}</td>
       <td style="cursor:pointer" onclick="viewOS('${o.id}')">${o.aparelho ? escapeHtml(o.aparelho) : '<span class="text-faint">— aguardando —</span>'}</td>
       <td class="text-faint" style="max-width:120px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;" title="${escapeHtml(o.defeito)}">${escapeHtml(o.defeito)}</td>
-      <td><span class="badge ${statusBadgeClass(o.status)}">${o.status}</span></td>
+      <td><span class="badge ${statusBadgeClass(o.status)}">${o.status}</span>${alertaParada}</td>
       <td class="mono">${formatCurrency(o.total)}</td>
       <td class="mono">${formatDate(o.dataEntrada)}</td>
       <td style="white-space:nowrap;">
@@ -3632,7 +3679,8 @@ function renderOSTable(){
         </div>
       </td>
     </tr>
-  `).join('');
+  `;
+  }).join('');
 }
 
 /* =========================================================
