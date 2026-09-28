@@ -280,13 +280,13 @@
     </div>
 
     <div class="card">
-      <div class="section-title">Identificação de quem aprova</div>
+      <div class="section-title">Confirme quem está aprovando</div>
       <div style="font-size:12px; color:var(--text-dim); line-height:1.5; background:var(--panel-2); border:1px solid var(--border); border-radius:8px; padding:10px 12px; margin-bottom:14px;">
-        Preencha seu nome completo e CPF ou RG — isso serve como comprovante de que foi você quem aprovou este orçamento.
+        Pra sua tranquilidade e a nossa, pedimos seu nome e um documento antes de confirmar — assim fica registrado que foi você quem aprovou, caso precise consultar isso depois.
       </div>
       <div style="margin-bottom:12px;">
         <label style="display:block; font-size:11px; color:var(--text-faint); text-transform:uppercase; letter-spacing:0.4px; margin-bottom:6px;">Nome completo</label>
-        <input type="text" id="aprov-nome" placeholder="Seu nome completo"
+        <input type="text" id="aprov-nome" placeholder="Digite seu nome completo"
           style="width:100%; background:var(--panel-2); border:1px solid var(--border); border-radius:8px; padding:11px 12px; font-size:14px; color:var(--text); outline:none;">
       </div>
       <div>
@@ -925,8 +925,10 @@ function renderAprovacaoView(o){
     </div>`;
   }).join('');
 
-  document.getElementById('aprov-nome').value = o.cliente_nome || '';
-  document.getElementById('aprov-documento').value = o.cliente_cpfcnpj || '';
+  // Nome e CPF/RG ficam em branco de propósito — é o próprio cliente quem precisa
+  // preencher, pra valer como comprovante de que foi ele quem aprovou.
+  document.getElementById('aprov-nome').value = '';
+  document.getElementById('aprov-documento').value = '';
 
   const erro = document.getElementById('aprov-erro');
   erro.classList.remove('show');
@@ -985,13 +987,13 @@ async function confirmarAprovacao(){
   const nomeAprovador = document.getElementById('aprov-nome').value.trim();
   const documentoAprovador = document.getElementById('aprov-documento').value.trim();
   if(!nomeAprovador){
-    erro.textContent = 'Informe o nome completo de quem está aprovando.';
+    erro.textContent = 'Falta só seu nome completo pra gente confirmar a aprovação.';
     erro.classList.add('show');
     document.getElementById('aprov-nome').focus();
     return;
   }
   if(!documentoAprovador){
-    erro.textContent = 'Informe o CPF ou RG de quem está aprovando.';
+    erro.textContent = 'Falta seu CPF ou RG pra gente confirmar a aprovação.';
     erro.classList.add('show');
     document.getElementById('aprov-documento').focus();
     return;
