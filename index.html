@@ -679,6 +679,50 @@
     .av-grid{ max-height:210px; }
   }
 
+
+  /* ===== Usuários (admin) ===== */
+  .usr-stats{ display:grid; grid-template-columns:repeat(4,1fr); gap:12px; margin-bottom:16px; }
+  .usr-stat{ background:var(--panel); border:1px solid var(--border); border-radius:var(--radius); padding:12px 14px; }
+  .usr-stat b{ display:block; font-size:20px; }
+  .usr-stat span{ font-size:12px; color:var(--text-faint); }
+  .usr-toolbar{ display:flex; gap:10px; margin-bottom:16px; flex-wrap:wrap; }
+  .usr-toolbar .search{ flex:1; min-width:220px; }
+  .usr-toolbar select{ width:auto; min-width:160px; }
+  .usr-grid{ display:grid; grid-template-columns:repeat(auto-fill,minmax(300px,1fr)); gap:14px; }
+  .usr-card{ background:var(--panel); border:1px solid var(--border); border-radius:var(--radius); padding:16px; display:flex; flex-direction:column; gap:12px; }
+  .usr-card.inativo{ opacity:.6; }
+  .usr-top{ display:flex; gap:12px; align-items:center; min-width:0; }
+  .usr-top .avatar{ width:48px; height:48px; font-size:17px; }
+  .usr-info{ min-width:0; flex:1; }
+  .usr-info strong{ display:block; font-size:14.5px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .usr-info .mono{ font-size:12px; }
+  .usr-tags{ display:flex; gap:6px; flex-wrap:wrap; }
+  .usr-tag{ font-size:11px; font-weight:600; padding:3px 9px; border-radius:100px; white-space:nowrap; }
+  .usr-perfil-admin_full{ background:var(--purple-bg); color:var(--purple); }
+  .usr-perfil-admin{ background:var(--blue-bg); color:var(--blue); }
+  .usr-perfil-gestao{ background:var(--yellow-bg); color:var(--yellow); }
+  .usr-perfil-tecnico{ background:var(--green-bg); color:var(--green); }
+  .usr-perfil-auxiliar{ background:rgba(255,255,255,.07); color:var(--text-dim); }
+  .usr-tag-ok{ background:var(--green-bg); color:var(--green); }
+  .usr-tag-off{ background:rgba(255,255,255,.07); color:var(--text-faint); }
+  .usr-tag-warn{ background:var(--yellow-bg); color:var(--yellow); }
+  .usr-tag-err{ background:var(--red-bg); color:var(--red); }
+  .usr-tag-eu{ background:var(--accent-bg); color:var(--accent); }
+  .usr-meta{ font-size:12px; color:var(--text-faint); }
+  .usr-acoes{ display:flex; gap:6px; flex-wrap:wrap; border-top:1px solid var(--border); padding-top:12px; }
+  .usr-acoes .btn{ padding:6px 10px; font-size:12px; }
+  .usr-acoes .btn-danger-soft{ color:var(--red); }
+  .usr-acoes .btn-danger-soft:hover{ border-color:var(--red); background:var(--red-bg); }
+  .usr-perm-lista{ display:grid; grid-template-columns:1fr 1fr; gap:8px; }
+  .usr-perm-item{ display:flex; align-items:center; gap:8px; font-size:13px; color:var(--text-faint); padding:8px 10px; border:1px dashed var(--border); border-radius:8px; }
+  .usr-aviso{ background:var(--accent-bg); border:1px solid rgba(45,160,224,.3); border-radius:8px; padding:10px 12px; font-size:12.5px; color:var(--text-dim); line-height:1.5; }
+  @media (max-width: 768px){
+    .usr-stats{ grid-template-columns:repeat(2,1fr); }
+    .usr-grid{ grid-template-columns:1fr; }
+    .usr-perm-lista{ grid-template-columns:1fr; }
+    .usr-toolbar select{ flex:1; }
+  }
+
   /* ── MOBILE (≤ 768px) ── */
   @media (max-width: 768px){
     /* Layout */
@@ -1180,6 +1224,9 @@
     </button>
 
     <div class="nav-divider"></div>
+    <button class="nav-item" data-page="usuarios" id="nav-usuarios" onclick="goToPage('usuarios')" style="display:none;">
+      <span class="nav-icon">👥</span> Usuários
+    </button>
     <button class="nav-item" onclick="openDataModal()">
       <span class="nav-icon">&#128196;</span> Relatórios / Dados
     </button>
@@ -1620,6 +1667,38 @@
       </div>
     </div>
 
+
+    <!-- ===================== USUÁRIOS (ADMIN) ===================== -->
+    <div class="page" id="page-usuarios">
+      <div class="page-header">
+        <div>
+          <h1>Usuários</h1>
+          <p>Crie, edite e controle o acesso da equipe ao sistema</p>
+        </div>
+        <button class="btn btn-primary" onclick="abrirUsuarioModal()">+ Novo usuário</button>
+      </div>
+
+      <div class="usr-stats" id="usr-stats"></div>
+
+      <div class="toolbar usr-toolbar">
+        <div class="search">
+          <span class="search-icon">&#128269;</span>
+          <input type="text" id="usr-busca" placeholder="Buscar por nome ou login..." oninput="renderUsuarios()">
+        </div>
+        <select id="usr-filtro-status" onchange="renderUsuarios()">
+          <option value="">Todos os status</option>
+          <option value="ativo">Ativos</option>
+          <option value="inativo">Desativados</option>
+          <option value="bloqueado">Bloqueados</option>
+          <option value="pendente">Aguardando 1º acesso</option>
+        </select>
+        <select id="usr-filtro-perfil" onchange="renderUsuarios()">
+          <option value="">Todos os perfis</option>
+        </select>
+      </div>
+
+      <div class="usr-grid" id="usr-grid"><div class="hint">Carregando...</div></div>
+    </div>
     <!-- ===================== MEU PERFIL ===================== -->
     <div class="page" id="page-perfil">
       <div class="page-header">
@@ -2753,6 +2832,87 @@
   </div>
 </div>
 
+
+<!-- ===================== MODAL: USUÁRIO (criar/editar) ===================== -->
+<div class="modal-overlay" id="usr-modal-overlay">
+  <div class="modal" style="max-width:560px;">
+    <div class="modal-header">
+      <h2 id="usr-modal-titulo">Novo usuário</h2>
+      <button class="modal-close" onclick="closeModal('usr-modal-overlay')">&times;</button>
+    </div>
+    <input type="hidden" id="usr-id">
+    <div class="av-tabs" style="margin-bottom:16px;">
+      <button class="av-tab active" id="usr-tab-dados" onclick="usrTrocarAba('dados')">Dados</button>
+      <button class="av-tab" id="usr-tab-perm" onclick="usrTrocarAba('perm')">Permissões</button>
+    </div>
+    <div id="usr-painel-dados">
+      <div class="field">
+        <label>Nome *</label>
+        <input type="text" id="usr-nome" maxlength="80" placeholder="Ex: João Silva">
+      </div>
+      <div class="field-row">
+        <div class="field">
+          <label>Usuário (login) *</label>
+          <input type="text" id="usr-login" maxlength="30" placeholder="ex: joao.silva" autocomplete="off" oninput="usrNormalizarLogin(this)">
+          <div class="hint">Letras minúsculas, números, ponto, hífen ou _</div>
+        </div>
+        <div class="field">
+          <label>Perfil de acesso *</label>
+          <select id="usr-perfil"></select>
+        </div>
+      </div>
+      <div class="usr-aviso" id="usr-aviso-senha">
+        🔑 O usuário entra com a <b>senha padrão da empresa</b> e será obrigado a criar uma senha pessoal no primeiro acesso.
+      </div>
+    </div>
+    <div id="usr-painel-perm" style="display:none;">
+      <div class="usr-aviso" style="margin-bottom:14px;">
+        🚧 <b>Em breve.</b> Aqui você vai definir o que este usuário pode ver e editar em cada módulo. Por enquanto, todos os usuários ativos têm acesso aos módulos do sistema; só o painel de Usuários é restrito a administradores.
+      </div>
+      <div class="usr-perm-lista">
+        <div class="usr-perm-item">📋 Ordens de serviço</div><div class="usr-perm-item">📦 Estoque</div>
+        <div class="usr-perm-item">👤 Clientes</div><div class="usr-perm-item">💵 Compras</div>
+        <div class="usr-perm-item">📋 Tarefas</div><div class="usr-perm-item">🔍 Cotação</div>
+        <div class="usr-perm-item">🗑️ Laudos de descarte</div><div class="usr-perm-item">☉ Painel / Relatórios</div>
+      </div>
+    </div>
+    <div class="modal-actions">
+      <button class="btn" onclick="closeModal('usr-modal-overlay')">Cancelar</button>
+      <button class="btn btn-primary" id="usr-btn-salvar" onclick="salvarUsuario()">Criar usuário</button>
+    </div>
+  </div>
+</div>
+
+<!-- ===================== MODAL: CONFIRMAÇÃO (usuários) ===================== -->
+<div class="modal-overlay" id="usr-confirm-overlay">
+  <div class="modal" style="max-width:460px;">
+    <div class="modal-header">
+      <h2 id="usr-confirm-titulo">Confirmar</h2>
+      <button class="modal-close" onclick="closeModal('usr-confirm-overlay')">&times;</button>
+    </div>
+    <div id="usr-confirm-msg" style="font-size:13.5px; color:var(--text-dim); line-height:1.6;"></div>
+    <div class="field" id="usr-confirm-campo" style="display:none; margin-top:14px;">
+      <label id="usr-confirm-label"></label>
+      <input type="text" id="usr-confirm-input" autocomplete="off">
+    </div>
+    <div class="modal-actions">
+      <button class="btn" onclick="closeModal('usr-confirm-overlay')">Cancelar</button>
+      <button class="btn btn-primary" id="usr-confirm-btn">Confirmar</button>
+    </div>
+  </div>
+</div>
+
+<!-- ===================== MODAL: ACESSOS DE UM USUÁRIO ===================== -->
+<div class="modal-overlay" id="usr-acessos-overlay">
+  <div class="modal" style="max-width:520px;">
+    <div class="modal-header">
+      <h2 id="usr-acessos-titulo">Histórico</h2>
+      <button class="modal-close" onclick="closeModal('usr-acessos-overlay')">&times;</button>
+    </div>
+    <div class="acessos-lista" id="usr-acessos-lista"></div>
+  </div>
+</div>
+
 <!-- ===================== TOASTS ===================== -->
 <div id="foto-lightbox" onclick="fotoFechar()" style="display:none; position:fixed; inset:0; z-index:400; background:rgba(0,0,0,.88); align-items:center; justify-content:center; padding:16px; cursor:zoom-out;">
   <img alt="" style="max-width:100%; max-height:100%; border-radius:8px;">
@@ -3066,6 +3226,8 @@ function aplicarUsuarioNaUI(u){
   const userEl = document.getElementById('sidebar-user');
   if(userEl) userEl.textContent = u.nome || u.usuario;
   renderAvatar(document.getElementById('sidebar-avatar'), u);
+  const navUsr = document.getElementById('nav-usuarios');
+  if(navUsr) navUsr.style.display = ehAdminPerfil(u.perfil) ? '' : 'none';
   if(document.getElementById('page-perfil')?.classList.contains('active')) preencherPerfil(u);
 }
 
@@ -3660,6 +3822,250 @@ async function salvarAvatarIlustrado(){
   finally { btn.disabled = false; btn.textContent = 'Salvar avatar'; }
 }
 
+
+/* =========================================================
+   USUÁRIOS — painel de administração (Administrador Full / Administrador)
+   ========================================================= */
+let _usrData = { usuarios:[], atribuiveis:[], eu_id:null };
+
+function ehAdminPerfil(p){ return p === 'admin_full' || p === 'admin'; }
+
+function tempoRelativo(iso){
+  if(!iso) return 'nunca acessou';
+  const diff = (Date.now() - new Date(iso).getTime()) / 1000;
+  if(diff < 60) return 'agora mesmo';
+  if(diff < 3600) return 'há ' + Math.floor(diff/60) + ' min';
+  if(diff < 86400) return 'há ' + Math.floor(diff/3600) + ' h';
+  if(diff < 172800) return 'ontem';
+  if(diff < 30*86400) return 'há ' + Math.floor(diff/86400) + ' dias';
+  return new Date(iso).toLocaleDateString('pt-BR');
+}
+
+async function carregarUsuarios(){
+  const grid = document.getElementById('usr-grid');
+  try {
+    const r = await apiUsuarios('admin-listar');
+    _usrData = r;
+    if(r.perfis) _perfisInfo = r.perfis;
+    const sel = document.getElementById('usr-filtro-perfil');
+    const atual = sel.value;
+    sel.innerHTML = '<option value="">Todos os perfis</option>' +
+      Object.keys(_perfisInfo).map(p => `<option value="${p}">${escapeHtml(nomePerfil(p))}</option>`).join('');
+    sel.value = atual;
+    renderUsuarios();
+  } catch(e){
+    grid.innerHTML = `<div class="hint">Não foi possível carregar: ${escapeHtml(e.message)}</div>`;
+  }
+}
+
+function renderUsuarios(){
+  const lista = _usrData.usuarios || [];
+  const busca = (document.getElementById('usr-busca').value || '').toLowerCase().trim();
+  const fStatus = document.getElementById('usr-filtro-status').value;
+  const fPerfil = document.getElementById('usr-filtro-perfil').value;
+
+  document.getElementById('usr-stats').innerHTML = [
+    ['Total', lista.length],
+    ['Ativos', lista.filter(u => u.ativo).length],
+    ['Desativados', lista.filter(u => !u.ativo).length],
+    ['Aguardando 1º acesso', lista.filter(u => u.ativo && u.primeiro_acesso).length],
+  ].map(([l,v]) => `<div class="usr-stat"><b>${v}</b><span>${l}</span></div>`).join('');
+
+  const filtrada = lista.filter(u => {
+    if(busca && !((u.nome||'').toLowerCase().includes(busca) || (u.usuario||'').includes(busca))) return false;
+    if(fPerfil && u.perfil !== fPerfil) return false;
+    if(fStatus === 'ativo' && !u.ativo) return false;
+    if(fStatus === 'inativo' && u.ativo) return false;
+    if(fStatus === 'bloqueado' && !u.bloqueado) return false;
+    if(fStatus === 'pendente' && !(u.ativo && u.primeiro_acesso)) return false;
+    return true;
+  });
+
+  const grid = document.getElementById('usr-grid');
+  if(!filtrada.length){ grid.innerHTML = '<div class="hint">Nenhum usuário encontrado.</div>'; return; }
+
+  grid.innerHTML = filtrada.map(u => {
+    const souEu = String(u.id) === String(_usrData.eu_id);
+    const tags = [
+      `<span class="usr-tag usr-perfil-${escapeHtml(u.perfil)}">${escapeHtml(nomePerfil(u.perfil))}</span>`,
+      u.ativo ? '<span class="usr-tag usr-tag-ok">Ativo</span>' : '<span class="usr-tag usr-tag-off">Desativado</span>',
+      u.ativo && u.primeiro_acesso ? '<span class="usr-tag usr-tag-warn">Aguardando 1º acesso</span>' : '',
+      u.bloqueado ? '<span class="usr-tag usr-tag-err">🔒 Bloqueado</span>' : '',
+      souEu ? '<span class="usr-tag usr-tag-eu">Você</span>' : '',
+    ].join('');
+    const id = escapeHtml(String(u.id));
+    let acoes;
+    if(souEu){
+      acoes = `<button class="btn" onclick="goToPage('perfil')">Meu perfil</button>
+               <button class="btn" onclick="verAcessosUsuario('${id}')">🕐 Histórico</button>`;
+    } else if(!u.gerenciavel){
+      acoes = `<span class="usr-meta">🔒 Apenas um Administrador Full pode gerenciar este usuário.</span>`;
+    } else {
+      acoes = `<button class="btn" onclick="abrirUsuarioModal('${id}')">✏️ Editar</button>
+               <button class="btn" onclick="resetarSenhaUsuario('${id}')">🔑 Resetar senha</button>
+               ${u.bloqueado ? `<button class="btn" onclick="desbloquearUsuario('${id}')">🔓 Desbloquear</button>` : ''}
+               <button class="btn" onclick="alterarStatusUsuario('${id}', ${!u.ativo})">${u.ativo ? '🚫 Desativar' : '✅ Reativar'}</button>
+               <button class="btn" onclick="verAcessosUsuario('${id}')">🕐 Histórico</button>
+               <button class="btn btn-danger-soft" onclick="excluirUsuario('${id}')">🗑 Excluir</button>`;
+    }
+    return `<div class="usr-card ${u.ativo ? '' : 'inativo'}">
+      <div class="usr-top">
+        <span class="avatar" data-usr-avatar="${id}"></span>
+        <div class="usr-info">
+          <strong>${escapeHtml(u.nome || u.usuario)}</strong>
+          <span class="mono">@${escapeHtml(u.usuario)}</span>
+        </div>
+      </div>
+      <div class="usr-tags">${tags}</div>
+      <div class="usr-meta">Último acesso: ${tempoRelativo(u.ultimo_acesso)}</div>
+      <div class="usr-acoes">${acoes}</div>
+    </div>`;
+  }).join('');
+
+  filtrada.forEach(u => renderAvatar(grid.querySelector(`[data-usr-avatar="${CSS.escape(String(u.id))}"]`), u));
+}
+
+function usrBuscar(id){ return (_usrData.usuarios || []).find(u => String(u.id) === String(id)); }
+
+function usrNormalizarLogin(inp){
+  const v = inp.value.toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/\s+/g, '.').replace(/[^a-z0-9._-]/g, '');
+  if(v !== inp.value) inp.value = v;
+}
+
+function usrTrocarAba(aba){
+  document.getElementById('usr-tab-dados').classList.toggle('active', aba === 'dados');
+  document.getElementById('usr-tab-perm').classList.toggle('active', aba === 'perm');
+  document.getElementById('usr-painel-dados').style.display = aba === 'dados' ? '' : 'none';
+  document.getElementById('usr-painel-perm').style.display = aba === 'perm' ? '' : 'none';
+}
+
+function abrirUsuarioModal(id){
+  const u = id ? usrBuscar(id) : null;
+  document.getElementById('usr-id').value = u ? u.id : '';
+  document.getElementById('usr-modal-titulo').textContent = u ? 'Editar usuário' : 'Novo usuário';
+  document.getElementById('usr-btn-salvar').textContent = u ? 'Salvar alterações' : 'Criar usuário';
+  document.getElementById('usr-nome').value = u ? (u.nome || '') : '';
+  document.getElementById('usr-login').value = u ? u.usuario : '';
+  document.getElementById('usr-aviso-senha').style.display = u ? 'none' : '';
+  const opcoes = (_usrData.atribuiveis || []).slice();
+  if(u && !opcoes.includes(u.perfil)) opcoes.unshift(u.perfil);
+  document.getElementById('usr-perfil').innerHTML = opcoes.map(p =>
+    `<option value="${p}">${escapeHtml(nomePerfil(p))}</option>`).join('');
+  document.getElementById('usr-perfil').value = u ? u.perfil : (opcoes.includes('tecnico') ? 'tecnico' : opcoes[opcoes.length-1]);
+  usrTrocarAba('dados');
+  openModal('usr-modal-overlay');
+  setTimeout(() => document.getElementById('usr-nome').focus(), 50);
+}
+
+async function salvarUsuario(){
+  const id = document.getElementById('usr-id').value;
+  const nome = document.getElementById('usr-nome').value.trim();
+  const usuario = document.getElementById('usr-login').value.trim();
+  const perfil = document.getElementById('usr-perfil').value;
+  if(nome.length < 2){ showToast('Informe o nome.', true); return; }
+  if(!/^[a-z0-9._-]{3,30}$/.test(usuario)){ showToast('Login inválido: use 3 a 30 letras minúsculas, números, ponto, hífen ou _.', true); return; }
+  const btn = document.getElementById('usr-btn-salvar');
+  btn.disabled = true;
+  try {
+    if(id){
+      await apiUsuarios('admin-editar', { id, nome, usuario, perfil });
+      showToast('Usuário atualizado.');
+    } else {
+      await apiUsuarios('admin-criar', { nome, usuario, perfil });
+      showToast(`Usuário @${usuario} criado. Ele entra com a senha padrão.`);
+    }
+    closeModal('usr-modal-overlay');
+    carregarUsuarios();
+  } catch(e){ showToast(e.message, true); }
+  finally { btn.disabled = false; }
+}
+
+// Confirmação genérica (com campo opcional para digitar o login)
+function usrConfirmar({ titulo, msg, botao, perigo, digitar }){
+  return new Promise(resolve => {
+    document.getElementById('usr-confirm-titulo').textContent = titulo;
+    document.getElementById('usr-confirm-msg').innerHTML = msg;
+    const campo = document.getElementById('usr-confirm-campo');
+    const inp = document.getElementById('usr-confirm-input');
+    campo.style.display = digitar ? '' : 'none';
+    inp.value = '';
+    if(digitar) document.getElementById('usr-confirm-label').textContent = `Digite "${digitar}" para confirmar`;
+    const btn = document.getElementById('usr-confirm-btn');
+    btn.textContent = botao || 'Confirmar';
+    btn.className = 'btn ' + (perigo ? 'btn-danger' : 'btn-primary');
+    btn.onclick = () => {
+      if(digitar && inp.value.trim() !== digitar){ showToast('O texto digitado não confere.', true); return; }
+      closeModal('usr-confirm-overlay'); resolve(digitar ? inp.value.trim() : true);
+    };
+    document.querySelector('#usr-confirm-overlay .modal-close').onclick = () => { closeModal('usr-confirm-overlay'); resolve(false); };
+    document.querySelector('#usr-confirm-overlay .modal-actions .btn').onclick = () => { closeModal('usr-confirm-overlay'); resolve(false); };
+    openModal('usr-confirm-overlay');
+    if(digitar) setTimeout(() => inp.focus(), 50);
+  });
+}
+
+async function resetarSenhaUsuario(id){
+  const u = usrBuscar(id); if(!u) return;
+  const ok = await usrConfirmar({
+    titulo: 'Resetar senha',
+    msg: `A senha de <b>${escapeHtml(u.nome || u.usuario)}</b> voltará para a <b>senha padrão da empresa</b>. No próximo login, ele será obrigado a criar uma nova senha.<br><br>Se ele estiver conectado, será desconectado.`,
+    botao: 'Resetar senha'
+  });
+  if(!ok) return;
+  try { await apiUsuarios('admin-reset-senha', { id }); showToast('Senha redefinida para a padrão.'); carregarUsuarios(); }
+  catch(e){ showToast(e.message, true); }
+}
+
+async function alterarStatusUsuario(id, ativo){
+  const u = usrBuscar(id); if(!u) return;
+  const ok = await usrConfirmar(ativo ? {
+    titulo: 'Reativar usuário',
+    msg: `<b>${escapeHtml(u.nome || u.usuario)}</b> voltará a conseguir entrar no sistema.`,
+    botao: 'Reativar'
+  } : {
+    titulo: 'Desativar usuário',
+    msg: `<b>${escapeHtml(u.nome || u.usuario)}</b> não conseguirá mais entrar no sistema, e será desconectado agora. O cadastro e o histórico continuam guardados, e você pode reativar quando quiser.`,
+    botao: 'Desativar', perigo: true
+  });
+  if(!ok) return;
+  try { await apiUsuarios('admin-status', { id, ativo }); showToast(ativo ? 'Usuário reativado.' : 'Usuário desativado.'); carregarUsuarios(); }
+  catch(e){ showToast(e.message, true); }
+}
+
+async function desbloquearUsuario(id){
+  try { await apiUsuarios('admin-desbloquear', { id }); showToast('Usuário desbloqueado.'); carregarUsuarios(); }
+  catch(e){ showToast(e.message, true); }
+}
+
+async function excluirUsuario(id){
+  const u = usrBuscar(id); if(!u) return;
+  const conf = await usrConfirmar({
+    titulo: 'Excluir usuário',
+    msg: `Isto remove <b>${escapeHtml(u.nome || u.usuario)}</b> <b>definitivamente</b>. As tarefas atribuídas a ele voltam a ser "tarefa geral". Não dá para desfazer.<br><br>Se a ideia é só impedir o acesso, use <b>Desativar</b>.`,
+    botao: 'Excluir definitivamente', perigo: true, digitar: u.usuario
+  });
+  if(!conf) return;
+  try { await apiUsuarios('admin-excluir', { id, confirmacao: conf }); showToast('Usuário excluído.'); carregarUsuarios(); }
+  catch(e){ showToast(e.message, true); }
+}
+
+async function verAcessosUsuario(id){
+  const u = usrBuscar(id); if(!u) return;
+  document.getElementById('usr-acessos-titulo').textContent = 'Histórico — ' + (u.nome || u.usuario);
+  const box = document.getElementById('usr-acessos-lista');
+  box.innerHTML = '<div class="hint">Carregando...</div>';
+  openModal('usr-acessos-overlay');
+  try {
+    const r = await apiUsuarios('admin-acessos', { id });
+    const logs = r.logs || [];
+    box.innerHTML = logs.length ? logs.map(l => `
+      <div class="acesso-item">
+        <span>${escapeHtml(ACOES_LOG[l.acao] || l.acao)}${l.detalhes && l.acao.startsWith('ADMIN_') ? `<br><small class="usr-meta">${escapeHtml(l.detalhes)}</small>` : ''}</span>
+        <span>${formatarDataHora(l.criado_em)}</span>
+      </div>`).join('') : '<div class="hint">Nenhum registro ainda.</div>';
+  } catch(e){ box.innerHTML = `<div class="hint">${escapeHtml(e.message)}</div>`; }
+}
+
 /* =========================================================
    LINK DE ACOMPANHAMENTO (rastreio público da OS)
    ========================================================= */
@@ -3861,6 +4267,7 @@ function showLoadingOverlay(show){
    NAVEGAÇÃO
    ========================================================= */
 function goToPage(page){
+  if(page === 'usuarios' && !ehAdminPerfil((getCurrentUser() || {}).perfil)) page = 'dashboard';
   document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
   document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
   document.getElementById('page-' + page).classList.add('active');
@@ -3878,6 +4285,7 @@ function goToPage(page){
   if(page === 'cotacao') initCotacaoPage();
   if(page === 'laudos') renderLaudosTable();
   if(page === 'perfil') renderPerfilPage();
+  if(page === 'usuarios') carregarUsuarios();
   try { sessionStorage.setItem('mobit_pagina', page); } catch(e){}
 }
 
