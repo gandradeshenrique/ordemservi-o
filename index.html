@@ -7149,7 +7149,9 @@ Retorne SOMENTE JSON válido, sem texto adicional:
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'Authorization': 'Bearer ' + SB_KEY
+        'Authorization': 'Bearer ' + SB_KEY,
+        'apikey': SB_KEY,
+        'x-session-token': getSessionToken()
       },
       body: JSON.stringify({ base64: _pedidoBase64, mimeType: _pedidoMime })
     });
@@ -10667,7 +10669,9 @@ async function executarCotacao(){
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'Authorization': 'Bearer ' + SB_KEY
+        'Authorization': 'Bearer ' + SB_KEY,
+        'apikey': SB_KEY,
+        'x-session-token': getSessionToken()
       },
       body: JSON.stringify({ itens: _cotacaoItens })
     });
