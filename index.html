@@ -3151,33 +3151,52 @@ function sbHeaders(extra){
   };
 }
 
+// Todo acesso a dados passa pela Edge Function "dados", que confere a sessão
+// e as permissões do usuário antes de repassar ao banco.
+async function sbFetch(method, table, query = '', body, prefer){
+  const res = await fetch(`${SB_URL}/functions/v1/dados`, {
+    method: 'POST',
+    headers: { 'Content-Type':'application/json', apikey: SB_KEY, Authorization: 'Bearer ' + SB_KEY, 'x-session-token': getSessionToken() },
+    body: JSON.stringify({ method, table, query, body, prefer })
+  });
+  if(res.status === 401){
+    let msg = 'Sessão encerrada. Faça login novamente.';
+    try { msg = (await res.clone().json()).error || msg; } catch(e){}
+    showToast(msg, true);
+    setTimeout(logout, 1500);
+  }
+  return res;
+}
+
+async function sbErro(r, rotulo){
+  let t = '';
+  try { t = await r.text(); } catch(e){}
+  if(r.status === 403) return new Error('Você não tem permissão para esta ação.');
+  return new Error(`${rotulo} ${r.status}: ${t}`);   // texto original (com o código do erro)
+}
+
 async function sbGet(table, params=''){
-  const r = await fetch(`${SB_URL}/rest/v1/${table}?${params}`, { headers: sbHeaders() });
-  if(!r.ok) throw new Error(`GET ${table} ${r.status}`);
+  const r = await sbFetch('GET', table, params);
+  if(r.status === 403) return [];      // módulo sem permissão: tratado como vazio
+  if(!r.ok) throw await sbErro(r, `GET ${table}`);
   return r.json();
 }
 
 async function sbPost(table, body){
-  const r = await fetch(`${SB_URL}/rest/v1/${table}`, {
-    method:'POST', headers: sbHeaders(), body: JSON.stringify(body)
-  });
-  if(!r.ok) throw new Error(`POST ${table} ${r.status}: ${await r.text()}`);
+  const r = await sbFetch('POST', table, '', body);
+  if(!r.ok) throw await sbErro(r, `POST ${table}`);
   return r.json();
 }
 
 async function sbPatch(table, id_col, id_val, body){
-  const r = await fetch(`${SB_URL}/rest/v1/${table}?${id_col}=eq.${encodeURIComponent(id_val)}`, {
-    method:'PATCH', headers: sbHeaders(), body: JSON.stringify(body)
-  });
-  if(!r.ok) throw new Error(`PATCH ${table} ${r.status}: ${await r.text()}`);
+  const r = await sbFetch('PATCH', table, `${id_col}=eq.${encodeURIComponent(id_val)}`, body);
+  if(!r.ok) throw await sbErro(r, `PATCH ${table}`);
   return r.json();
 }
 
 async function sbDelete(table, id_col, id_val){
-  const r = await fetch(`${SB_URL}/rest/v1/${table}?${id_col}=eq.${encodeURIComponent(id_val)}`, {
-    method:'DELETE', headers: sbHeaders({'Prefer':''})
-  });
-  if(!r.ok) throw new Error(`DELETE ${table} ${r.status}`);
+  const r = await sbFetch('DELETE', table, `${id_col}=eq.${encodeURIComponent(id_val)}`, undefined, '');
+  if(!r.ok) throw await sbErro(r, `DELETE ${table}`);
 }
 
 async function sbGetConfig(chave){
@@ -3186,9 +3205,7 @@ async function sbGetConfig(chave){
 }
 
 async function sbSetConfig(chave, valor){
-  await fetch(`${SB_URL}/rest/v1/configuracoes?chave=eq.${chave}`, {
-    method:'PATCH', headers: sbHeaders(), body: JSON.stringify({valor: String(valor)})
-  });
+  await sbFetch('PATCH', 'configuracoes', `chave=eq.${chave}`, { valor: String(valor) });
 }
 
 /* =========================================================
@@ -4315,19 +4332,19 @@ async function loadFromSupabase(){
     // A coluna 'fotos' precisa existir no Supabase; sem ela o recurso de fotos fica desligado
     // Sonda direta: pede só a coluna; se o Supabase responder erro 4xx, a coluna não existe
     try {
-      const rp = await fetch(`${SB_URL}/rest/v1/ordens_servico?select=fotos&limit=1`, { headers: sbHeaders() });
+      const rp = await sbFetch('GET', 'ordens_servico', 'select=fotos&limit=1');
       state.colunaFotos = rp.ok;
     } catch(e){ state.colunaFotos = os.length ? ('fotos' in os[0]) : true; }
 
     // Mesma sonda pras colunas do link de acompanhamento (rodar sql_rastreio_os.sql cria elas)
     try {
-      const rr = await fetch(`${SB_URL}/rest/v1/ordens_servico?select=rastreio_token&limit=1`, { headers: sbHeaders() });
+      const rr = await sbFetch('GET', 'ordens_servico', 'select=rastreio_token&limit=1');
       state.colunaRastreio = rr.ok;
     } catch(e){ state.colunaRastreio = os.length ? ('rastreio_token' in os[0]) : false; }
 
     // Sonda pra coluna de aprovação de orçamento pelo cliente (mesmo script sql_rastreio_os.sql)
     try {
-      const ra = await fetch(`${SB_URL}/rest/v1/ordens_servico?select=aprovacoes_dispositivos&limit=1`, { headers: sbHeaders() });
+      const ra = await sbFetch('GET', 'ordens_servico', 'select=aprovacoes_dispositivos&limit=1');
       state.colunaAprovacoes = ra.ok;
     } catch(e){ state.colunaAprovacoes = os.length ? ('aprovacoes_dispositivos' in os[0]) : false; }
 
@@ -9948,8 +9965,7 @@ async function saveCompra(){
     if(editId){
       await sbPatch('compras', 'id', editId, payload);
       // Deletar itens antigos e reinserir
-      await fetch(`${SB_URL}/rest/v1/compras_itens?compra_id=eq.${editId}`,
-        { method:'DELETE', headers: sbHeaders({'Prefer':''}) });
+      await sbFetch('DELETE', 'compras_itens', `compra_id=eq.${editId}`, undefined, '');
       for(const it of itens){
         await sbPost('compras_itens', { ...it, compra_id: editId });
       }
@@ -10393,10 +10409,7 @@ function iniciarNotificacoes(){
 
 async function checarNotificacoes(){
   try{
-    const res = await fetch(
-      `${SB_URL}/rest/v1/notificacoes?order=criado_em.desc&limit=30&select=id,os_id,os_numero,aparelho,tipo,mensagem,lida,criado_em`,
-      { headers: { apikey: SB_KEY, Authorization: 'Bearer ' + SB_KEY } }
-    );
+    const res = await sbFetch('GET', 'notificacoes', 'order=criado_em.desc&limit=30&select=id,os_id,os_numero,aparelho,tipo,mensagem,lida,criado_em');
     const rows = await res.json();
     if(!Array.isArray(rows)) return;
 
@@ -10480,11 +10493,7 @@ async function marcarNotificacaoLida(id){
   renderNotifBadge(notifCache.filter(n => !n.lida).length);
   renderNotifLista();
   try{
-    await fetch(`${SB_URL}/rest/v1/notificacoes?id=eq.${id}`, {
-      method: 'PATCH',
-      headers: { apikey: SB_KEY, Authorization: 'Bearer ' + SB_KEY, 'Content-Type': 'application/json', Prefer: 'return=minimal' },
-      body: JSON.stringify({ lida: true })
-    });
+    await sbFetch('PATCH', 'notificacoes', `id=eq.${id}`, { lida: true }, 'return=minimal');
   } catch(e){ /* próxima checagem corrige se a marcação não persistir */ }
 }
 
@@ -10495,11 +10504,7 @@ async function marcarTodasNotificacoesLidas(){
   renderNotifBadge(0);
   renderNotifLista();
   try{
-    await fetch(`${SB_URL}/rest/v1/notificacoes?id=in.(${idsNaoLidas.join(',')})`, {
-      method: 'PATCH',
-      headers: { apikey: SB_KEY, Authorization: 'Bearer ' + SB_KEY, 'Content-Type': 'application/json', Prefer: 'return=minimal' },
-      body: JSON.stringify({ lida: true })
-    });
+    await sbFetch('PATCH', 'notificacoes', `id=in.(${idsNaoLidas.join(',')})`, { lida: true }, 'return=minimal');
   } catch(e){ /* próxima checagem corrige se a marcação não persistir */ }
 }
 

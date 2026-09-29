@@ -631,11 +631,16 @@ async function mostrarAcompanhamento(o){
    ========================================================= */
 async function buscarLaudosDaOS(o){
   try {
-    const r = await fetch(`${SB_URL}/rest/v1/laudos_descarte?os_numero=eq.${o.numero}&order=created_at.desc&limit=5`, {
-      headers: { apikey: SB_KEY, Authorization: 'Bearer ' + SB_KEY }
+    // Função segura no banco: só devolve os laudos desta OS com link + senha válidos
+    const senha = sessionStorage.getItem('rastreio_senha_' + token) || '';
+    const r = await fetch(`${SB_URL}/rest/v1/rpc/laudos_rastreio`, {
+      method: 'POST',
+      headers: { apikey: SB_KEY, Authorization: 'Bearer ' + SB_KEY, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ p_token: token, p_senha: senha })
     });
-    if(!r.ok) return []; // tabela pode não existir ainda — não trava o acompanhamento normal
-    return await r.json();
+    if(!r.ok) return []; // função pode não existir ainda — não trava o acompanhamento normal
+    const rows = await r.json();
+    return Array.isArray(rows) ? rows : [];
   } catch(e){ return []; } // falha pontual de rede — tenta de novo no próximo ciclo
 }
 
@@ -666,6 +671,22 @@ function renderLaudoDescarteView(laudo, o){
 // Depois que o cliente decide (autoriza ou pede devolução), busca o estado atual da
 // OS de novo e deixa o mostrarAcompanhamento decidir a próxima tela (não há mais
 // laudo pendente, então ele mesmo libera o acompanhamento normal)
+async function decidirLaudoRastreio(laudo, decisao, nome){
+  const senha = sessionStorage.getItem('rastreio_senha_' + token) || '';
+  const r = await fetch(`${SB_URL}/rest/v1/rpc/decidir_laudo_rastreio`, {
+    method: 'POST',
+    headers: { apikey: SB_KEY, Authorization: 'Bearer ' + SB_KEY, 'Content-Type': 'application/json' },
+    body: JSON.stringify({ p_token: token, p_senha: senha, p_laudo_id: String(laudo.id), p_decisao: decisao, p_nome: nome || null })
+  });
+  if(!r.ok) throw new Error(`Erro ${r.status}`);
+  const res = await r.json();
+  if(!res || !res.ok){
+    // já respondido por outra pessoa/aba: só atualiza a tela
+    if(res && res.motivo === 'ja_respondido') return;
+    throw new Error(res && res.motivo ? res.motivo : 'falha');
+  }
+}
+
 async function avancarAposDecisaoLaudo(){
   laudoDescarteAtivo = null;
   const senha = sessionStorage.getItem('rastreio_senha_' + token);
@@ -695,12 +716,7 @@ async function autorizarLaudoDescarte(){
   const historico = [...(laudo.historico||[]), { date: hoje, text: `Descarte autorizado por ${nome} (via link de acompanhamento).` }];
 
   try {
-    const r = await fetch(`${SB_URL}/rest/v1/laudos_descarte?id=eq.${laudo.id}`, {
-      method: 'PATCH',
-      headers: { apikey: SB_KEY, Authorization: 'Bearer ' + SB_KEY, 'Content-Type': 'application/json', Prefer: 'return=minimal' },
-      body: JSON.stringify({ status: 'Autorizado', autorizado_nome: nome, autorizado_data: hoje, historico })
-    });
-    if(!r.ok) throw new Error(`Erro ${r.status}`);
+    await decidirLaudoRastreio(laudo, 'autorizar', nome);
     await avancarAposDecisaoLaudo();
   } catch(e){
     erro.textContent = 'Não foi possível registrar a autorização agora. Tente novamente em instantes.';
@@ -724,12 +740,7 @@ async function solicitarDevolucaoLaudo(){
   const historico = [...(laudo.historico||[]), { date: hoje, text: 'Cliente solicitou a devolução do(s) aparelho(s) em vez do descarte (via link de acompanhamento).' }];
 
   try {
-    const r = await fetch(`${SB_URL}/rest/v1/laudos_descarte?id=eq.${laudo.id}`, {
-      method: 'PATCH',
-      headers: { apikey: SB_KEY, Authorization: 'Bearer ' + SB_KEY, 'Content-Type': 'application/json', Prefer: 'return=minimal' },
-      body: JSON.stringify({ status: 'Devolução solicitada', historico })
-    });
-    if(!r.ok) throw new Error(`Erro ${r.status}`);
+    await decidirLaudoRastreio(laudo, 'devolver');
     await avancarAposDecisaoLaudo();
   } catch(e){
     erro.textContent = 'Não foi possível registrar sua solicitação agora. Tente novamente em instantes.';
