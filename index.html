@@ -2756,6 +2756,46 @@ async function sbSetConfig(chave, valor){
 }
 
 /* =========================================================
+   USUÁRIOS / PERFIL — Edge Function "usuarios" (exige token de sessão)
+   ========================================================= */
+function getSessionToken(){
+  try { return sessionStorage.getItem('mobit_token') || ''; } catch(e){ return ''; }
+}
+
+async function apiUsuarios(action, body){
+  const res = await fetch(`${SB_URL}/functions/v1/usuarios?action=${encodeURIComponent(action)}`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      apikey: SB_KEY,
+      Authorization: 'Bearer ' + SB_KEY,
+      'x-session-token': getSessionToken()
+    },
+    body: JSON.stringify(body || {})
+  });
+  let data = {};
+  try { data = await res.json(); } catch(e){}
+  if(res.status === 401){
+    showToast(data.error || 'Sessão encerrada. Faça login novamente.', true);
+    setTimeout(logout, 1500);
+    throw new Error(data.error || 'Sessão encerrada');
+  }
+  if(!res.ok || data.error) throw new Error(data.error || ('Erro ' + res.status));
+  return data;
+}
+
+// Atualiza os dados do usuário logado a partir do servidor
+async function atualizarUsuarioAtual(){
+  const r = await apiUsuarios('me');
+  if(r && r.user){
+    sessionStorage.setItem('mobit_user', JSON.stringify(r.user));
+    const userEl = document.getElementById('sidebar-user');
+    if(userEl) userEl.textContent = r.user.nome || r.user.usuario;
+  }
+  return r;
+}
+
+/* =========================================================
    LINK DE ACOMPANHAMENTO (rastreio público da OS)
    ========================================================= */
 // Cache só em memória (nunca persistido) das senhas em texto puro recém-geradas,
@@ -8075,7 +8115,7 @@ async function openTarefaModal(id, colunaInicial){
   const sel = document.getElementById('tarefa-atribuido');
   sel.innerHTML = '<option value="">— Tarefa geral —</option>';
   try {
-    const users = await sbGet('usuarios', 'ativo=eq.true&select=id,nome,usuario&order=nome.asc');
+    const users = await sbGet('usuarios_publico', 'ativo=eq.true&select=id,nome,usuario&order=nome.asc');
     users.forEach(u => {
       const opt = document.createElement('option');
       opt.value = u.id; opt.textContent = u.nome || u.usuario;
@@ -8720,7 +8760,18 @@ function getCurrentUser(){
 
 function logout(){
   clearTimeout(_logoutTimer);
+  const tk = getSessionToken();
+  if(tk){
+    try {
+      fetch(`${SB_URL}/functions/v1/auth?action=logout`, {
+        method:'POST', keepalive:true,
+        headers:{ 'Content-Type':'application/json', apikey:SB_KEY, Authorization:'Bearer '+SB_KEY, 'x-session-token':tk },
+        body:'{}'
+      }).catch(()=>{});
+    } catch(e){}
+  }
   sessionStorage.removeItem('mobit_user');
+  sessionStorage.removeItem('mobit_token');
   try { sessionStorage.removeItem('mobit_pagina'); } catch(e){}
   window.location.href = 'login.html';
 }
@@ -8747,10 +8798,16 @@ function initAutoLogout(){
 (async function init(){
   // Verificar sessão
   const user = getCurrentUser();
-  if(!user){
+  if(!user || !getSessionToken()){
+    sessionStorage.removeItem('mobit_user');
     window.location.href = 'login.html';
     return;
   }
+
+  // Valida a sessão no servidor (usuário desativado / senha resetada → volta pro login)
+  try { await atualizarUsuarioAtual(); }
+  catch(e){ if(/Sess|desativ|senha/i.test(e.message)) return; console.warn('Validação de sessão:', e.message); }
+  setInterval(() => { atualizarUsuarioAtual().catch(()=>{}); }, 10 * 60 * 1000);
 
   // Mostrar nome do usuário logado na sidebar
   const userEl = document.getElementById('sidebar-user');
