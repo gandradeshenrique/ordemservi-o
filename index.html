@@ -723,6 +723,30 @@
     .usr-toolbar select{ flex:1; }
   }
 
+
+  /* ===== Permissões ===== */
+  .perm-wrap{ overflow-x:auto; border:1px solid var(--border); border-radius:var(--radius); max-height:62vh; overflow-y:auto; }
+  .perm-tab{ width:100%; border-collapse:collapse; font-size:13px; }
+  .perm-tab th, .perm-tab td{ padding:8px 10px; border-bottom:1px solid var(--border); text-align:center; }
+  .perm-tab thead th{ position:sticky; top:0; background:var(--panel-2); z-index:2; font-size:11px; text-transform:uppercase; letter-spacing:.04em; color:var(--text-faint); white-space:nowrap; }
+  .perm-tab td:first-child, .perm-tab th:first-child{ text-align:left; }
+  .perm-tab tr.perm-mod td{ background:var(--bg-soft); font-weight:700; color:var(--accent); font-size:12px; text-transform:uppercase; letter-spacing:.05em; }
+  .perm-tab input[type=checkbox]{ width:17px; height:17px; accent-color:var(--accent); cursor:pointer; }
+  .perm-tab input[type=checkbox]:disabled{ cursor:not-allowed; opacity:.55; }
+  .perm-tab td.perm-alt{ background:rgba(251,191,36,.10); }
+  .perm-legenda{ font-size:12px; color:var(--text-faint); margin:10px 0 0; display:flex; gap:14px; flex-wrap:wrap; }
+  .perm-legenda i{ display:inline-block; width:12px; height:12px; border-radius:3px; background:rgba(251,191,36,.25); vertical-align:-2px; margin-right:4px; }
+  .uperm-mod{ font-size:12px; font-weight:700; color:var(--accent); text-transform:uppercase; letter-spacing:.05em; margin:14px 0 6px; }
+  .uperm-row{ display:flex; align-items:center; justify-content:space-between; gap:10px; padding:6px 0; border-bottom:1px solid var(--border); font-size:13px; }
+  .uperm-row select{ width:auto; min-width:170px; padding:6px 8px; font-size:12.5px; }
+  .uperm-row select.exc-lib{ border-color:var(--green); color:var(--green); }
+  .uperm-row select.exc-blq{ border-color:var(--red); color:var(--red); }
+  .uperm-lista{ max-height:52vh; overflow-y:auto; padding-right:4px; }
+  @media (max-width: 600px){
+    .uperm-row{ flex-direction:column; align-items:stretch; }
+    .uperm-row select{ width:100%; }
+  }
+
   /* ── MOBILE (≤ 768px) ── */
   @media (max-width: 768px){
     /* Layout */
@@ -1675,7 +1699,10 @@
           <h1>Usuários</h1>
           <p>Crie, edite e controle o acesso da equipe ao sistema</p>
         </div>
-        <button class="btn btn-primary" onclick="abrirUsuarioModal()">+ Novo usuário</button>
+        <div style="display:flex; gap:8px; flex-wrap:wrap;">
+          <button class="btn" id="btn-perm-perfis" style="display:none;" onclick="abrirPermissoesPerfis()">🛡️ Permissões dos perfis</button>
+          <button class="btn btn-primary" onclick="abrirUsuarioModal()">+ Novo usuário</button>
+        </div>
       </div>
 
       <div class="usr-stats" id="usr-stats"></div>
@@ -2866,19 +2893,32 @@
       </div>
     </div>
     <div id="usr-painel-perm" style="display:none;">
-      <div class="usr-aviso" style="margin-bottom:14px;">
-        🚧 <b>Em breve.</b> Aqui você vai definir o que este usuário pode ver e editar em cada módulo. Por enquanto, todos os usuários ativos têm acesso aos módulos do sistema; só o painel de Usuários é restrito a administradores.
-      </div>
-      <div class="usr-perm-lista">
-        <div class="usr-perm-item">📋 Ordens de serviço</div><div class="usr-perm-item">📦 Estoque</div>
-        <div class="usr-perm-item">👤 Clientes</div><div class="usr-perm-item">💵 Compras</div>
-        <div class="usr-perm-item">📋 Tarefas</div><div class="usr-perm-item">🔍 Cotação</div>
-        <div class="usr-perm-item">🗑️ Laudos de descarte</div><div class="usr-perm-item">☉ Painel / Relatórios</div>
-      </div>
+      <div id="usr-perm-conteudo"></div>
     </div>
     <div class="modal-actions">
       <button class="btn" onclick="closeModal('usr-modal-overlay')">Cancelar</button>
       <button class="btn btn-primary" id="usr-btn-salvar" onclick="salvarUsuario()">Criar usuário</button>
+    </div>
+  </div>
+</div>
+
+
+<!-- ===================== MODAL: PERMISSÕES DOS PERFIS ===================== -->
+<div class="modal-overlay" id="perm-overlay">
+  <div class="modal modal-wide" style="max-width:900px;">
+    <div class="modal-header">
+      <h2>🛡️ Permissões dos perfis</h2>
+      <button class="modal-close" onclick="closeModal('perm-overlay')">&times;</button>
+    </div>
+    <p class="hint" style="margin:-8px 0 12px;">Marque o que cada perfil pode fazer. Vale para todos do perfil, exceto quem tiver uma exceção no próprio cadastro. O Administrador Full tem sempre acesso total.</p>
+    <div class="perm-wrap"><table class="perm-tab" id="perm-tabela"></table></div>
+    <div class="perm-legenda"><span><i></i>Diferente do padrão do sistema</span><span>🔒 Painel de Usuários e permissões seguem o perfil (não editável)</span></div>
+    <div class="modal-actions" style="justify-content:space-between;">
+      <button class="btn btn-ghost" onclick="restaurarPermissoesPerfis()">↺ Restaurar padrão</button>
+      <div style="display:flex; gap:10px;">
+        <button class="btn" onclick="closeModal('perm-overlay')">Cancelar</button>
+        <button class="btn btn-primary" id="perm-btn-salvar" onclick="salvarPermissoesPerfis()">Salvar permissões</button>
+      </div>
     </div>
   </div>
 </div>
@@ -3228,6 +3268,7 @@ function aplicarUsuarioNaUI(u){
   renderAvatar(document.getElementById('sidebar-avatar'), u);
   const navUsr = document.getElementById('nav-usuarios');
   if(navUsr) navUsr.style.display = ehAdminPerfil(u.perfil) ? '' : 'none';
+  if(typeof aplicarPermissoes === 'function') aplicarPermissoes();
   if(document.getElementById('page-perfil')?.classList.contains('active')) preencherPerfil(u);
 }
 
@@ -3847,6 +3888,7 @@ async function carregarUsuarios(){
     const r = await apiUsuarios('admin-listar');
     _usrData = r;
     if(r.perfis) _perfisInfo = r.perfis;
+    document.getElementById('btn-perm-perfis').style.display = r.catalogo ? '' : 'none';
     const sel = document.getElementById('usr-filtro-perfil');
     const atual = sel.value;
     sel.innerHTML = '<option value="">Todos os perfis</option>' +
@@ -3892,6 +3934,7 @@ function renderUsuarios(){
       u.ativo && u.primeiro_acesso ? '<span class="usr-tag usr-tag-warn">Aguardando 1º acesso</span>' : '',
       u.bloqueado ? '<span class="usr-tag usr-tag-err">🔒 Bloqueado</span>' : '',
       souEu ? '<span class="usr-tag usr-tag-eu">Você</span>' : '',
+      u.permissoes && Object.keys(u.permissoes).length && u.perfil !== 'admin_full' ? `<span class="usr-tag usr-tag-warn" title="Tem permissões diferentes do perfil">⚙ ${Object.keys(u.permissoes).length} exceção(ões)</span>` : '',
     ].join('');
     const id = escapeHtml(String(u.id));
     let acoes;
@@ -3952,7 +3995,10 @@ function abrirUsuarioModal(id){
   document.getElementById('usr-perfil').innerHTML = opcoes.map(p =>
     `<option value="${p}">${escapeHtml(nomePerfil(p))}</option>`).join('');
   document.getElementById('usr-perfil').value = u ? u.perfil : (opcoes.includes('tecnico') ? 'tecnico' : opcoes[opcoes.length-1]);
+  window._usrPermEdit = u ? { ...(u.permissoes || {}) } : {};
   usrTrocarAba('dados');
+  renderPermissoesUsuario();
+  document.getElementById('usr-perfil').onchange = renderPermissoesUsuario;
   openModal('usr-modal-overlay');
   setTimeout(() => document.getElementById('usr-nome').focus(), 50);
 }
@@ -3973,6 +4019,7 @@ async function salvarUsuario(){
     if(id){
       const dados = { id, nome, perfil };
       if(loginMudou) dados.usuario = usuario;
+      if(_usrData.catalogo && perfil !== 'admin_full') dados.permissoes = window._usrPermEdit || {};
       await apiUsuarios('admin-editar', dados);
       showToast('Usuário atualizado.');
     } else {
@@ -4069,6 +4116,108 @@ async function verAcessosUsuario(id){
         <span>${formatarDataHora(l.criado_em)}</span>
       </div>`).join('') : '<div class="hint">Nenhum registro ainda.</div>';
   } catch(e){ box.innerHTML = `<div class="hint">${escapeHtml(e.message)}</div>`; }
+}
+
+
+/* =========================================================
+   PERMISSÕES — editor (somente Administrador Full)
+   ========================================================= */
+let _permDados = null;   // { catalogo, matriz_perfis, padrao_perfis }
+const PERM_COLS = ['admin_full','admin','gestao','tecnico','auxiliar'];
+
+async function abrirPermissoesPerfis(){
+  openModal('perm-overlay');
+  document.getElementById('perm-tabela').innerHTML = '<tr><td class="hint">Carregando...</td></tr>';
+  try { _permDados = await apiUsuarios('admin-perm-obter'); renderPermissoesPerfis(); }
+  catch(e){ document.getElementById('perm-tabela').innerHTML = `<tr><td class="hint">${escapeHtml(e.message)}</td></tr>`; }
+}
+
+function renderPermissoesPerfis(){
+  const d = _permDados; if(!d) return;
+  let h = '<thead><tr><th>Ação</th>' + PERM_COLS.map(p => `<th>${escapeHtml(nomePerfil(p))}</th>`).join('') + '</tr></thead><tbody>';
+  for(const mod of d.catalogo){
+    h += `<tr class="perm-mod"><td colspan="${PERM_COLS.length + 1}">${escapeHtml(mod.nome)}</td></tr>`;
+    for(const [k, label] of mod.itens){
+      h += `<tr><td>${escapeHtml(label)}</td>` + PERM_COLS.map(p => {
+        const v = !!d.matriz_perfis[p][k];
+        const alt = p !== 'admin_full' && v !== !!d.padrao_perfis[p][k];
+        return `<td class="${alt ? 'perm-alt' : ''}"><input type="checkbox" ${v ? 'checked' : ''} ${p === 'admin_full' ? 'disabled' : ''}
+          onchange="_permDados.matriz_perfis['${p}']['${k}']=this.checked; renderPermissoesPerfis()"></td>`;
+      }).join('') + '</tr>';
+    }
+  }
+  h += `<tr class="perm-mod"><td colspan="${PERM_COLS.length + 1}">Usuários 🔒</td></tr>
+        <tr><td>Ver/gerenciar usuários</td><td>✅</td><td>✅*</td><td>—</td><td>—</td><td>—</td></tr>
+        <tr><td>Editar permissões</td><td>✅</td><td>—</td><td>—</td><td>—</td><td>—</td></tr>`;
+  h += '</tbody>';
+  const wrap = document.querySelector('#perm-overlay .perm-wrap');
+  const sc = wrap.scrollTop;
+  document.getElementById('perm-tabela').innerHTML = h;
+  wrap.scrollTop = sc;
+}
+
+async function salvarPermissoesPerfis(){
+  const btn = document.getElementById('perm-btn-salvar');
+  btn.disabled = true; btn.textContent = 'Salvando...';
+  try {
+    const perfis = {};
+    ['admin','gestao','tecnico','auxiliar'].forEach(p => perfis[p] = _permDados.matriz_perfis[p]);
+    _permDados = await apiUsuarios('admin-perm-salvar', { perfis });
+    closeModal('perm-overlay');
+    showToast('Permissões salvas. Valem no próximo carregamento de cada usuário.');
+    carregarUsuarios();
+  } catch(e){ showToast(e.message, true); }
+  finally { btn.disabled = false; btn.textContent = 'Salvar permissões'; }
+}
+
+async function restaurarPermissoesPerfis(){
+  const ok = await usrConfirmar({ titulo:'Restaurar padrão', msg:'Todas as permissões dos perfis voltam ao padrão do sistema. As exceções individuais de cada usuário <b>não</b> são alteradas.', botao:'Restaurar' });
+  if(!ok) return;
+  try { _permDados = await apiUsuarios('admin-perm-restaurar'); renderPermissoesPerfis(); showToast('Permissões restauradas ao padrão.'); carregarUsuarios(); }
+  catch(e){ showToast(e.message, true); }
+}
+
+// ---- Exceções por usuário (aba Permissões do cadastro) ----
+function renderPermissoesUsuario(){
+  const box = document.getElementById('usr-perm-conteudo');
+  const id = document.getElementById('usr-id').value;
+  const u = id ? usrBuscar(id) : null;
+  const perfil = document.getElementById('usr-perfil').value;
+  if(!_usrData.catalogo){
+    box.innerHTML = '<div class="usr-aviso">🔒 Somente o <b>Administrador Full</b> pode alterar permissões.</div>'; return;
+  }
+  if(!u){
+    box.innerHTML = '<div class="usr-aviso">Crie o usuário primeiro. Depois, abra <b>Editar</b> para definir exceções de permissão.</div>'; return;
+  }
+  if(perfil === 'admin_full'){
+    box.innerHTML = '<div class="usr-aviso">O <b>Administrador Full</b> tem sempre acesso total — não há exceções.</div>'; return;
+  }
+  const base = (_usrData.matriz_perfis || {})[perfil] || {};
+  const exc = window._usrPermEdit || {};
+  let h = `<div class="usr-aviso" style="margin-bottom:6px;">Por padrão, vale o que está definido para o perfil <b>${escapeHtml(nomePerfil(perfil))}</b>. Use <b>Liberar</b> ou <b>Bloquear</b> só para abrir exceções para esta pessoa.</div><div class="uperm-lista">`;
+  for(const mod of _usrData.catalogo){
+    h += `<div class="uperm-mod">${escapeHtml(mod.nome)}</div>`;
+    for(const [k, label] of mod.itens){
+      const v = exc[k] === true ? 'lib' : exc[k] === false ? 'blq' : 'pad';
+      h += `<div class="uperm-row"><span>${escapeHtml(label)}</span>
+        <select class="${v === 'lib' ? 'exc-lib' : v === 'blq' ? 'exc-blq' : ''}" onchange="usrPermSet('${k}', this.value)">
+          <option value="pad" ${v === 'pad' ? 'selected' : ''}>Padrão do perfil (${base[k] ? '✅ pode' : '❌ não pode'})</option>
+          <option value="lib" ${v === 'lib' ? 'selected' : ''}>✅ Liberar</option>
+          <option value="blq" ${v === 'blq' ? 'selected' : ''}>⛔ Bloquear</option>
+        </select></div>`;
+    }
+  }
+  h += '</div>';
+  const lista = box.querySelector('.uperm-lista'); const sc = lista ? lista.scrollTop : 0;
+  box.innerHTML = h;
+  const nl = box.querySelector('.uperm-lista'); if(nl) nl.scrollTop = sc;
+}
+
+function usrPermSet(k, v){
+  window._usrPermEdit = window._usrPermEdit || {};
+  if(v === 'pad') delete window._usrPermEdit[k];
+  else window._usrPermEdit[k] = (v === 'lib');
+  renderPermissoesUsuario();
 }
 
 /* =========================================================
@@ -4272,7 +4421,8 @@ function showLoadingOverlay(show){
    NAVEGAÇÃO
    ========================================================= */
 function goToPage(page){
-  if(page === 'usuarios' && !ehAdminPerfil((getCurrentUser() || {}).perfil)) page = 'dashboard';
+  if(page === 'usuarios' && !ehAdminPerfil((getCurrentUser() || {}).perfil)) page = primeiraPaginaPermitida();
+  if(PERM_PAGINAS[page] && !pode(PERM_PAGINAS[page])) page = primeiraPaginaPermitida();
   document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
   document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
   document.getElementById('page-' + page).classList.add('active');
@@ -5990,6 +6140,7 @@ function wzRefresh(){
 }
 
 function wzShow(n){
+  if(n === 6 && !pode('os.custos')) n = (wzCurrent > 6 ? 5 : 7);
   wzCurrent = n;
   document.querySelectorAll('#os-modal-overlay fieldset[data-step]').forEach(f => {
     f.style.display = (f.dataset.step || '').split(' ').includes(String(n)) ? '' : 'none';
@@ -10074,6 +10225,112 @@ function initAutoLogout(){
   resetTimer(); // inicia o primeiro timer
 }
 
+
+/* =========================================================
+   PERMISSÕES — aplicação na interface (Etapa A)
+   ========================================================= */
+function pode(chave){
+  const u = getCurrentUser();
+  const p = u && u.permissoes_efetivas;
+  if(!p) return true;            // ainda não carregou: não bloqueia
+  return p[chave] !== false;
+}
+
+// Página → permissão para ver
+const PERM_PAGINAS = { dashboard:'painel.ver', ordens:'os.ver', estoque:'estoque.ver', clientes:'clientes.ver',
+  compras:'compras.ver', kanban:'tarefas.ver', cotacao:'cotacao.usar', laudos:'laudos.ver' };
+
+// Função global → permissão exigida (string ou função dos argumentos)
+const PERM_FUNCOES = {
+  deleteOS:'os.excluir', quickUpdateStatus:'os.status', abrirLinkAcompanhamento:'os.rastreio', gerarNovoLinkRastreio:'os.rastreio', printOS:'os.imprimir',
+  openOSModal: (id) => id ? 'os.editar' : 'os.criar',
+  openStockModal:'estoque.editar', saveStockItem:'estoque.editar', deleteStockItem:'estoque.excluir', openPedidoModal:'estoque.importar_nf',
+  openClientModal:'clientes.editar', openClientModalFromOS:'clientes.editar', saveClient:'clientes.editar', deleteClient:'clientes.excluir',
+  openCompraModal:'compras.editar', saveCompra:'compras.editar', openLancarNFModal:'compras.editar',
+  marcarPago:'compras.pagamento', marcarPendente:'compras.pagamento', deleteCompra:'compras.excluir',
+  saveTarefa:'tarefas.editar', deleteTarefa:'tarefas.excluir', openNovaColuna:'tarefas.colunas', removerColuna:'tarefas.colunas', saveColunas:'tarefas.colunas',
+  openLaudoAvulsoModal:'laudos.editar', saveLaudoAvulso:'laudos.editar', marcarDevolvidoLaudo:'laudos.status', marcarDescartadoLaudo:'laudos.status', printLaudo:'laudos.ver',
+  exportCSV:'dados.exportar', exportComprasCSV:'dados.exportar', importData:'dados.importar',
+  exportDashboardCSV:'painel.exportar', exportDashboardPDF:'painel.exportar', toggleExportMenu:'painel.exportar',
+};
+
+// CSS que esconde os botões de cada ação sem permissão (classe np-<chave> no <body>)
+const PERM_CSS = {
+  'painel.ver':       '.nav-item[data-page="dashboard"], #bn-dashboard',
+  'painel.financeiro':'#dash-kpis, .card:has(#chart-fat-diario), .card:has(#chart-fornecedor), .card:has(#chart-lucro), .card:has(#chart-pecas)',
+  'painel.exportar':  '[onclick^="toggleExportMenu"]',
+  'os.ver':           '.nav-item[data-page="ordens"], #bn-ordens',
+  'os.criar':         '[onclick^="openOSModal()"], #fab-nova-os',
+  'os.editar':        '[onclick^="openOSModal(\'"], #os-view-edit-btn',
+  'os.excluir':       '[onclick^="deleteOS("], #os-view-del-btn',
+  'os.rastreio':      '#os-view-link-btn, [onclick^="abrirLinkAcompanhamento("], [onclick^="gerarNovoLinkRastreio("]',
+  'os.imprimir':      '[onclick^="printOS("]',
+  'os.custos':        '.wz-step[data-go="6"]',
+  'estoque.ver':      '.nav-item[data-page="estoque"], #bn-estoque',
+  'estoque.custo':    'table:has(#stock-table-body) th:nth-child(8), #stock-table-body td:nth-child(8), .field:has(#stock-custo)',
+  'estoque.editar':   '[onclick^="openStockModal("]',
+  'estoque.importar_nf':'[onclick^="openPedidoModal("]',
+  'estoque.excluir':  '[onclick^="deleteStockItem("]',
+  'clientes.ver':     '.nav-item[data-page="clientes"], #bn-clientes',
+  'clientes.editar':  '[onclick^="openClientModal("], [onclick^="openClientModalFromOS("]',
+  'clientes.excluir': '[onclick^="deleteClient("]',
+  'compras.ver':      '.nav-item[data-page="compras"]',
+  'compras.editar':   '[onclick^="openCompraModal("], [onclick^="openLancarNFModal("]',
+  'compras.pagamento':'[onclick^="marcarPago("], [onclick^="marcarPendente("]',
+  'compras.excluir':  '[onclick^="deleteCompra("]',
+  'tarefas.ver':      '.nav-item[data-page="kanban"]',
+  'tarefas.editar':   '[onclick^="openTarefaModal()"], [onclick^="openTarefaModal(null"], #tarefa-modal-overlay .modal-actions .btn-primary',
+  'tarefas.excluir':  '[onclick^="deleteTarefa("]',
+  'tarefas.colunas':  '[onclick^="openNovaColuna("], [onclick^="removerColuna("]',
+  'cotacao.usar':     '.nav-item[data-page="cotacao"]',
+  'laudos.ver':       '.nav-item[data-page="laudos"]',
+  'laudos.editar':    '[onclick^="openLaudoAvulsoModal("]',
+  'laudos.status':    '[onclick^="marcarDevolvidoLaudo("], [onclick^="marcarDescartadoLaudo("]',
+  'dados.exportar':   '[onclick^="exportCSV("], [onclick^="exportComprasCSV("]',
+  'dados.importar':   '[onclick^="importData("], #data-modal-overlay input[type=file]',
+};
+
+(function instalarGuardasPermissao(){
+  // estilo
+  const css = Object.entries(PERM_CSS).map(([k, sel]) =>
+    sel.split(',').map(x => `body.np-${k.replace(/\./g,'-')} ${x.trim()}`).join(',\n') + '{ display:none !important; }').join('\n') +
+    '\nbody.np-dados-menu [onclick^="openDataModal("]{ display:none !important; }' +
+    '\nbody.np-os-valores #os-mao-obra, body.np-os-valores .part-preco{ pointer-events:none; opacity:.55; background:var(--panel-2); }';
+  const st = document.createElement('style'); st.id = 'perm-css'; st.textContent = css;
+  document.head.appendChild(st);
+  // funções
+  for(const [fn, regra] of Object.entries(PERM_FUNCOES)){
+    const orig = window[fn];
+    if(typeof orig !== 'function') continue;
+    window[fn] = function(...args){
+      const chave = typeof regra === 'function' ? regra(...args) : regra;
+      if(!pode(chave)){ showToast('Você não tem permissão para esta ação.', true); return; }
+      return orig.apply(this, args);
+    };
+  }
+  // valores da OS: impede edição de mão de obra / preço de peça
+  document.addEventListener('focusin', e => {
+    if(e.target.matches && e.target.matches('#os-mao-obra, .part-preco') && !pode('os.valores')) e.target.blur();
+  });
+})();
+
+function aplicarPermissoes(){
+  const u = getCurrentUser(); if(!u || !u.permissoes_efetivas) return;
+  const b = document.body;
+  [...b.classList].filter(c => c.startsWith('np-')).forEach(c => b.classList.remove(c));
+  for(const [k, v] of Object.entries(u.permissoes_efetivas)) if(v === false) b.classList.add('np-' + k.replace(/\./g,'-'));
+  if(!pode('dados.exportar') && !pode('dados.importar')) b.classList.add('np-dados-menu');
+  // se a página atual não é permitida, vai para a primeira permitida
+  const atual = document.querySelector('.page.active');
+  const pag = atual ? atual.id.replace('page-','') : 'dashboard';
+  if(PERM_PAGINAS[pag] && !pode(PERM_PAGINAS[pag])) goToPage(primeiraPaginaPermitida());
+}
+
+function primeiraPaginaPermitida(){
+  for(const [pg, k] of Object.entries(PERM_PAGINAS)) if(pode(k)) return pg;
+  return 'perfil';
+}
+
 /* =========================================================
    INICIALIZAÇÃO
    ========================================================= */
@@ -10092,7 +10349,7 @@ function initAutoLogout(){
   setInterval(() => { atualizarUsuarioAtual().catch(()=>{}); }, 10 * 60 * 1000);
 
   // Mostrar nome do usuário logado na sidebar
-  aplicarUsuarioNaUI(user);
+  aplicarUsuarioNaUI(getCurrentUser() || user);
 
   // Iniciar auto-logout por inatividade (3 horas)
   initAutoLogout();
