@@ -2853,7 +2853,7 @@
       <div class="field-row">
         <div class="field">
           <label>Usuário (login) *</label>
-          <input type="text" id="usr-login" maxlength="30" placeholder="ex: joao.silva" autocomplete="off" oninput="usrNormalizarLogin(this)">
+          <input type="text" id="usr-login" maxlength="40" placeholder="ex: joao.silva" autocomplete="off" oninput="usrNormalizarLogin(this)">
           <div class="hint">Letras minúsculas, números, ponto, hífen ou _</div>
         </div>
         <div class="field">
@@ -3963,12 +3963,17 @@ async function salvarUsuario(){
   const usuario = document.getElementById('usr-login').value.trim();
   const perfil = document.getElementById('usr-perfil').value;
   if(nome.length < 2){ showToast('Informe o nome.', true); return; }
-  if(!/^[a-z0-9._-]{3,30}$/.test(usuario)){ showToast('Login inválido: use 3 a 30 letras minúsculas, números, ponto, hífen ou _.', true); return; }
+  const original = id ? (usrBuscar(id) || {}).usuario : null;
+  const loginMudou = !id || usuario !== original;
+  if(loginMudou && !/^[a-z0-9._-]{3,30}$/.test(usuario)){ showToast('Login inválido: use 3 a 30 letras minúsculas, números, ponto, hífen ou _.', true); return; }
   const btn = document.getElementById('usr-btn-salvar');
+  if(btn.disabled) return;
   btn.disabled = true;
   try {
     if(id){
-      await apiUsuarios('admin-editar', { id, nome, usuario, perfil });
+      const dados = { id, nome, perfil };
+      if(loginMudou) dados.usuario = usuario;
+      await apiUsuarios('admin-editar', dados);
       showToast('Usuário atualizado.');
     } else {
       await apiUsuarios('admin-criar', { nome, usuario, perfil });
