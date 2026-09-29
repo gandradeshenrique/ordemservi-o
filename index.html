@@ -585,6 +585,75 @@
     thead th{ padding:10px 12px; }
   }
 
+
+  /* ===== Perfil / Avatar ===== */
+  .avatar{
+    border-radius:50%; flex-shrink:0; overflow:hidden;
+    display:inline-flex; align-items:center; justify-content:center;
+    background:var(--accent); color:#fff; font-weight:700;
+    letter-spacing:.02em; user-select:none;
+  }
+  .avatar img{ width:100%; height:100%; object-fit:cover; display:block; }
+  .avatar-sm{ width:36px; height:36px; font-size:13px; }
+  .avatar-xl{ width:112px; height:112px; font-size:38px; }
+
+  .perfil-card{
+    display:flex; align-items:center; gap:10px; width:100%;
+    background:var(--panel); border:1px solid var(--border); border-radius:10px;
+    padding:8px 10px; cursor:pointer; text-align:left; font-family:var(--sans);
+    transition:border-color .15s, background .15s;
+  }
+  .perfil-card:hover{ border-color:var(--accent-dim); }
+  .perfil-card.active{ border-color:var(--accent); background:var(--accent-bg); }
+  .perfil-card-txt{ display:flex; flex-direction:column; min-width:0; line-height:1.25; }
+  .perfil-card-txt strong{ font-size:13px; color:var(--text); font-weight:600; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .perfil-card-txt span{ font-size:11.5px; color:var(--text-faint); }
+
+  .perfil-grid{ display:grid; grid-template-columns:300px 1fr; gap:18px; align-items:start; }
+  .perfil-col{ display:flex; flex-direction:column; gap:18px; min-width:0; }
+  .perfil-id{ display:flex; flex-direction:column; align-items:center; text-align:center; gap:6px; padding:26px 20px; }
+  .perfil-avatar-wrap{ position:relative; margin-bottom:8px; }
+  .perfil-avatar-btn{
+    position:absolute; right:0; bottom:0; width:34px; height:34px; border-radius:50%;
+    background:var(--panel-2); border:2px solid var(--panel); color:var(--text);
+    cursor:pointer; display:flex; align-items:center; justify-content:center; font-size:15px;
+  }
+  .perfil-avatar-btn:hover{ background:var(--accent); }
+  .perfil-id h2{ font-size:18px; font-weight:600; }
+  .perfil-id .mono{ font-size:12px; }
+  .perfil-meta{ font-size:12px; color:var(--text-faint); margin-top:4px; }
+  .perfil-cores{ display:flex; flex-wrap:wrap; gap:8px; justify-content:center; margin-top:6px; }
+  .perfil-cor{ width:24px; height:24px; border-radius:50%; cursor:pointer; border:2px solid transparent; transition:transform .12s; }
+  .perfil-cor:hover{ transform:scale(1.1); }
+  .perfil-cor.sel{ border-color:#fff; box-shadow:0 0 0 2px var(--accent); }
+  .perfil-sec-title{ font-size:14px; font-weight:600; margin-bottom:14px; display:flex; align-items:center; gap:8px; }
+  .perfil-reqs{ display:grid; grid-template-columns:1fr 1fr; gap:4px 12px; margin:-4px 0 14px; }
+  .perfil-req{ font-size:12px; color:var(--text-faint); }
+  .perfil-req.ok{ color:var(--green); }
+  .perfil-forca{ display:flex; gap:4px; margin:-6px 0 4px; }
+  .perfil-forca div{ height:3px; flex:1; border-radius:2px; background:var(--border); }
+  .tema-opcoes{ display:grid; grid-template-columns:repeat(3,1fr); gap:10px; }
+  .tema-opt{
+    border:1px solid var(--border); border-radius:10px; padding:12px; background:var(--bg-soft);
+    display:flex; flex-direction:column; gap:8px; font-size:13px; color:var(--text); cursor:pointer; font-family:var(--sans); text-align:left;
+  }
+  .tema-opt.sel{ border-color:var(--accent); box-shadow:0 0 0 2px var(--accent-bg); }
+  .tema-opt:disabled{ opacity:.5; cursor:not-allowed; }
+  .tema-opt small{ font-size:11px; color:var(--text-faint); }
+  .tema-prev{ height:44px; border-radius:6px; border:1px solid var(--border); }
+  .acessos-lista{ display:flex; flex-direction:column; }
+  .acesso-item{ display:flex; justify-content:space-between; gap:12px; padding:9px 0; border-bottom:1px solid var(--border); font-size:13px; }
+  .acesso-item:last-child{ border-bottom:none; }
+  .acesso-item span:last-child{ color:var(--text-faint); font-size:12px; white-space:nowrap; }
+
+  @media (max-width: 900px){
+    .perfil-grid{ grid-template-columns:1fr; }
+  }
+  @media (max-width: 520px){
+    .perfil-reqs{ grid-template-columns:1fr; }
+    .tema-opcoes{ grid-template-columns:1fr; }
+  }
+
   /* ── MOBILE (≤ 768px) ── */
   @media (max-width: 768px){
     /* Layout */
@@ -1090,14 +1159,15 @@
       <span class="nav-icon">&#128196;</span> Relatórios / Dados
     </button>
 
-    <div class="sidebar-footer" style="display:flex;flex-direction:column;gap:6px;align-items:flex-start;">
-      <div style="display:flex;align-items:center;gap:8px;width:100%;">
-        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="color:var(--accent);flex-shrink:0;">
-          <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/>
-        </svg>
-        <span id="sidebar-user" style="font-size:13px;color:var(--text);font-weight:500;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">—</span>
-      </div>
-      <button onclick="logout()" style="background:none;border:1px solid var(--border);border-radius:6px;color:var(--text-dim);font-size:12px;padding:5px 10px;cursor:pointer;width:100%;text-align:left;display:flex;align-items:center;gap:6px;transition:all .2s;"
+    <div class="sidebar-footer" style="display:flex;flex-direction:column;gap:8px;align-items:stretch;">
+      <button class="perfil-card" id="sidebar-perfil-card" onclick="goToPage('perfil')" title="Meu perfil">
+        <span class="avatar avatar-sm" id="sidebar-avatar"></span>
+        <span class="perfil-card-txt">
+          <strong id="sidebar-user">—</strong>
+          <span>Ver perfil</span>
+        </span>
+      </button>
+      <button onclick="logout()" style="background:none;border:1px solid var(--border);border-radius:6px;color:var(--text-dim);font-size:12px;padding:6px 10px;cursor:pointer;width:100%;text-align:left;display:flex;align-items:center;gap:6px;transition:all .2s;"
         onmouseover="this.style.borderColor='var(--red)';this.style.color='var(--red)'"
         onmouseout="this.style.borderColor='var(--border)';this.style.color='var(--text-dim)'">
         <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -1521,6 +1591,120 @@
         <div style="font-size:13px; font-weight:700; margin-bottom:12px; color:var(--text);">🕐 Cotações recentes</div>
         <div id="cotacao-historico-body">
           <div style="color:var(--text-faint); font-size:13px; text-align:center; padding:12px 0;">Nenhuma cotação realizada nesta sessão.</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ===================== MEU PERFIL ===================== -->
+    <div class="page" id="page-perfil">
+      <div class="page-header">
+        <div>
+          <h1>Meu perfil</h1>
+          <p>Seus dados, foto, senha e preferências</p>
+        </div>
+      </div>
+
+      <div class="perfil-grid">
+        <!-- Coluna esquerda: identidade -->
+        <div class="perfil-col">
+          <div class="card perfil-id">
+            <div class="perfil-avatar-wrap">
+              <span class="avatar avatar-xl" id="perfil-avatar"></span>
+              <button class="perfil-avatar-btn" title="Trocar foto" onclick="document.getElementById('perfil-foto-input').click()">📷</button>
+              <input type="file" id="perfil-foto-input" accept="image/*" style="display:none;" onchange="perfilFotoSelecionada(this)">
+            </div>
+            <h2 id="perfil-nome-exib">—</h2>
+            <span class="mono" id="perfil-login-exib">@—</span>
+            <span class="badge badge-aberto" id="perfil-perfil-exib" style="margin-top:4px;">—</span>
+            <div class="perfil-meta" id="perfil-desde"></div>
+
+            <div style="display:flex; gap:8px; margin-top:14px; flex-wrap:wrap; justify-content:center;">
+              <button class="btn btn-sm" onclick="document.getElementById('perfil-foto-input').click()">Trocar foto</button>
+              <button class="btn btn-sm btn-ghost" id="perfil-btn-remover-foto" onclick="perfilRemoverFoto()">Remover foto</button>
+            </div>
+
+            <div style="width:100%; border-top:1px solid var(--border); margin-top:16px; padding-top:14px;">
+              <div class="hint" style="margin:0 0 6px;">Cor do avatar (quando sem foto)</div>
+              <div class="perfil-cores" id="perfil-cores"></div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Coluna direita -->
+        <div class="perfil-col">
+          <div class="card">
+            <div class="perfil-sec-title">👤 Dados pessoais</div>
+            <div class="field">
+              <label>Nome de exibição</label>
+              <input type="text" id="perfil-nome" maxlength="80" placeholder="Seu nome">
+            </div>
+            <div class="field-row">
+              <div class="field mb-0">
+                <label>Usuário (login)</label>
+                <input type="text" id="perfil-usuario" disabled>
+              </div>
+              <div class="field mb-0">
+                <label>Perfil de acesso</label>
+                <input type="text" id="perfil-perfil" disabled>
+              </div>
+            </div>
+            <div class="hint">Login e perfil só podem ser alterados por um administrador.</div>
+            <div style="display:flex; justify-content:flex-end; margin-top:14px;">
+              <button class="btn btn-primary" id="perfil-btn-salvar-nome" onclick="perfilSalvarNome()">Salvar dados</button>
+            </div>
+          </div>
+
+          <div class="card">
+            <div class="perfil-sec-title">🔒 Alterar senha</div>
+            <div class="field">
+              <label>Senha atual</label>
+              <input type="password" id="perfil-senha-atual" autocomplete="current-password">
+            </div>
+            <div class="field-row">
+              <div class="field">
+                <label>Nova senha</label>
+                <input type="password" id="perfil-senha-nova" autocomplete="new-password" oninput="perfilValidarSenha()">
+              </div>
+              <div class="field">
+                <label>Confirmar nova senha</label>
+                <input type="password" id="perfil-senha-conf" autocomplete="new-password" oninput="perfilValidarSenha()">
+              </div>
+            </div>
+            <div id="perfil-senha-feedback" style="display:none;">
+              <div class="perfil-forca" id="perfil-forca"><div></div><div></div><div></div><div></div></div>
+              <div class="hint" id="perfil-forca-label" style="margin:0 0 10px;"></div>
+              <div class="perfil-reqs" id="perfil-reqs"></div>
+            </div>
+            <div class="hint">Ao alterar a senha, você será desconectado dos outros aparelhos.</div>
+            <div style="display:flex; justify-content:flex-end; margin-top:14px;">
+              <button class="btn btn-primary" id="perfil-btn-senha" onclick="perfilTrocarSenha()">Alterar senha</button>
+            </div>
+          </div>
+
+          <div class="card">
+            <div class="perfil-sec-title">🎨 Aparência</div>
+            <div class="tema-opcoes">
+              <button class="tema-opt sel" type="button">
+                <div class="tema-prev" style="background:linear-gradient(135deg,#15181c 60%,#20262c 60%);"></div>
+                Escuro<small>Tema atual</small>
+              </button>
+              <button class="tema-opt" type="button" disabled>
+                <div class="tema-prev" style="background:linear-gradient(135deg,#f4f6f8 60%,#ffffff 60%);"></div>
+                Claro<small>Em breve</small>
+              </button>
+              <button class="tema-opt" type="button" disabled>
+                <div class="tema-prev" style="background:linear-gradient(135deg,#15181c 50%,#f4f6f8 50%);"></div>
+                Automático<small>Em breve · segue o aparelho</small>
+              </button>
+            </div>
+          </div>
+
+          <div class="card">
+            <div class="perfil-sec-title">🕐 Últimos acessos</div>
+            <div class="acessos-lista" id="perfil-acessos">
+              <div class="hint">Carregando...</div>
+            </div>
+          </div>
         </div>
       </div>
     </div>
@@ -2787,12 +2971,229 @@ async function apiUsuarios(action, body){
 // Atualiza os dados do usuário logado a partir do servidor
 async function atualizarUsuarioAtual(){
   const r = await apiUsuarios('me');
-  if(r && r.user){
-    sessionStorage.setItem('mobit_user', JSON.stringify(r.user));
-    const userEl = document.getElementById('sidebar-user');
-    if(userEl) userEl.textContent = r.user.nome || r.user.usuario;
-  }
+  if(r && r.perfis) _perfisInfo = r.perfis;
+  if(r && r.user) aplicarUsuarioNaUI(r.user);
   return r;
+}
+
+
+/* =========================================================
+   MEU PERFIL — avatar, dados, senha, acessos
+   ========================================================= */
+let _perfisInfo = {
+  admin_full:{ nome:'Administrador Full' }, admin:{ nome:'Administrador' },
+  gestao:{ nome:'Gestão' }, tecnico:{ nome:'Técnico' }, auxiliar:{ nome:'Auxiliar Técnico' }
+};
+const AVATAR_CORES = ['#2da0e0','#28a745','#20c997','#6f42c1','#e83e8c','#fd7e14','#dc3545','#6c757d'];
+
+function nomePerfil(p){ return (_perfisInfo[p] && _perfisInfo[p].nome) || p || '—'; }
+
+function iniciaisDe(nome){
+  const partes = String(nome || '').trim().split(/\s+/).filter(Boolean);
+  if(!partes.length) return '?';
+  const ini = partes.length === 1 ? partes[0].slice(0,2) : partes[0][0] + partes[partes.length-1][0];
+  return ini.toUpperCase();
+}
+
+// Preenche um elemento .avatar com a foto ou as iniciais
+function renderAvatar(el, u){
+  if(!el || !u) return;
+  el.style.background = u.avatar_cor || 'var(--accent)';
+  if(u.avatar_url){
+    el.innerHTML = `<img src="${escapeHtml(u.avatar_url)}" alt="">`;
+    const img = el.querySelector('img');
+    img.onerror = () => { el.textContent = iniciaisDe(u.nome || u.usuario); };
+  } else {
+    el.textContent = iniciaisDe(u.nome || u.usuario);
+  }
+}
+
+function aplicarUsuarioNaUI(u){
+  if(!u) return;
+  sessionStorage.setItem('mobit_user', JSON.stringify(u));
+  const userEl = document.getElementById('sidebar-user');
+  if(userEl) userEl.textContent = u.nome || u.usuario;
+  renderAvatar(document.getElementById('sidebar-avatar'), u);
+  if(document.getElementById('page-perfil')?.classList.contains('active')) preencherPerfil(u);
+}
+
+function preencherPerfil(u){
+  renderAvatar(document.getElementById('perfil-avatar'), u);
+  document.getElementById('perfil-nome-exib').textContent = u.nome || u.usuario;
+  document.getElementById('perfil-login-exib').textContent = '@' + u.usuario;
+  document.getElementById('perfil-perfil-exib').textContent = nomePerfil(u.perfil);
+  document.getElementById('perfil-desde').textContent = u.criado_em
+    ? 'Membro desde ' + new Date(u.criado_em).toLocaleDateString('pt-BR', { month:'long', year:'numeric' })
+    : '';
+  document.getElementById('perfil-btn-remover-foto').style.display = u.avatar_url ? '' : 'none';
+  const nomeInp = document.getElementById('perfil-nome');
+  if(document.activeElement !== nomeInp) nomeInp.value = u.nome || '';
+  document.getElementById('perfil-usuario').value = u.usuario || '';
+  document.getElementById('perfil-perfil').value = nomePerfil(u.perfil);
+  document.getElementById('perfil-cores').innerHTML = AVATAR_CORES.map(c =>
+    `<div class="perfil-cor ${c.toLowerCase() === String(u.avatar_cor||'').toLowerCase() ? 'sel' : ''}" style="background:${c}" title="${c}" onclick="perfilSalvarCor('${c}')"></div>`
+  ).join('');
+}
+
+async function renderPerfilPage(){
+  const u = getCurrentUser();
+  if(u) preencherPerfil(u);
+  document.getElementById('perfil-senha-atual').value = '';
+  document.getElementById('perfil-senha-nova').value = '';
+  document.getElementById('perfil-senha-conf').value = '';
+  perfilValidarSenha();
+  try { await atualizarUsuarioAtual(); } catch(e){}
+  carregarAcessosPerfil();
+}
+
+const ACOES_LOG = {
+  LOGIN:'Entrou no sistema', LOGOUT:'Saiu do sistema', TROCAR_SENHA:'Alterou a senha',
+  PERFIL_NOME:'Alterou o nome', ADMIN_CRIAR_USUARIO:'Criou um usuário', ADMIN_EDITAR_USUARIO:'Editou um usuário',
+  ADMIN_RESET_SENHA:'Redefiniu uma senha', ADMIN_DESATIVAR:'Desativou um usuário', ADMIN_REATIVAR:'Reativou um usuário',
+  ADMIN_DESBLOQUEAR:'Desbloqueou um usuário', ADMIN_EXCLUIR_USUARIO:'Excluiu um usuário'
+};
+function formatarDataHora(iso){
+  if(!iso) return '—';
+  const d = new Date(iso);
+  return d.toLocaleDateString('pt-BR') + ' ' + d.toLocaleTimeString('pt-BR', { hour:'2-digit', minute:'2-digit' });
+}
+
+async function carregarAcessosPerfil(){
+  const box = document.getElementById('perfil-acessos');
+  try {
+    const r = await apiUsuarios('perfil-acessos');
+    const logs = r.logs || [];
+    box.innerHTML = logs.length ? logs.map(l => `
+      <div class="acesso-item">
+        <span>${escapeHtml(ACOES_LOG[l.acao] || l.acao)}</span>
+        <span>${formatarDataHora(l.criado_em)}</span>
+      </div>`).join('') : '<div class="hint">Nenhum registro ainda.</div>';
+  } catch(e){
+    box.innerHTML = `<div class="hint">Não foi possível carregar: ${escapeHtml(e.message)}</div>`;
+  }
+}
+
+async function perfilSalvarNome(){
+  const nome = document.getElementById('perfil-nome').value.trim();
+  if(nome.length < 2){ showToast('Informe um nome com pelo menos 2 letras.', true); return; }
+  const btn = document.getElementById('perfil-btn-salvar-nome');
+  btn.disabled = true; btn.textContent = 'Salvando...';
+  try {
+    const r = await apiUsuarios('perfil-atualizar', { nome });
+    aplicarUsuarioNaUI(r.user); preencherPerfil(r.user);
+    showToast('Dados atualizados.');
+    carregarAcessosPerfil();
+  } catch(e){ showToast(e.message, true); }
+  finally { btn.disabled = false; btn.textContent = 'Salvar dados'; }
+}
+
+async function perfilSalvarCor(cor){
+  try {
+    const r = await apiUsuarios('perfil-atualizar', { avatar_cor: cor });
+    aplicarUsuarioNaUI(r.user); preencherPerfil(r.user);
+  } catch(e){ showToast(e.message, true); }
+}
+
+// Recorta a imagem no centro (quadrado) e reduz para 256px antes de enviar
+function prepararFotoAvatar(file){
+  return new Promise((resolve, reject) => {
+    const url = URL.createObjectURL(file);
+    const img = new Image();
+    img.onload = () => {
+      const lado = Math.min(img.width, img.height);
+      const sx = (img.width - lado) / 2, sy = (img.height - lado) / 2;
+      const canvas = document.createElement('canvas');
+      canvas.width = canvas.height = 256;
+      const ctx = canvas.getContext('2d');
+      ctx.fillStyle = '#fff'; ctx.fillRect(0, 0, 256, 256);
+      ctx.drawImage(img, sx, sy, lado, lado, 0, 0, 256, 256);
+      URL.revokeObjectURL(url);
+      resolve(canvas.toDataURL('image/jpeg', 0.85));
+    };
+    img.onerror = () => { URL.revokeObjectURL(url); reject(new Error('Não foi possível ler a imagem.')); };
+    img.src = url;
+  });
+}
+
+async function perfilFotoSelecionada(input){
+  const file = input.files && input.files[0];
+  input.value = '';
+  if(!file) return;
+  if(!file.type.startsWith('image/')){ showToast('Selecione um arquivo de imagem.', true); return; }
+  const av = document.getElementById('perfil-avatar');
+  av.style.opacity = '.5';
+  try {
+    const dataUrl = await prepararFotoAvatar(file);
+    const r = await apiUsuarios('perfil-avatar', { imagem: dataUrl });
+    aplicarUsuarioNaUI(r.user); preencherPerfil(r.user);
+    showToast('Foto atualizada.');
+  } catch(e){ showToast(e.message, true); }
+  finally { av.style.opacity = '1'; }
+}
+
+async function perfilRemoverFoto(){
+  if(!confirm('Remover sua foto de perfil?')) return;
+  try {
+    const r = await apiUsuarios('perfil-avatar-remover');
+    aplicarUsuarioNaUI(r.user); preencherPerfil(r.user);
+    showToast('Foto removida.');
+  } catch(e){ showToast(e.message, true); }
+}
+
+function perfilRequisitos(senha, usuario){
+  return [
+    { ok: senha.length >= 8,           texto: 'Mínimo de 8 caracteres' },
+    { ok: /[A-Z]/.test(senha),         texto: '1 letra maiúscula' },
+    { ok: /[a-z]/.test(senha),         texto: '1 letra minúscula' },
+    { ok: /[0-9]/.test(senha),         texto: '1 número' },
+    { ok: /[^A-Za-z0-9]/.test(senha),  texto: '1 caractere especial' },
+    { ok: !usuario || !senha.toLowerCase().includes(usuario.toLowerCase()), texto: 'Sem o nome de usuário' },
+  ];
+}
+
+function perfilValidarSenha(){
+  const nova = document.getElementById('perfil-senha-nova').value;
+  const conf = document.getElementById('perfil-senha-conf').value;
+  const fb = document.getElementById('perfil-senha-feedback');
+  if(!nova){ fb.style.display = 'none'; return; }
+  fb.style.display = 'block';
+  const u = getCurrentUser() || {};
+  const reqs = perfilRequisitos(nova, u.usuario);
+  if(conf) reqs.push({ ok: nova === conf, texto: 'Confirmação igual' });
+  document.getElementById('perfil-reqs').innerHTML = reqs.map(r =>
+    `<div class="perfil-req ${r.ok ? 'ok' : ''}">${r.ok ? '✓' : '○'} ${r.texto}</div>`).join('');
+  let score = 0;
+  if(nova.length >= 8) score++;
+  if(nova.length >= 12) score++;
+  if(/[A-Z]/.test(nova) && /[a-z]/.test(nova)) score++;
+  if(/[0-9]/.test(nova)) score++;
+  if(/[^A-Za-z0-9]/.test(nova)) score++;
+  score = Math.min(score, 4);
+  const cores = ['var(--red)','var(--red)','var(--yellow)','var(--green)','var(--green)'];
+  const labels = ['Muito fraca','Fraca','Razoável','Boa','Forte'];
+  document.querySelectorAll('#perfil-forca div').forEach((b,i) => { b.style.background = i < score ? cores[score] : 'var(--border)'; });
+  const lb = document.getElementById('perfil-forca-label');
+  lb.textContent = 'Força: ' + labels[score]; lb.style.color = cores[score];
+}
+
+async function perfilTrocarSenha(){
+  const atual = document.getElementById('perfil-senha-atual').value;
+  const nova  = document.getElementById('perfil-senha-nova').value;
+  const conf  = document.getElementById('perfil-senha-conf').value;
+  const u = getCurrentUser() || {};
+  if(!atual){ showToast('Informe a senha atual.', true); return; }
+  if(perfilRequisitos(nova, u.usuario).some(r => !r.ok)){ showToast('A nova senha não atende aos requisitos.', true); perfilValidarSenha(); return; }
+  if(nova !== conf){ showToast('A confirmação não confere com a nova senha.', true); return; }
+  const btn = document.getElementById('perfil-btn-senha');
+  btn.disabled = true; btn.textContent = 'Alterando...';
+  try {
+    await apiUsuarios('perfil-senha', { senha_atual: atual, nova_senha: nova });
+    ['perfil-senha-atual','perfil-senha-nova','perfil-senha-conf'].forEach(id => document.getElementById(id).value = '');
+    perfilValidarSenha();
+    showToast('Senha alterada com sucesso.');
+    carregarAcessosPerfil();
+  } catch(e){ showToast(e.message, true); }
+  finally { btn.disabled = false; btn.textContent = 'Alterar senha'; }
 }
 
 /* =========================================================
@@ -2999,7 +3400,10 @@ function goToPage(page){
   document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
   document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
   document.getElementById('page-' + page).classList.add('active');
-  document.querySelector(`.nav-item[data-page="${page}"]`).classList.add('active');
+  const navEl = document.querySelector(`.nav-item[data-page="${page}"]`);
+  if(navEl) navEl.classList.add('active');
+  const perfilCard = document.getElementById('sidebar-perfil-card');
+  if(perfilCard) perfilCard.classList.toggle('active', page === 'perfil');
 
   if(page === 'dashboard') renderDashboard();
   if(page === 'ordens') renderOSTable();
@@ -3009,6 +3413,7 @@ function goToPage(page){
   if(page === 'kanban') renderKanban();
   if(page === 'cotacao') initCotacaoPage();
   if(page === 'laudos') renderLaudosTable();
+  if(page === 'perfil') renderPerfilPage();
   try { sessionStorage.setItem('mobit_pagina', page); } catch(e){}
 }
 
@@ -3016,7 +3421,7 @@ function goToPage(page){
 function restaurarPagina(){
   let page = null;
   try { page = sessionStorage.getItem('mobit_pagina'); } catch(e){}
-  if(page && page !== 'dashboard' && document.getElementById('page-' + page) && document.querySelector(`.nav-item[data-page="${page}"]`)){
+  if(page && page !== 'dashboard' && document.getElementById('page-' + page) && (page === 'perfil' || document.querySelector(`.nav-item[data-page="${page}"]`))){
     goToPage(page);
   }
 }
@@ -8810,8 +9215,7 @@ function initAutoLogout(){
   setInterval(() => { atualizarUsuarioAtual().catch(()=>{}); }, 10 * 60 * 1000);
 
   // Mostrar nome do usuário logado na sidebar
-  const userEl = document.getElementById('sidebar-user');
-  if(userEl) userEl.textContent = user.nome || user.usuario;
+  aplicarUsuarioNaUI(user);
 
   // Iniciar auto-logout por inatividade (3 horas)
   initAutoLogout();
