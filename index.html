@@ -4,6 +4,16 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>OficinaOS — Gestão de Assistência Técnica</title>
+<script>
+  // Aplica o tema salvo antes de desenhar a página (evita piscar)
+  (function(){
+    try {
+      var t = localStorage.getItem('mobit_tema') || 'escuro';
+      if(t === 'auto') t = window.matchMedia && window.matchMedia('(prefers-color-scheme: light)').matches ? 'claro' : 'escuro';
+      document.documentElement.dataset.tema = t;
+    } catch(e){}
+  })();
+</script>
 <style>
   :root{
     --bg: #15181c;
@@ -30,7 +40,43 @@
     --radius: 10px;
     --mono: 'JetBrains Mono', 'Roboto Mono', monospace;
     --sans: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    --tint: 255,255,255;          /* base dos sombreamentos sutis (branco no escuro, preto no claro) */
+    --sombra: rgba(0,0,0,0.35);
+    color-scheme: dark;
   }
+
+  /* ===== Tema claro ===== */
+  html[data-tema="claro"]{
+    --bg: #f2f4f7;
+    --bg-soft: #ffffff;
+    --panel: #ffffff;
+    --panel-2: #f4f6f9;
+    --border: #dce2e9;
+    --text: #1b2430;
+    --text-dim: #4d5967;
+    --text-faint: #7b8693;
+    --accent: #1f8fd0;
+    --accent-dim: #1878b0;
+    --accent-bg: rgba(31,143,208,0.12);
+    --green: #15803d;
+    --green-bg: rgba(22,163,74,0.12);
+    --red: #dc2626;
+    --red-bg: rgba(220,38,38,0.10);
+    --blue: #2563eb;
+    --blue-bg: rgba(37,99,235,0.10);
+    --yellow: #b45309;
+    --yellow-bg: rgba(217,119,6,0.14);
+    --purple: #7c3aed;
+    --purple-bg: rgba(124,58,237,0.10);
+    --tint: 0,0,0;
+    --sombra: rgba(15,23,42,0.12);
+    color-scheme: light;
+  }
+  html[data-tema="claro"] .btn-primary{ color:#fff; }
+  html[data-tema="claro"] .kanban-col-title{ filter: brightness(.78) saturate(1.2); }
+  html[data-tema="claro"] .brand-logo{ filter: invert(1) hue-rotate(180deg) saturate(1.4); }
+  html[data-tema="claro"] .kanban-card:hover,
+  html[data-tema="claro"] .modal{ box-shadow: 0 8px 28px var(--sombra); }
 
   *{ box-sizing: border-box; margin:0; padding:0; }
 
@@ -347,7 +393,7 @@
   }
   table:has(#os-table-body) th, table:has(#os-table-body) td{ padding-left:10px; padding-right:10px; }
   tbody tr:last-child td{ border-bottom:none; }
-  tbody tr:hover{ background: rgba(255,255,255,0.018); }
+  tbody tr:hover{ background: rgba(var(--tint),0.018); }
   .mono{ font-family: var(--mono); font-size:12.5px; color: var(--text-dim); }
   .cell-strong{ font-weight:600; }
   .empty-row td{
@@ -378,7 +424,7 @@
   .badge-andamento{ background: var(--yellow-bg); color: var(--yellow); }
   .badge-aguardando{ background: var(--purple-bg); color: var(--purple); }
   .badge-concluido{ background: var(--green-bg); color: var(--green); }
-  .badge-entregue{ background: rgba(255,255,255,0.08); color: var(--text-dim); }
+  .badge-entregue{ background: rgba(var(--tint),0.08); color: var(--text-dim); }
   .badge-cancelado{ background: var(--red-bg); color: var(--red); }
 
   .stock-pill{
@@ -671,7 +717,7 @@
   .av-opt:hover{ border-color:var(--accent-dim); }
   .av-opt.sel{ border-color:var(--accent); box-shadow:0 0 0 2px var(--accent-bg); }
   .av-cores{ display:flex; flex-wrap:wrap; gap:8px; margin-bottom:14px; }
-  .av-cor{ width:28px; height:28px; border-radius:50%; cursor:pointer; border:2px solid rgba(255,255,255,.15); }
+  .av-cor{ width:28px; height:28px; border-radius:50%; cursor:pointer; border:2px solid rgba(var(--tint),.15); }
   .av-cor.sel{ border-color:#fff; box-shadow:0 0 0 2px var(--accent); }
   @media (max-width: 680px){
     .av-editor{ grid-template-columns:1fr; }
@@ -702,9 +748,9 @@
   .usr-perfil-admin{ background:var(--blue-bg); color:var(--blue); }
   .usr-perfil-gestao{ background:var(--yellow-bg); color:var(--yellow); }
   .usr-perfil-tecnico{ background:var(--green-bg); color:var(--green); }
-  .usr-perfil-auxiliar{ background:rgba(255,255,255,.07); color:var(--text-dim); }
+  .usr-perfil-auxiliar{ background:rgba(var(--tint),.07); color:var(--text-dim); }
   .usr-tag-ok{ background:var(--green-bg); color:var(--green); }
-  .usr-tag-off{ background:rgba(255,255,255,.07); color:var(--text-faint); }
+  .usr-tag-off{ background:rgba(var(--tint),.07); color:var(--text-faint); }
   .usr-tag-warn{ background:var(--yellow-bg); color:var(--yellow); }
   .usr-tag-err{ background:var(--red-bg); color:var(--red); }
   .usr-tag-eu{ background:var(--accent-bg); color:var(--accent); }
@@ -1032,7 +1078,7 @@
   .kanban-col { background:var(--panel-2); border-radius:var(--radius); padding:14px; min-height:300px; }
   .kanban-col-header { display:flex; justify-content:space-between; align-items:center; margin-bottom:14px; }
   .kanban-col-title  { font-size:13px; font-weight:700; text-transform:uppercase; letter-spacing:.06em; }
-  .kanban-col-count  { font-size:11px; font-weight:700; background:rgba(255,255,255,0.08);
+  .kanban-col-count  { font-size:11px; font-weight:700; background:rgba(var(--tint),0.08);
     border-radius:20px; padding:2px 8px; color:var(--text-dim); }
 
   .kanban-card { background:var(--panel); border:1px solid var(--border); border-radius:8px;
@@ -1815,18 +1861,18 @@
 
           <div class="card">
             <div class="perfil-sec-title">🎨 Aparência</div>
-            <div class="tema-opcoes">
-              <button class="tema-opt sel" type="button">
+            <div class="tema-opcoes" id="tema-opcoes">
+              <button class="tema-opt" type="button" data-tema="escuro" onclick="perfilSalvarTema('escuro')">
                 <div class="tema-prev" style="background:linear-gradient(135deg,#15181c 60%,#20262c 60%);"></div>
-                Escuro<small>Tema atual</small>
+                Escuro<small>Padrão do sistema</small>
               </button>
-              <button class="tema-opt" type="button" disabled>
-                <div class="tema-prev" style="background:linear-gradient(135deg,#f4f6f8 60%,#ffffff 60%);"></div>
-                Claro<small>Em breve</small>
+              <button class="tema-opt" type="button" data-tema="claro" onclick="perfilSalvarTema('claro')">
+                <div class="tema-prev" style="background:linear-gradient(135deg,#f2f4f7 60%,#ffffff 60%);"></div>
+                Claro<small>Fundo claro</small>
               </button>
-              <button class="tema-opt" type="button" disabled>
-                <div class="tema-prev" style="background:linear-gradient(135deg,#15181c 50%,#f4f6f8 50%);"></div>
-                Automático<small>Em breve · segue o aparelho</small>
+              <button class="tema-opt" type="button" data-tema="auto" onclick="perfilSalvarTema('auto')">
+                <div class="tema-prev" style="background:linear-gradient(135deg,#15181c 50%,#f2f4f7 50%);"></div>
+                Automático<small>Segue o aparelho</small>
               </button>
             </div>
           </div>
@@ -3286,6 +3332,7 @@ function aplicarUsuarioNaUI(u){
   const navUsr = document.getElementById('nav-usuarios');
   if(navUsr) navUsr.style.display = ehAdminPerfil(u.perfil) ? '' : 'none';
   if(typeof aplicarPermissoes === 'function') aplicarPermissoes();
+  if(u.tema && typeof aplicarTema === 'function') aplicarTema(u.tema);
   if(document.getElementById('page-perfil')?.classList.contains('active')) preencherPerfil(u);
 }
 
@@ -4237,6 +4284,40 @@ function usrPermSet(k, v){
   renderPermissoesUsuario();
 }
 
+
+/* =========================================================
+   TEMA (escuro / claro / automático)
+   ========================================================= */
+let _temaPref = 'escuro';
+function resolverTema(t){
+  if(t === 'auto') return window.matchMedia && window.matchMedia('(prefers-color-scheme: light)').matches ? 'claro' : 'escuro';
+  return t === 'claro' ? 'claro' : 'escuro';
+}
+function aplicarTema(pref){
+  _temaPref = ['escuro','claro','auto'].includes(pref) ? pref : 'escuro';
+  const antes = document.documentElement.dataset.tema;
+  const efetivo = resolverTema(_temaPref);
+  document.documentElement.dataset.tema = efetivo;
+  try { localStorage.setItem('mobit_tema', _temaPref); } catch(e){}
+  document.querySelectorAll('#tema-opcoes .tema-opt').forEach(b => b.classList.toggle('sel', b.dataset.tema === _temaPref));
+  // gráficos têm cores próprias: redesenha o Painel se estiver aberto
+  if(antes !== efetivo && document.getElementById('page-dashboard')?.classList.contains('active') && typeof renderDashboard === 'function'){
+    try { renderDashboard(); } catch(e){}
+  }
+}
+if(window.matchMedia){
+  const mq = window.matchMedia('(prefers-color-scheme: light)');
+  const aoMudar = () => { if(_temaPref === 'auto') aplicarTema('auto'); };
+  if(mq.addEventListener) mq.addEventListener('change', aoMudar); else if(mq.addListener) mq.addListener(aoMudar);
+}
+async function perfilSalvarTema(t){
+  aplicarTema(t);
+  try {
+    const r = await apiUsuarios('perfil-atualizar', { tema: t });
+    if(r && r.user) sessionStorage.setItem('mobit_user', JSON.stringify({ ...getCurrentUser(), ...r.user }));
+  } catch(e){ showToast('Tema aplicado neste aparelho, mas não foi possível salvar no perfil: ' + e.message, true); }
+}
+
 /* =========================================================
    LINK DE ACOMPANHAMENTO (rastreio público da OS)
    ========================================================= */
@@ -4423,7 +4504,7 @@ function showLoadingOverlay(show){
     el.style.cssText = `position:fixed;inset:0;background:rgba(15,18,22,0.85);z-index:9999;
       display:flex;align-items:center;justify-content:center;flex-direction:column;gap:16px;`;
     el.innerHTML = `
-      <div style="width:44px;height:44px;border:3px solid #343c45;border-top-color:#2da0e0;
+      <div style="width:44px;height:44px;border:3px solid var(--border);border-top-color:var(--accent);
         border-radius:50%;animation:spin .7s linear infinite;"></div>
       <span style="color:#9aa5b1;font-size:14px;">Carregando dados...</span>
       <style>@keyframes spin{to{transform:rotate(360deg)}}</style>`;
@@ -4603,7 +4684,7 @@ function renderDashboard(){
   renderChart('chart-status-a', 'doughnut', STATUS_ALL, [{
     data: statusCountA, backgroundColor: STATUS_COLORS,
     borderColor: 'var(--panel)', borderWidth: 2
-  }], { plugins:{ legend:{ position:'right', labels:{ color:'#9aa5b1', font:{size:11} } } } });
+  }], { plugins:{ legend:{ position:'right', labels:{ color:cg('texto'), font:{size:11} } } } });
 
   // ── Gráfico 2: Faturamento diário (linha) ──
   const diasA = getDiasRange(aDe, aAte);
@@ -4618,7 +4699,7 @@ function renderDashboard(){
       { label:'Período', data: fatDiarioA, borderColor:'#0094d4', backgroundColor:'rgba(0,148,212,.1)', tension:.4, fill:true },
       ...(periodoBAtivoFat ? [{ label:'Período (Comparativo)', data: fatDiarioB, borderColor:'#f59e0b', backgroundColor:'rgba(245,158,11,.1)', tension:.4, fill:true, borderDash:[4,4] }] : [])
     ],
-    { plugins:{ legend:{ labels:{ color:'#9aa5b1' } } }, scales:{ y:{ ticks:{ color:'#9aa5b1', callback: v=>'R$'+v }, grid:{ color:'rgba(255,255,255,.05)' } }, x:{ ticks:{ color:'#9aa5b1', maxTicksLimit:10 }, grid:{ display:false } } } }
+    { plugins:{ legend:{ labels:{ color:cg('texto') } } }, scales:{ y:{ ticks:{ color:cg('texto'), callback: v=>'R$'+v }, grid:{ color:cg('grade') } }, x:{ ticks:{ color:cg('texto'), maxTicksLimit:10 }, grid:{ display:false } } } }
   );
 
   // ── Gráfico 3: PF vs PJ (barra agrupada) ──
@@ -4631,7 +4712,7 @@ function renderDashboard(){
   renderChart('chart-pf-pj', 'bar', ['Pessoa Física','Pessoa Jurídica'], [
     { label:'Período', data:[pfA,pjA], backgroundColor:['rgba(0,148,212,.7)','rgba(0,148,212,.7)'] },
     ...(periodoBAtivoTipo ? [{ label:'Período (Comparativo)', data:[pfB,pjB], backgroundColor:['rgba(245,158,11,.5)','rgba(245,158,11,.5)'] }] : [])
-  ], { plugins:{ legend:{ labels:{ color:'#9aa5b1' } } }, scales:{ y:{ ticks:{ color:'#9aa5b1' }, grid:{ color:'rgba(255,255,255,.05)' } }, x:{ ticks:{ color:'#9aa5b1' }, grid:{ display:false } } } });
+  ], { plugins:{ legend:{ labels:{ color:cg('texto') } } }, scales:{ y:{ ticks:{ color:cg('texto') }, grid:{ color:cg('grade') } }, x:{ ticks:{ color:cg('texto') }, grid:{ display:false } } } });
 
   // ── Gráfico 4: Gastos por fornecedor (barra horizontal) ──
   const fornecedores = ['CNN','SKYTECH'];
@@ -4644,8 +4725,8 @@ function renderDashboard(){
     ...(periodoBAtivoForn ? [{ label:'Período (Comparativo)', data: gastosFornB, backgroundColor:'rgba(245,158,11,.5)' }] : [])
   ], {
     indexAxis:'y',
-    plugins:{ legend:{ labels:{ color:'#9aa5b1' } } },
-    scales:{ x:{ ticks:{ color:'#9aa5b1', callback:v=>'R$'+v.toLocaleString('pt-BR') }, grid:{ color:'rgba(255,255,255,.05)' } }, y:{ ticks:{ color:'#9aa5b1' }, grid:{ display:false } } }
+    plugins:{ legend:{ labels:{ color:cg('texto') } } },
+    scales:{ x:{ ticks:{ color:cg('texto'), callback:v=>'R$'+v.toLocaleString('pt-BR') }, grid:{ color:cg('grade') } }, y:{ ticks:{ color:cg('texto') }, grid:{ display:false } } }
   });
 
   // ── Gráfico Lucro estimado (barras: Faturamento, Gastos, Lucro) ──
@@ -4661,8 +4742,8 @@ function renderDashboard(){
     {
       plugins:{ legend:{ display:false } },
       scales:{
-        y:{ ticks:{ color:'#9aa5b1', callback: v => 'R$' + v.toLocaleString('pt-BR') }, grid:{ color:'rgba(255,255,255,.05)' } },
-        x:{ ticks:{ color:'#9aa5b1' }, grid:{ display:false } }
+        y:{ ticks:{ color:cg('texto'), callback: v => 'R$' + v.toLocaleString('pt-BR') }, grid:{ color:cg('grade') } },
+        x:{ ticks:{ color:cg('texto') }, grid:{ display:false } }
       }
     }
   );
@@ -4683,7 +4764,7 @@ function renderDashboard(){
     renderChart('chart-pecas', 'pie',
       pecasOrdenadas.map(([nome]) => nome.length > 20 ? nome.slice(0,20)+'…' : nome),
       [{ data: pecasOrdenadas.map(([,qtd]) => qtd), backgroundColor: coresPecas, borderColor:'var(--panel)', borderWidth:2 }],
-      { plugins:{ legend:{ position:'right', labels:{ color:'#9aa5b1', font:{size:10}, boxWidth:12 } } } }
+      { plugins:{ legend:{ position:'right', labels:{ color:cg('texto'), font:{size:10}, boxWidth:12 } } } }
     );
   } else {
     if(_dashCharts['chart-pecas']){ _dashCharts['chart-pecas'].destroy(); delete _dashCharts['chart-pecas']; }
@@ -4790,6 +4871,12 @@ function dashSetMesAtual(){
 }
 
 const _dashCharts = {};
+// Cores dos gráficos conforme o tema atual
+function cg(tipo){
+  const claro = document.documentElement.dataset.tema === 'claro';
+  if(tipo === 'grade') return claro ? 'rgba(0,0,0,.07)' : 'rgba(255,255,255,.05)';
+  return claro ? '#4d5967' : '#9aa5b1';
+}
 function renderChart(id, type, labels, datasets, options){
   if(_dashCharts[id]){ _dashCharts[id].destroy(); delete _dashCharts[id]; }
   const canvas = document.getElementById(id);
@@ -8059,7 +8146,7 @@ function renderStockTable(){
     <tr>
       <td class="mono">${escapeHtml(s.codigo)}</td>
       <td class="cell-strong">${escapeHtml(s.nome)}</td>
-      <td class="text-faint">${s.detalhes ? `<span style="font-size:11px;background:rgba(255,255,255,0.06);border-radius:4px;padding:2px 7px;">${escapeHtml(s.detalhes)}</span>` : '—'}</td>
+      <td class="text-faint">${s.detalhes ? `<span style="font-size:11px;background:rgba(var(--tint),0.06);border-radius:4px;padding:2px 7px;">${escapeHtml(s.detalhes)}</span>` : '—'}</td>
       <td>${escapeHtml(s.categoria)}</td>
       <td class="text-faint">${escapeHtml(s.compativel || '—')}</td>
       <td class="mono">${s.quantidade}</td>
@@ -9454,7 +9541,7 @@ function selecionarCorColuna(cor){
     el.style.transform = 'scale(1)';
   });
   const el = document.getElementById('col-cor-opt-' + cor.replace('#',''));
-  if(el){ el.style.border = '2px solid #fff'; el.style.transform = 'scale(1.25)'; }
+  if(el){ el.style.border = '2px solid var(--text)'; el.style.transform = 'scale(1.25)'; }
   document.getElementById('coluna-cor').value = cor;
 }
 
@@ -9541,7 +9628,7 @@ async function renderKanban(){
       const vencido = t.prazo && t.prazo < hoje && t.coluna !== 'Concluído';
       const prazoHTML = prazoStr
         ? `<span style="font-size:10px;padding:2px 6px;border-radius:20px;font-weight:600;
-            background:${vencido?'rgba(220,53,69,.2)':'rgba(255,255,255,.07)'};
+            background:${vencido?'rgba(220,53,69,.2)':'rgba(var(--tint),.07)'};
             color:${vencido?'#dc3545':'var(--text-faint)'};">
             📅 ${prazoStr}${vencido?' ⚠':''}
            </span>`
@@ -9644,7 +9731,7 @@ function selecionarCorCard(cor){
   });
   const hex = cor.replace('#','');
   const el = document.getElementById('cor-opt-' + hex);
-  if(el){ el.style.border = '2px solid #fff'; el.style.transform = 'scale(1.25)'; }
+  if(el){ el.style.border = '2px solid var(--text)'; el.style.transform = 'scale(1.25)'; }
   document.getElementById('tarefa-cor').value = cor;
 }
 
