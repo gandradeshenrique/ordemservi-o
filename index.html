@@ -5944,17 +5944,33 @@ function fotoComprimir(file, maxLado, qualidade){
   });
 }
 
-async function fotoEnviar(blob, path){
-  const r = await fetch(`${SB_URL}/storage/v1/object/fotos-os/${path}`, {
-    method:'POST',
-    headers:{ apikey:SB_KEY, Authorization:'Bearer ' + SB_KEY, 'Content-Type':'image/jpeg', 'x-upsert':'false' },
-    body: blob
+// Fotos passam pela Edge Function "dados" (confere login e permissão de OS)
+async function fotoChamarServidor(storage){
+  const res = await fetch(`${SB_URL}/functions/v1/dados`, {
+    method: 'POST',
+    headers: { 'Content-Type':'application/json', apikey: SB_KEY, Authorization: 'Bearer ' + SB_KEY, 'x-session-token': getSessionToken() },
+    body: JSON.stringify({ storage })
   });
-  if(!r.ok) throw new Error(`upload falhou (${r.status}). O bucket "fotos-os" existe e tem as políticas de envio?`);
-  return `${SB_URL}/storage/v1/object/public/fotos-os/${path}`;
+  let j = {};
+  try { j = await res.json(); } catch(e){}
+  if(res.status === 401){ showToast(j.error || 'Sessão encerrada. Faça login novamente.', true); setTimeout(logout, 1500); }
+  if(!res.ok) throw new Error(res.status === 403 ? 'Você não tem permissão para esta ação.' : (j.message || j.error || `Erro ${res.status}`));
+  return j;
+}
+function blobParaBase64(blob){
+  return new Promise((resolve, reject) => {
+    const fr = new FileReader();
+    fr.onload = () => resolve(String(fr.result).split(',')[1] || '');
+    fr.onerror = () => reject(new Error('Não foi possível ler a foto.'));
+    fr.readAsDataURL(blob);
+  });
+}
+async function fotoEnviar(blob, path){
+  const j = await fotoChamarServidor({ acao: 'upload', path, base64: await blobParaBase64(blob) });
+  return j.url;
 }
 async function fotoApagarStorage(path){
-  try { await fetch(`${SB_URL}/storage/v1/object/fotos-os/${path}`, { method:'DELETE', headers:{ apikey:SB_KEY, Authorization:'Bearer ' + SB_KEY } }); } catch(e){}
+  try { await fotoChamarServidor({ acao: 'delete', path }); } catch(e){}
 }
 function fotoNovoPath(numero, did, stage){
   return `os-${numero}/${did}/${stage}-${Date.now()}-${Math.random().toString(36).slice(2, 7)}.jpg`;
