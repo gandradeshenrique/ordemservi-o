@@ -175,6 +175,40 @@
   .aprov-sub-item input[type=checkbox]:disabled{ cursor:default; opacity:0.5; }
   .aprov-sub-valor{ margin-left:auto; }
   .aprov-sub-reparo{ cursor:default; padding-bottom:4px; margin-bottom:2px; border-bottom:1px dashed var(--border); color:var(--text-faint); }
+
+  /* ===== Tela de confirmação (após decisão do cliente) ===== */
+  #confirmacao-view{ display:none; }
+  .conf-hero{ text-align:center; padding:26px 20px 22px; }
+  .conf-icone{ width:72px; height:72px; border-radius:50%; display:flex; align-items:center; justify-content:center; margin:0 auto 14px; font-size:34px; animation: confPop .45s cubic-bezier(.2,1.4,.4,1) both; }
+  @keyframes confPop{ from{ transform:scale(.4); opacity:0; } to{ transform:scale(1); opacity:1; } }
+  .conf-hero h2{ font-size:20px; margin-bottom:8px; }
+  .conf-hero p{ font-size:13.5px; color:var(--text-dim); line-height:1.6; }
+  .conf-tom-ok .conf-icone{ background:var(--green-bg); color:var(--green); }
+  .conf-tom-ok h2{ color:var(--green); }
+  .conf-tom-eco .conf-icone{ background:var(--green-bg); }
+  .conf-tom-eco h2{ color:var(--green); }
+  .conf-tom-info .conf-icone{ background:var(--blue-bg); }
+  .conf-tom-info h2{ color:var(--blue); }
+  .conf-tom-neutro .conf-icone{ background:var(--panel-2); }
+  .conf-aviso{ display:flex; gap:10px; align-items:flex-start; background:var(--accent-bg); border:1px solid rgba(45,160,224,.3); border-radius:8px; padding:11px 12px; font-size:12.5px; color:var(--text); line-height:1.5; margin-top:16px; text-align:left; }
+  .conf-item{ display:flex; justify-content:space-between; gap:10px; padding:9px 0; border-bottom:1px solid var(--border); font-size:13px; }
+  .conf-item:last-child{ border-bottom:none; }
+  .conf-item small{ display:block; color:var(--text-faint); font-size:11.5px; margin-top:2px; }
+  .conf-status{ font-size:11.5px; font-weight:700; white-space:nowrap; }
+  .conf-total{ display:flex; justify-content:space-between; padding-top:10px; margin-top:4px; border-top:1.5px solid var(--border); font-weight:700; font-size:15px; }
+  .conf-comprovante{ font-size:12px; color:var(--text-faint); margin-top:10px; }
+  .conf-passos{ display:flex; flex-direction:column; gap:0; }
+  .conf-passo{ display:flex; gap:12px; position:relative; padding-bottom:16px; }
+  .conf-passo:last-child{ padding-bottom:0; }
+  .conf-passo::before{ content:''; position:absolute; left:10px; top:22px; bottom:0; width:2px; background:var(--border); }
+  .conf-passo:last-child::before{ display:none; }
+  .conf-passo-bola{ width:22px; height:22px; border-radius:50%; border:2px solid var(--border); background:var(--bg); flex-shrink:0; display:flex; align-items:center; justify-content:center; font-size:11px; font-weight:700; color:var(--text-faint); position:relative; z-index:1; }
+  .conf-passo.feito .conf-passo-bola{ background:var(--green); border-color:var(--green); color:#0b1a10; }
+  .conf-passo.feito::before{ background:var(--green); }
+  .conf-passo-txt{ font-size:13px; padding-top:1px; }
+  .conf-passo-txt small{ display:block; color:var(--text-faint); font-size:11.5px; }
+  .conf-passo.feito .conf-passo-txt{ color:var(--text); font-weight:600; }
+  .conf-passo:not(.feito) .conf-passo-txt{ color:var(--text-dim); }
   .aprov-total-line{ display:flex; justify-content:space-between; align-items:center; padding-top:12px; margin-top:6px; border-top:1.5px solid var(--border); font-weight:700; font-size:15px; }
 
   @media (max-width:420px){
@@ -302,6 +336,32 @@
     <div class="footer-note">Mobit Soluções · página de acompanhamento</div>
   </div>
 
+
+  <!-- ===== CONFIRMAÇÃO DA DECISÃO DO CLIENTE ===== -->
+  <div id="confirmacao-view">
+    <div class="topbar">
+      <img src="logo.png" alt="Mobit Soluções" onerror="this.style.display='none'">
+      <a class="sair" onclick="sair()">Sair</a>
+    </div>
+    <div class="card conf-hero" id="conf-hero">
+      <div class="conf-icone" id="conf-icone"></div>
+      <h2 id="conf-titulo"></h2>
+      <p id="conf-mensagem"></p>
+      <div class="conf-aviso" id="conf-aviso"><span>🔔</span><span id="conf-aviso-txt"></span></div>
+    </div>
+    <div class="card" id="conf-resumo-card">
+      <div class="section-title" id="conf-resumo-titulo">Resumo</div>
+      <div id="conf-resumo"></div>
+      <div class="conf-comprovante" id="conf-comprovante"></div>
+    </div>
+    <div class="card">
+      <div class="section-title">Próximos passos</div>
+      <div class="conf-passos" id="conf-passos"></div>
+    </div>
+    <button class="btn" id="btn-conf-continuar" onclick="fecharConfirmacao()">Acompanhar minha OS em tempo real →</button>
+    <div class="footer-note">Mobit Soluções · página de acompanhamento</div>
+  </div>
+
   <!-- ===== LAUDO DE DESCARTE ===== -->
   <div id="laudo-descarte-view" style="display:none;">
     <div class="topbar">
@@ -318,8 +378,9 @@
     </div>
 
     <div class="card">
-      <div class="section-title" style="color:var(--red);">⚠ Aparelho(s) sem reparo viável</div>
-      <p style="font-size:12.5px; color:var(--text-dim); margin:0 0 4px;">
+      <div class="conf-aviso" id="laudo-contexto" style="display:none; margin:0 0 14px;"><span>ℹ️</span><span id="laudo-contexto-txt"></span></div>
+      <div class="section-title" id="laudo-descarte-secao" style="color:var(--red);">⚠ Aparelho(s) sem reparo viável</div>
+      <p id="laudo-descarte-texto" style="font-size:12.5px; color:var(--text-dim); margin:0 0 4px;">
         O(s) aparelho(s) abaixo foi(ram) avaliado(s) tecnicamente e o reparo não é economicamente viável.
         Escolha uma das opções abaixo pra seguirmos.
       </p>
@@ -437,6 +498,9 @@ async function tentarAcesso(){
 }
 
 function sair(){
+  confirmacaoAtiva = false;
+  pendenteAposLaudo = null;
+  const cv = document.getElementById('confirmacao-view'); if(cv) cv.style.display = 'none';
   sessionStorage.removeItem('rastreio_senha_' + token);
   if(pollTimer) clearInterval(pollTimer);
   document.getElementById('track-view').style.display = 'none';
@@ -476,6 +540,7 @@ let laudoParaBaixar = null;
 
 async function mostrarAcompanhamento(o){
   ultimoOS = o;
+  if(confirmacaoAtiva) return;   // tela de confirmação aberta: não troca de tela
   document.getElementById('login-view').style.display = 'none';
 
   // Orçamento aguardando resposta do cliente: mostra a tela de aprovação em vez do acompanhamento normal
@@ -646,6 +711,19 @@ async function buscarLaudosDaOS(o){
 
 function renderLaudoDescarteView(laudo, o){
   document.getElementById('laudo-descarte-titulo').textContent = `OS #${o.numero}`;
+  const nAp = (laudo.aparelhos || []).length || 1;
+  if(laudo.origem === 'reprovacao_os'){
+    document.getElementById('laudo-descarte-secao').textContent = nAp === 1 ? '📱 Aparelho não aprovado' : '📱 Aparelhos não aprovados';
+    document.getElementById('laudo-descarte-secao').style.color = 'var(--text)';
+    document.getElementById('laudo-descarte-texto').textContent = nAp === 1
+      ? 'Como o reparo deste aparelho não foi aprovado, escolha abaixo o que devemos fazer com ele: descarte ecológico ou devolução.'
+      : 'Como o reparo destes aparelhos não foi aprovado, escolha abaixo o que devemos fazer com eles: descarte ecológico ou devolução.';
+  } else {
+    document.getElementById('laudo-descarte-secao').textContent = '⚠ Aparelho(s) sem reparo viável';
+    document.getElementById('laudo-descarte-secao').style.color = 'var(--red)';
+    document.getElementById('laudo-descarte-texto').textContent = 'O(s) aparelho(s) abaixo foi(ram) avaliado(s) tecnicamente e o reparo não é economicamente viável. Escolha uma das opções abaixo pra seguirmos.';
+  }
+  atualizarContextoLaudo();
   document.getElementById('laudo-descarte-cliente').textContent = o.cliente_nome || '';
 
   const aparelhos = laudo.aparelhos || [];
@@ -717,7 +795,8 @@ async function autorizarLaudoDescarte(){
 
   try {
     await decidirLaudoRastreio(laudo, 'autorizar', nome);
-    await avancarAposDecisaoLaudo();
+    laudoDescarteAtivo = null;
+    confirmacaoAposLaudo('autorizar', laudo, nome);
   } catch(e){
     erro.textContent = 'Não foi possível registrar a autorização agora. Tente novamente em instantes.';
     erro.classList.add('show');
@@ -741,7 +820,8 @@ async function solicitarDevolucaoLaudo(){
 
   try {
     await decidirLaudoRastreio(laudo, 'devolver');
-    await avancarAposDecisaoLaudo();
+    laudoDescarteAtivo = null;
+    confirmacaoAposLaudo('devolver', laudo);
   } catch(e){
     erro.textContent = 'Não foi possível registrar sua solicitação agora. Tente novamente em instantes.';
     erro.classList.add('show');
@@ -985,6 +1065,197 @@ function atualizarTotalAprovacao(){
   if(!btn.disabled) btn.textContent = aprovados === 0 ? 'Reprovar todos os aparelhos' : 'Aprovar reparo';
 }
 
+
+/* =========================================================
+   TELA DE CONFIRMAÇÃO — mostrada uma vez, logo após a decisão do cliente
+   ========================================================= */
+let confirmacaoAtiva = false;
+
+function agoraFormatado(){
+  const d = new Date();
+  return d.toLocaleDateString('pt-BR') + ' às ' + d.toLocaleTimeString('pt-BR', { hour:'2-digit', minute:'2-digit' });
+}
+function pl(n, um, varios){ return n === 1 ? um : varios; }
+
+function mostrarConfirmacao(cfg){
+  confirmacaoAtiva = true;
+  ['login-view','track-view','aprovacao-view','laudo-descarte-view'].forEach(id => {
+    const el = document.getElementById(id); if(el) el.style.display = 'none';
+  });
+  document.getElementById('conf-hero').className = 'card conf-hero conf-tom-' + cfg.tom;
+  document.getElementById('conf-icone').textContent = cfg.icone;
+  document.getElementById('conf-titulo').textContent = cfg.titulo;
+  document.getElementById('conf-mensagem').innerHTML = cfg.mensagem;
+  document.getElementById('conf-aviso-txt').innerHTML = cfg.aviso;
+  document.getElementById('conf-resumo-titulo').textContent = cfg.resumoTitulo || 'Resumo';
+  document.getElementById('conf-resumo').innerHTML = cfg.resumoHtml || '';
+  document.getElementById('conf-comprovante').textContent = cfg.comprovante || '';
+  document.getElementById('conf-passos').innerHTML = cfg.passos.map((p, i) => `
+    <div class="conf-passo ${p.feito ? 'feito' : ''}">
+      <div class="conf-passo-bola">${p.feito ? '✓' : (i + 1)}</div>
+      <div class="conf-passo-txt">${escapeHtml(p.txt)}${p.sub ? `<small>${escapeHtml(p.sub)}</small>` : ''}</div>
+    </div>`).join('');
+  document.getElementById('btn-conf-continuar').textContent = cfg.botao || 'Acompanhar minha OS em tempo real →';
+  document.getElementById('confirmacao-view').style.display = 'block';
+  window.scrollTo({ top: 0, behavior: 'smooth' });
+}
+
+async function fecharConfirmacao(){
+  confirmacaoAtiva = false;
+  document.getElementById('confirmacao-view').style.display = 'none';
+  const senha = sessionStorage.getItem('rastreio_senha_' + token);
+  if(ultimoOS) await mostrarAcompanhamento(ultimoOS);
+  if(senha){
+    try { const rr = await verificarAcesso(senha); if(rr && rr.length) mostrarAcompanhamento(rr[0]); } catch(e){}
+  }
+}
+
+// Decisão do orçamento aguardando a escolha do laudo (descarte/devolução) dos reprovados
+let pendenteAposLaudo = null;
+
+function atualizarContextoLaudo(){
+  const box = document.getElementById('laudo-contexto');
+  if(!box) return;
+  const p = pendenteAposLaudo;
+  if(!p){ box.style.display = 'none'; return; }
+  const aprov = p.resumo.filter(r => r.aprovado).length;
+  const repr = p.resumo.length - aprov;
+  document.getElementById('laudo-contexto-txt').innerHTML = aprov
+    ? `Recebemos a aprovação de <strong>${aprov} ${pl(aprov,'aparelho','aparelhos')}</strong>. Falta só uma escolha: o que fazemos com ${pl(repr,'o aparelho que você <strong>não aprovou</strong>','os aparelhos que você <strong>não aprovou</strong>')}?`
+    : `Registramos que você optou por <strong>não seguir com o reparo</strong>. Falta só uma escolha: o que fazemos com ${pl(repr,'o aparelho','os aparelhos')}?`;
+  box.style.display = 'flex';
+}
+
+async function abrirLaudoAposReprovacao(resumo, nome, osBase, senha){
+  let osAtual = osBase;
+  try { const rr = await verificarAcesso(senha); if(rr && rr.length) osAtual = rr[0]; } catch(e){}
+  // o laudo é criado pelo banco no mesmo instante; tenta algumas vezes por segurança
+  let pend = null;
+  for(let i = 0; i < 3 && !pend; i++){
+    const laudos = await buscarLaudosDaOS(osAtual);
+    pend = laudos.find(l => l.status === 'Aguardando autorização') || null;
+    if(!pend) await new Promise(r => setTimeout(r, 700));
+  }
+  ultimoOS = osAtual;
+  if(!pend) return false;
+  pendenteAposLaudo = { resumo, nome, o: osAtual };
+  laudoDescarteAtivo = pend;
+  ['login-view','track-view','aprovacao-view','confirmacao-view'].forEach(id => { const el = document.getElementById(id); if(el) el.style.display = 'none'; });
+  document.getElementById('laudo-descarte-view').style.display = 'block';
+  renderLaudoDescarteView(pend, osAtual);
+  window.scrollTo({ top: 0, behavior: 'smooth' });
+  return true;
+}
+
+// Depois da escolha do laudo: parcial → tela de orçamento aprovado; total → confirmação do laudo
+function confirmacaoAposLaudo(decisao, laudo, nome){
+  const p = pendenteAposLaudo;
+  pendenteAposLaudo = null;
+  atualizarContextoLaudo();
+  if(p && p.resumo.some(r => r.aprovado)){
+    confirmacaoOrcamento(p.resumo, p.nome, p.o, decisao);
+  } else {
+    confirmacaoLaudo(decisao, laudo, nome);
+  }
+}
+
+// Orçamento aprovado (tudo ou parte). "destino" = escolha feita para os reprovados.
+function confirmacaoOrcamento(resumo, nomeAprovador, o, destino){
+  const aprovados = resumo.filter(r => r.aprovado);
+  const total = aprovados.reduce((s, r) => s + r.valor, 0);
+  const itens = resumo.map(r => `
+    <div class="conf-item">
+      <div>${escapeHtml(r.nome)}${r.opcionais.length ? `<small>+ ${escapeHtml(r.opcionais.join(', '))}</small>` : ''}</div>
+      <div style="text-align:right;">
+        <div class="conf-status" style="color:${r.aprovado ? 'var(--green)' : 'var(--red)'};">${r.aprovado ? '✓ Aprovado' : '✕ Não aprovado'}</div>
+        ${r.aprovado ? `<div class="mono" style="font-size:12.5px;">${formatCurrency(r.valor)}</div>` : ''}
+        ${!r.aprovado && destino ? `<div style="font-size:11.5px; color:var(--text-dim);">${destino === 'autorizar' ? '♻️ Descarte autorizado' : '📦 Devolução solicitada'}</div>` : ''}
+      </div>
+    </div>`).join('');
+  const previsao = o && o.data_prevista ? `Previsão: ${formatDate(o.data_prevista)}` : '';
+
+  if(!aprovados.length){
+    mostrarConfirmacao({
+      tom: 'neutro', icone: '📋',
+      titulo: 'Decisão registrada',
+      mensagem: `Registramos que você optou por <strong>não seguir com o reparo</strong>. Nossa equipe vai preparar os próximos passos para ${pl(resumo.length, 'o aparelho', 'os aparelhos')} e você será avisado por aqui.`,
+      aviso: 'Continue acompanhando por <strong>este mesmo link</strong> — a página atualiza sozinha sempre que houver novidade.',
+      resumoTitulo: 'Sua decisão',
+      resumoHtml: itens,
+      comprovante: `Registrado por ${nomeAprovador} em ${agoraFormatado()}`,
+      passos: [
+        { txt: 'Orçamento não aprovado', feito: true },
+        { txt: 'Nossa equipe define os próximos passos', sub: 'Você será avisado por este link' },
+        { txt: 'Devolução ou encerramento da OS' },
+      ],
+      botao: 'Ver minha OS →'
+    });
+    return;
+  }
+
+  const parcial = aprovados.length < resumo.length;
+  mostrarConfirmacao({
+    tom: 'ok', icone: '✓',
+    titulo: parcial ? 'Orçamento aprovado parcialmente' : 'Orçamento aprovado!',
+    mensagem: `Recebemos sua aprovação. <strong>Em breve iremos iniciar o reparo ${pl(aprovados.length, 'do aparelho', 'dos aparelhos')}.</strong>` +
+      (parcial && destino ? `<br><span style="font-size:12.5px;">${pl(resumo.length - aprovados.length, 'O aparelho não aprovado', 'Os aparelhos não aprovados')}: ${destino === 'autorizar' ? 'descarte ecológico autorizado ♻️' : 'devolução solicitada — nosso time de logística vai cuidar disso 📦'}.</span>` : ''),
+    aviso: 'A partir de agora você acompanha cada etapa do reparo <strong>em tempo real</strong> por este mesmo link. Guarde-o — a página atualiza sozinha sempre que o status mudar.',
+    resumoTitulo: 'Resumo da aprovação',
+    resumoHtml: itens + `<div class="conf-total"><span>Total aprovado</span><span class="mono">${formatCurrency(total)}</span></div>`,
+    comprovante: `Aprovado por ${nomeAprovador} em ${agoraFormatado()}`,
+    passos: [
+      { txt: 'Orçamento aprovado', feito: true },
+      { txt: 'Reparo em andamento', sub: previsao },
+      { txt: 'Pronto para retirada' },
+      { txt: 'Entregue' },
+    ]
+  });
+}
+
+// Laudo de descarte: descarte autorizado ou devolução solicitada
+function confirmacaoLaudo(decisao, laudo, nome){
+  const aparelhos = (laudo && laudo.aparelhos) || [];
+  const n = Math.max(aparelhos.length, 1);
+  const lista = aparelhos.map(a => `
+    <div class="conf-item">
+      <div>${escapeHtml(a.modelo || 'Aparelho')}${a.imei ? `<small>IMEI/Série: ${escapeHtml(a.imei)}</small>` : ''}</div>
+    </div>`).join('');
+
+  if(decisao === 'autorizar'){
+    mostrarConfirmacao({
+      tom: 'eco', icone: '♻️',
+      titulo: 'Descarte autorizado',
+      mensagem: `Obrigado pela confirmação. ${pl(n, 'O aparelho será descartado', 'Os aparelhos serão descartados')} de forma <strong>ecologicamente correta</strong>, com o devido tratamento para resíduos eletrônicos.`,
+      aviso: 'Você continua acompanhando tudo por <strong>este mesmo link</strong>, e o <strong>laudo de descarte</strong> fica disponível aqui para baixar e guardar.',
+      resumoTitulo: pl(n, 'Aparelho', 'Aparelhos'),
+      resumoHtml: lista,
+      comprovante: nome ? `Autorizado por ${nome} em ${agoraFormatado()}` : '',
+      passos: [
+        { txt: 'Descarte autorizado', feito: true },
+        { txt: 'Encaminhado para descarte ecológico' },
+        { txt: 'Descarte concluído', sub: 'O laudo de descarte fica disponível neste link' },
+      ],
+      botao: 'Ver minha OS e o laudo →'
+    });
+  } else {
+    mostrarConfirmacao({
+      tom: 'info', icone: '📦',
+      titulo: 'Devolução solicitada',
+      mensagem: `Que pena que não vamos seguir com o reparo desta vez. Registramos sua solicitação e vamos encaminhar ${pl(n, 'o aparelho', 'os aparelhos')} para o nosso <strong>time de logística</strong>, que vai cuidar da devolução.`,
+      aviso: 'Você acompanha o andamento da devolução por <strong>este mesmo link</strong> — a página atualiza sozinha sempre que houver novidade.',
+      resumoTitulo: pl(n, 'Aparelho a devolver', 'Aparelhos a devolver'),
+      resumoHtml: lista,
+      comprovante: `Solicitado em ${agoraFormatado()}`,
+      passos: [
+        { txt: 'Devolução solicitada', feito: true },
+        { txt: 'Separação pelo time de logística' },
+        { txt: pl(n, 'Aparelho devolvido', 'Aparelhos devolvidos') },
+      ],
+      botao: 'Ver minha OS →'
+    });
+  }
+}
+
 async function confirmarAprovacao(){
   const senha = sessionStorage.getItem('rastreio_senha_' + token);
   if(!senha){ sair(); return; }
@@ -1026,6 +1297,19 @@ async function confirmarAprovacao(){
       });
     }
     decisoes[devId] = obj;
+  });
+
+  // Resumo para a tela de confirmação (valores já considerando os itens opcionais desmarcados)
+  const resumoDecisao = checks.map(c => {
+    const d = lista.find(x => x.id === c.dataset.dev) || { nome:'Aparelho', valor:0, acessorios:[] };
+    let valor = d.valor; const opcionais = [];
+    document.querySelectorAll('.aprov-ac-check').forEach(ac => {
+      if(ac.dataset.dev !== c.dataset.dev) return;
+      const item = (d.acessorios || []).find(a => a.categoria === ac.dataset.cat);
+      if(!item) return;
+      if(ac.checked) opcionais.push(item.label); else valor -= item.valor;
+    });
+    return { nome: d.nome, aprovado: c.checked, valor, opcionais: c.checked ? opcionais : [] };
   });
 
   const btn = document.getElementById('btn-confirmar-aprovacao');
@@ -1083,8 +1367,14 @@ async function confirmarAprovacao(){
     }
 
     aprovacaoAtiva = false;
-    const rows2 = await verificarAcesso(senha);
-    if(rows2 && rows2.length) mostrarAcompanhamento(rows2[0]);
+    if(resumoDecisao.some(r => !r.aprovado)){
+      confirmacaoAtiva = true;   // segura o polling enquanto prepara a próxima tela
+      const abriu = await abrirLaudoAposReprovacao(resumoDecisao, nomeAprovador, o, senha);
+      confirmacaoAtiva = false;
+      if(abriu) return;
+    }
+    confirmacaoOrcamento(resumoDecisao, nomeAprovador, o);
+    verificarAcesso(senha).then(rows2 => { if(rows2 && rows2.length) ultimoOS = rows2[0]; }).catch(()=>{});
   } catch(e){
     erro.textContent = 'Não foi possível enviar sua decisão (' + e.message + '). Tente novamente em instantes.';
     erro.classList.add('show');
