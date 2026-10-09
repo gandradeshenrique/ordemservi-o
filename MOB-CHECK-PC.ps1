@@ -190,7 +190,7 @@ public class LidMonitor {
 '@
 
 # mantem a maquina acordada durante todo o teste
-[void][MobNative]::SetThreadExecutionState(0x80000003)
+[void][MobNative]::SetThreadExecutionState([uint32]2147483651)   # ES_CONTINUOUS|ES_SYSTEM_REQUIRED|ES_DISPLAY_REQUIRED (0x80000003 vira numero negativo no PowerShell)
 
 # ---------- janela principal (WPF) ----------
 [xml]$XAML = @'
@@ -387,7 +387,7 @@ $Win.Add_Closed({ Cleanup; [Environment]::Exit(0) })
 
 function Cleanup {
     try{ powercfg /setacvalueindex SCHEME_CURRENT SUB_BUTTONS LIDACTION 1 | Out-Null; powercfg /setdcvalueindex SCHEME_CURRENT SUB_BUTTONS LIDACTION 1 | Out-Null; powercfg /setactive SCHEME_CURRENT | Out-Null }catch{}
-    try{ [void][MobNative]::SetThreadExecutionState(0x80000000) }catch{}
+    try{ [void][MobNative]::SetThreadExecutionState([uint32]2147483648) }catch{}
 }
 
 # =====================================================================
