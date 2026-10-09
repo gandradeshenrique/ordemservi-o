@@ -1,0 +1,117 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="robots" content="noindex, nofollow">
+<meta name="referrer" content="no-referrer">
+<meta name="theme-color" content="#050f1e">
+<title>MOB CHECK · Teste do aparelho</title>
+<style>
+  :root{ --bg:#050f1e; --panel:#0b1d36; --line:#1b3556; --ink:#eaf3fb; --muted:#8ea7c4; --brand:#008ed4; --accent:#64c2e9; --ok:#2fd07a; --warn:#f5b83d; }
+  *{ box-sizing:border-box; }
+  body{ margin:0; min-height:100vh; background:var(--bg); color:var(--ink); font:16px/1.45 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif; padding:20px 16px 40px; }
+  .wrap{ max-width:460px; margin:0 auto; }
+  .marca{ font-size:12px; letter-spacing:.12em; font-weight:700; color:var(--accent); }
+  h1{ font-size:28px; margin:6px 0 4px; }
+  p{ color:var(--muted); margin:6px 0; }
+  .card{ background:var(--panel); border:1px solid var(--line); border-radius:14px; padding:16px; margin-top:16px; }
+  .card h2{ font-size:13px; letter-spacing:.06em; text-transform:uppercase; color:var(--muted); margin:0 0 8px; }
+  .os{ font-size:20px; font-weight:700; }
+  .btn{ display:block; width:100%; text-align:center; text-decoration:none; font:inherit; font-weight:700; border-radius:12px; padding:15px; margin-top:10px; border:2px solid var(--brand); color:var(--brand); background:transparent; cursor:pointer; }
+  .btn.pri{ background:var(--brand); color:#fff; }
+  .passos{ margin:8px 0 0; padding-left:20px; color:var(--ink); }
+  .passos li{ margin:6px 0; }
+  .aviso{ color:var(--warn); }
+  .ok{ color:var(--ok); }
+  .destaque{ border-color:var(--brand); box-shadow:0 0 0 2px rgba(0,142,212,.25); }
+  small{ color:var(--muted); }
+  [hidden]{ display:none !important; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="marca">MOBIT SOLUÇÕES · ASSISTÊNCIA TÉCNICA</div>
+  <h1>MOB CHECK</h1>
+  <p>Teste automático do aparelho.</p>
+
+  <div id="invalido" class="card" hidden>
+    <h2>Link incompleto</h2>
+    <p>Este link não tem o código do teste. Gere um novo QR code no MobitOS e escaneie de novo.</p>
+  </div>
+
+  <div id="desktop" class="card" hidden>
+    <h2>Abra pelo celular</h2>
+    <p>Este teste roda no aparelho que será testado. Escaneie o QR code com a câmera do celular.</p>
+  </div>
+
+  <div id="ios" class="card" hidden>
+    <h2>iPhone</h2>
+    <p>O teste para iPhone abre direto no navegador, sem instalar nada.</p>
+    <a id="btn-ios" class="btn pri" href="#">Iniciar teste no iPhone</a>
+  </div>
+
+  <div id="android" hidden>
+    <div class="card" id="card-abrir">
+      <h2>1 · Já tem o app instalado?</h2>
+      <p id="msg-abrir">Tentando abrir o MOB CHECK…</p>
+      <a id="btn-abrir" class="btn pri" href="#">Abrir no MOB CHECK</a>
+    </div>
+    <div class="card" id="card-instalar">
+      <h2>2 · Ainda não tem? Instale o app</h2>
+      <a id="btn-baixar" class="btn" href="apk/MOB-CHECK.apk" download="MOB-CHECK.apk">Baixar o MOB CHECK</a>
+      <ol class="passos">
+        <li>Toque em <b>Baixar</b> e depois abra o arquivo baixado.</li>
+        <li>Se o Android pedir, permita <b>instalar apps desta fonte</b> e toque em <b>Instalar</b>.</li>
+        <li>Se aparecer o aviso do Play Protect, toque em <b>Instalar mesmo assim</b>.</li>
+        <li>Abra o <b>MOB CHECK</b>. O app reconhece o aparelho e a OS sozinho.</li>
+      </ol>
+      <p><small>Se o app não reconhecer a OS, volte aqui e toque em <b>Abrir no MOB CHECK</b>.</small></p>
+    </div>
+  </div>
+
+  <p style="margin-top:22px"><small>Este link vale por poucas horas e serve só para esta OS. O app não envia nada além do resultado dos testes.</small></p>
+</div>
+
+<script>
+(function(){
+  const $ = id => document.getElementById(id);
+  const q = new URLSearchParams(location.search);
+  const codigo = (q.get('c') || '').trim();
+  const ua = navigator.userAgent || '';
+  const ehAndroid = /Android/i.test(ua);
+  const ehIOS = /iPhone|iPad|iPod/i.test(ua) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+
+  if(!/^[A-Za-z0-9_-]{16,64}$/.test(codigo)){ $('invalido').hidden = false; return; }
+
+  if(ehIOS){
+    $('ios').hidden = false;
+    $('btn-ios').href = 'teste-ios.html?c=' + encodeURIComponent(codigo);
+    return;
+  }
+  if(!ehAndroid){ $('desktop').hidden = false; return; }
+
+  $('android').hidden = false;
+  const aqui = location.origin + location.pathname;
+  const semApp = aqui + '?c=' + encodeURIComponent(codigo) + '&sa=1';
+  // Abre o app se estiver instalado; se não estiver, o Chrome volta para esta página com sa=1
+  const intentUrl = 'intent://teste?c=' + encodeURIComponent(codigo) +
+    '#Intent;scheme=mobcheck;package=br.com.mobit.bancada;S.browser_fallback_url=' + encodeURIComponent(semApp) + ';end';
+  $('btn-abrir').href = intentUrl;
+
+  // Ao baixar, deixa o código copiado: o app, ao abrir pela primeira vez, vincula sozinho
+  $('btn-baixar').addEventListener('click', function(){
+    try { navigator.clipboard && navigator.clipboard.writeText('MOBCHECK:' + codigo); } catch(e){}
+  });
+
+  if(q.get('sa') === '1'){
+    $('msg-abrir').innerHTML = '<span class="aviso">O app ainda não está instalado neste aparelho.</span> Instale abaixo.';
+    $('card-instalar').classList.add('destaque');
+  } else {
+    $('msg-abrir').textContent = 'Tentando abrir o MOB CHECK… Se nada acontecer, toque no botão.';
+    setTimeout(function(){ location.href = intentUrl; }, 400);
+  }
+})();
+</script>
+</body>
+</html>
