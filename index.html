@@ -1153,6 +1153,7 @@
 </style>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/qrcode-generator/1.4.4/qrcode.min.js"></script>
 <style>
 /* ===== Wizard de abertura de OS ===== */
 .wz-steps{ display:flex; align-items:flex-start; margin:0 0 18px; position:sticky; top:0; z-index:5;
@@ -1215,6 +1216,17 @@
 .foto-saida-aparelho{ margin-bottom:6px; }
 .foto-saida-aparelho > .foto-titulo-ap{ font-size:12px; font-weight:700; color:var(--accent); text-transform:uppercase; letter-spacing:0.05em; }
 #os-modal-overlay[data-wz="6"] .fotos-box[data-stage="entrada"]{ display:none; }
+.ta-bar{ display:flex; align-items:center; gap:10px; flex-wrap:wrap; padding:10px 12px; margin-bottom:10px; border:1px dashed var(--accent); border-radius:var(--radius); background:var(--tint, rgba(45,160,224,.08)); }
+.ta-bar span{ font-size:12px; color:var(--text-dim); flex:1; min-width:160px; }
+.cl-item.ta-auto > span::after{ content:' ⚡ auto'; font-size:10px; font-weight:700; color:var(--accent); }
+.ta-plat{ display:flex; gap:8px; margin:6px 0 12px; }
+.ta-plat button{ flex:1; padding:12px; border-radius:var(--radius); border:2px solid var(--border); background:transparent; color:var(--text); font:inherit; font-weight:600; cursor:pointer; }
+.ta-plat button.on{ border-color:var(--accent); color:var(--accent); }
+.ta-plat button:disabled{ opacity:.45; cursor:not-allowed; }
+.ta-qr{ background:#fff; padding:12px; border-radius:12px; width:240px; max-width:100%; margin:8px auto; line-height:0; }
+.ta-qr svg{ width:100%; height:auto; }
+.ta-status{ text-align:center; font-weight:600; margin:8px 0; }
+.ta-ok{ color:var(--green); } .ta-erro{ color:var(--red); }
 </style>
 </head>
 <body>
@@ -2010,6 +2022,7 @@
       <div class="fotos-box" data-did="principal" data-stage="entrada"></div>
       <!-- CHECKLIST -->
       <div id="os-checklist-wrap">
+      <div class="ta-bar"><button type="button" class="btn btn-sm" onclick="testeAutoAbrir('principal')">⚡ Checklist automático</button><span>Testa o aparelho pelo celular e preenche a lista. Se preferir, preencha manualmente abaixo.</span></div>
       <fieldset style="border:1px solid var(--border); border-radius:var(--radius); padding:14px 18px; margin-bottom:4px;">
         <legend style="font-size:13px; font-weight:600; color:var(--accent); padding:0 6px;">
           ✔ Lista de Checagem — Os itens abaixo estão em condições de utilização? <span style="color:var(--red);">*</span>
@@ -2361,6 +2374,16 @@
       <button class="modal-close" onclick="closeModal('rastreio-link-overlay')">&times;</button>
     </div>
     <div class="modal-body" id="rastreio-link-content"></div>
+  </div>
+</div>
+
+<div class="modal-overlay" id="teste-auto-overlay">
+  <div class="modal" style="max-width:440px;">
+    <div class="modal-header">
+      <h2 class="modal-title">⚡ Checklist automático</h2>
+      <button class="modal-close" onclick="testeAutoFechar()">&times;</button>
+    </div>
+    <div class="modal-body" id="teste-auto-content"></div>
   </div>
 </div>
 
@@ -5621,6 +5644,7 @@ function openOSModal(osId){
   wzDirty = false;
   wzShow(1);
   openModal('os-modal-overlay');
+  if(osId) setTimeout(testeAutoVerificarPendentes, 400);   // resultado do teste que chegou com a OS fechada
 }
 
 function populateClientSelect(){
@@ -7022,6 +7046,7 @@ function addAparelhoExtra(existing){
       <div class="fotos-box" data-stage="entrada"></div>
 
       <div class="ae-checklist-wrap">
+        <div class="ta-bar"><button type="button" class="btn btn-sm" onclick="testeAutoAbrir(this.closest('.aparelho-extra-card').dataset.did)">⚡ Checklist automático</button><span>Testa este aparelho pelo celular e preenche a lista. Ou preencha manualmente abaixo.</span></div>
         <fieldset style="border:1px solid var(--border); border-radius:var(--radius); padding:14px 18px; margin-bottom:4px;">
           <legend style="font-size:13px; font-weight:600; color:var(--accent); padding:0 6px;">
             ✔ Lista de Checagem — Os itens abaixo estão em condições de utilização? <span style="color:var(--red);">*</span>
@@ -7443,6 +7468,244 @@ function addHistoryEntry(osId, text){
   if(o){
     o.historico = state.history[osId];
   }
+}
+
+
+/* =========================================================
+   CHECKLIST AUTOMÁTICO — app MOB CHECK (Android) / página (iPhone)
+   O técnico gera um QR único para o aparelho da OS; o celular testa e envia o resultado.
+   ========================================================= */
+const TA_BASE_URL = location.origin + location.pathname.replace(/[^/]*$/, '') + 'teste.html';
+const TA_ROTULOS = Object.fromEntries(CL_ITEMS);
+let _ta = { sessao:null, did:null, timer:null, plataforma:'android', fim:0 };
+let _taAplicando = new Set();
+let _taAvisados = new Set();
+
+async function apiTeste(action, body){
+  const res = await fetch(`${SB_URL}/functions/v1/teste-aparelho?action=${encodeURIComponent(action)}`, {
+    method:'POST',
+    headers:{ 'Content-Type':'application/json', apikey:SB_KEY, Authorization:'Bearer '+SB_KEY, 'x-session-token':getSessionToken() },
+    body: JSON.stringify(body || {})
+  });
+  let data = {};
+  try { data = await res.json(); } catch(e){}
+  if(res.status === 401){ showToast(data.error || 'Sessão encerrada. Faça login novamente.', true); setTimeout(logout, 1500); throw new Error(data.error || 'Sessão encerrada'); }
+  if(!res.ok || data.error) throw new Error(data.error || ('Erro ' + res.status));
+  return data;
+}
+
+// Escopo do aparelho no formulário aberto: radios de cada item
+function taRadios(did, chave){
+  if(did === 'principal') return [...document.querySelectorAll(`input[name="${chave}"]`)];
+  const card = document.querySelector(`#aparelhos-extras-list .aparelho-extra-card[data-did="${did}"]`);
+  return card ? [...card.querySelectorAll(`input[data-ck="${chave}"]`)] : [];
+}
+function taNomeAparelho(did){
+  if(did === 'principal') return (document.getElementById('os-aparelho') || {}).value || (document.getElementById('ac-aparelho-input') || {}).value || 'Aparelho 1';
+  const card = document.querySelector(`#aparelhos-extras-list .aparelho-extra-card[data-did="${did}"]`);
+  return card ? ((card.querySelector('.ae-modelo') || {}).value || 'Aparelho') : 'Aparelho';
+}
+function taImeiForm(did){
+  if(did === 'principal') return (document.getElementById('os-imei') || {}).value || '';
+  const card = document.querySelector(`#aparelhos-extras-list .aparelho-extra-card[data-did="${did}"]`);
+  return card ? ((card.querySelector('.ae-imei') || {}).value || '') : '';
+}
+// IMEI do teste x IMEI da OS: só compara quando os dois parecem IMEI (14+ dígitos)
+function taImeiConfere(imeiOS, imeiTeste){
+  const a = String(imeiOS || '').replace(/\D/g, '');
+  const b = String(imeiTeste || '').split(/[^0-9]+/).filter(x => x.length >= 14);
+  if(a.length < 14 || !b.length) return true;
+  return b.some(x => x === a || x.slice(0,14) === a.slice(0,14));
+}
+function taResumoFalhas(t){
+  return Object.entries(t.checklist || {}).filter(([k,v]) => v === 'Não' && k !== 'cl-liga').map(([k]) => TA_ROTULOS[k] || k);
+}
+
+// Preenche os radios do formulário. sobrescrever=false mantém o que o técnico já marcou.
+function taPreencherForm(did, t, sobrescrever){
+  let n = 0;
+  Object.entries(t.checklist || {}).forEach(([k, v]) => {
+    const rs = taRadios(did, k); if(!rs.length) return;
+    if(!sobrescrever && rs.some(r => r.checked)) return;
+    const alvo = rs.find(r => r.value === v); if(!alvo) return;
+    alvo.checked = true; n++;
+    const item = alvo.closest('.cl-item');
+    if(item){ item.classList.add('ta-auto'); const nota = (t.notas || {})[k]; if(nota) item.title = nota; }
+  });
+  const err = document.getElementById('checklist-error'); if(err) err.style.display = 'none';
+  return n;
+}
+
+function taTextoHistorico(t, n){
+  const f = taResumoFalhas(t);
+  return `Checklist preenchido pelo teste automático (${t.plataforma === 'ios' ? 'iPhone' : 'Android'}): ${n} ite${n === 1 ? 'm' : 'ns'}` + (f.length ? `. Com falha: ${f.join(', ')}` : '. Nenhuma falha') + '.';
+}
+
+// Aplica no formulário da OS que está aberta e já salva (como as fotos)
+async function taAplicarNoForm(t, sobrescrever){
+  const n = taPreencherForm(t.dispositivo_id, t, sobrescrever);
+  addHistoryEntry(t.os_id, taTextoHistorico(t, n));
+  wzDirty = true;
+  try { await saveOS({ level:1, close:false, silent:true, preservarStatus:true }); } catch(e){}
+  if(typeof wzRefresh === 'function') wzRefresh();
+  return n;
+}
+
+// Aplica direto na OS salva (quando o formulário dela não está aberto): só preenche o que está vazio
+async function taAplicarSalvo(t){
+  const o = state.os.find(x => x.id === t.os_id); if(!o) return -1;
+  const novo = {};
+  const fonte = t.dispositivo_id === 'principal' ? (o.checklist || {}) :
+    ((o.aparelhosExtras || []).find((a, i) => (a.id || ('x' + i)) === t.dispositivo_id) || {}).checklist || {};
+  Object.entries(t.checklist || {}).forEach(([k, v]) => { if(!fonte[k]) novo[k] = v; });
+  const n = Object.keys(novo).length;
+  addHistoryEntry(o.id, taTextoHistorico(t, n));
+  if(t.dispositivo_id === 'principal'){
+    o.checklist = Object.assign({}, o.checklist || {}, novo);
+    await sbPatch('ordens_servico', 'id', o.id, { checklist:o.checklist, historico:state.history[o.id] });
+  } else {
+    const extras = JSON.parse(JSON.stringify(o.aparelhosExtras || []));
+    const idx = extras.findIndex((a, i) => (a.id || ('x' + i)) === t.dispositivo_id);
+    if(idx < 0) return -1;
+    extras[idx].checklist = Object.assign({}, extras[idx].checklist || {}, novo);
+    o.aparelhosExtras = extras;
+    await sbPatch('ordens_servico', 'id', o.id, { aparelhos_extras:extras, historico:state.history[o.id] });
+  }
+  return n;
+}
+
+function taFormAbertoDaOS(osId){
+  const ov = document.getElementById('os-modal-overlay');
+  return !!(ov && ov.classList.contains('open') && document.getElementById('os-id').value === osId);
+}
+
+// Verifica resultados que chegaram com o sistema fechado ou com a OS fechada
+async function testeAutoVerificarPendentes(){
+  if(!(pode('os.editar') || pode('os.criar')) || !getSessionToken()) return;
+  let lista = [];
+  try { lista = await apiTeste('pendentes', {}); } catch(e){ return; }
+  for(const t of lista){
+    if(t.status !== 'recebido' || _taAplicando.has(t.id) || (_ta.sessao && _ta.sessao.id === t.id)) continue;
+    const o = state.os.find(x => x.id === t.os_id); if(!o) continue;
+    const imeiOS = taFormAbertoDaOS(t.os_id) ? taImeiForm(t.dispositivo_id) : (t.dispositivo_id === 'principal' ? o.imei : (((o.aparelhosExtras || []).find((a, i) => (a.id || ('x' + i)) === t.dispositivo_id) || {}).imei));
+    if(!taImeiConfere(imeiOS, (t.info_aparelho || {}).imei)){
+      if(!_taAvisados.has(t.id)){ _taAvisados.add(t.id); showToast(`Teste da OS #${o.numero}: o IMEI do aparelho testado não confere com o da OS. Abra a OS para decidir.`, true); }
+      continue;
+    }
+    _taAplicando.add(t.id);
+    try {
+      let n;
+      if(taFormAbertoDaOS(t.os_id)) n = await taAplicarNoForm(t, false);
+      else n = await taAplicarSalvo(t);
+      if(n >= 0){
+        await apiTeste('aplicar', { id:t.id });
+        showToast(`Teste automático da OS #${o.numero} aplicado ao checklist (${n} ite${n === 1 ? 'm' : 'ns'}).`);
+        renderOSTable();
+      }
+    } catch(e){ console.warn('Teste automático:', e.message); }
+    finally { _taAplicando.delete(t.id); }
+  }
+}
+function testeAutoIniciarVerificador(){
+  testeAutoVerificarPendentes();
+  setInterval(() => { if(!document.hidden) testeAutoVerificarPendentes(); }, 60000);
+  document.addEventListener('visibilitychange', () => { if(!document.hidden) testeAutoVerificarPendentes(); });
+}
+
+/* ---------- Tela do QR ---------- */
+function testeAutoFechar(){
+  if(_ta.timer){ clearInterval(_ta.timer); _ta.timer = null; }
+  closeModal('teste-auto-overlay');
+  // se o resultado chegar depois, o verificador aplica sozinho
+  _ta.sessao = null;
+  setTimeout(testeAutoVerificarPendentes, 1500);
+}
+
+async function testeAutoAbrir(did){
+  if(!wzOsExiste()){ showToast('Avance até a etapa de Recebimento para o sistema criar a OS antes do teste.', true); return; }
+  _ta = { sessao:null, did, timer:null, plataforma: (function(){ try { return localStorage.getItem('mobit_ta_plat') || 'android'; } catch(e){ return 'android'; } })(), fim:0 };
+  if(_ta.plataforma !== 'android') _ta.plataforma = 'android';
+  testeAutoDesenhar();
+  openModal('teste-auto-overlay');
+}
+
+function testeAutoDesenhar(){
+  const c = document.getElementById('teste-auto-content');
+  const nome = escapeHtml(taNomeAparelho(_ta.did));
+  c.innerHTML = `
+    <p style="margin:0 0 6px;"><b>${nome}</b></p>
+    <p class="hint" style="margin:0 0 8px;">Escolha o tipo do aparelho. O QR code vale só para este aparelho desta OS.</p>
+    <div class="ta-plat">
+      <button type="button" class="on">🤖 Android</button>
+      <button type="button" disabled title="Em breve">🍎 iPhone (em breve)</button>
+    </div>
+    <button class="btn btn-primary" style="width:100%;" onclick="testeAutoGerar()">Gerar QR code</button>
+    <p class="hint" style="margin-top:12px;">Sem o app? A página do QR ensina a instalar. O checklist manual continua disponível a qualquer momento.</p>`;
+}
+
+async function testeAutoGerar(){
+  const c = document.getElementById('teste-auto-content');
+  c.innerHTML = '<p class="ta-status">Preparando…</p>';
+  try {
+    if(wzDirty){ const ok = await saveOS({ level:1, close:false, silent:true, preservarStatus:true }); if(!ok){ testeAutoDesenhar(); return; } }
+    const osId = document.getElementById('os-id').value;
+    const s = await apiTeste('criar', { os_id:osId, dispositivo_id:_ta.did, dispositivo_nome:taNomeAparelho(_ta.did), plataforma:'android' });
+    _ta.sessao = { id:s.id, codigo:s.codigo, expira_em:s.expira_em, osId };
+    const url = TA_BASE_URL + '?c=' + encodeURIComponent(s.codigo);
+    let svg = '';
+    try { const q = qrcode(0, 'M'); q.addData(url); q.make(); svg = q.createSvgTag({ cellSize:6, margin:0, scalable:true }); } catch(e){ svg = ''; }
+    c.innerHTML = `
+      <p style="margin:0 0 4px;"><b>${escapeHtml(taNomeAparelho(_ta.did))}</b></p>
+      <ol class="hint" style="margin:0 0 6px; padding-left:18px;">
+        <li>Escaneie o QR com a câmera do celular a ser testado.</li>
+        <li>Instale ou abra o MOB CHECK e faça os testes.</li>
+        <li>Ao terminar, o resultado aparece aqui sozinho.</li>
+      </ol>
+      <div class="ta-qr">${svg || '<span style="color:#000;font-size:12px;">Não foi possível desenhar o QR. Use o link abaixo.</span>'}</div>
+      <div class="ta-status" id="ta-status">⏳ Aguardando o aparelho…</div>
+      <div style="display:flex; gap:8px;">
+        <button class="btn btn-sm" style="flex:1;" onclick="testeAutoCopiar()">Copiar link</button>
+        <button class="btn btn-sm" style="flex:1;" onclick="testeAutoFechar()">Fechar e continuar</button>
+      </div>
+      <p class="hint" style="margin-top:10px;">Pode fechar esta janela: o resultado fica guardado e é aplicado ao checklist assim que chegar.</p>`;
+    _ta.url = url;
+    _ta.timer = setInterval(testeAutoConsultar, 3000);
+  } catch(e){
+    c.innerHTML = `<p class="ta-status ta-erro">${escapeHtml(e.message)}</p><button class="btn" style="width:100%;" onclick="testeAutoDesenhar()">Voltar</button>`;
+  }
+}
+
+function testeAutoCopiar(){
+  try { navigator.clipboard.writeText(_ta.url || ''); showToast('Link copiado.'); } catch(e){ showToast('Não foi possível copiar.', true); }
+}
+
+async function testeAutoConsultar(){
+  const s = _ta.sessao; if(!s) return;
+  const st = document.getElementById('ta-status');
+  try {
+    const t = await apiTeste('status', { id:s.id });
+    if(!_ta.sessao || _ta.sessao.id !== s.id) return;
+    if(t.status === 'recebido'){
+      clearInterval(_ta.timer); _ta.timer = null;
+      _taAplicando.add(t.id);
+      try {
+        // IMEI diferente do da OS: confirma antes de aplicar
+        if(!taImeiConfere(taImeiForm(t.dispositivo_id), (t.info_aparelho || {}).imei) &&
+           !confirm(`O IMEI do aparelho testado (${(t.info_aparelho || {}).imei}) é diferente do IMEI da OS (${taImeiForm(t.dispositivo_id)}).\n\nAplicar o resultado mesmo assim?`)){
+          if(st){ st.className = 'ta-status ta-erro'; st.textContent = 'Resultado não aplicado (IMEI diferente).'; }
+          return;
+        }
+        const n = await taAplicarNoForm(t, true);
+        await apiTeste('aplicar', { id:t.id });
+        const f = taResumoFalhas(t);
+        if(st){ st.className = 'ta-status ta-ok'; st.innerHTML = `✓ Resultado recebido: ${n} ite${n === 1 ? 'm' : 'ns'} preenchido${n === 1 ? '' : 's'}.` + (f.length ? `<br><span class="ta-erro" style="font-size:13px;">Com falha: ${escapeHtml(f.join(', '))}</span>` : '<br><span style="font-size:13px;">Nenhuma falha encontrada.</span>'); }
+        document.querySelectorAll('#teste-auto-content .ta-qr, #teste-auto-content ol.hint').forEach(e => e.style.display = 'none');
+      } finally { _taAplicando.delete(t.id); }
+    } else if(new Date(t.expira_em) < new Date()){
+      clearInterval(_ta.timer); _ta.timer = null;
+      if(st){ st.className = 'ta-status ta-erro'; st.textContent = 'O QR expirou. Gere um novo.'; }
+    }
+  } catch(e){ /* sem rede por um instante: tenta de novo no próximo ciclo */ }
 }
 
 /* ---------- Visualizar OS ---------- */
@@ -10367,6 +10630,7 @@ const PERM_PAGINAS = { dashboard:'painel.ver', ordens:'os.ver', estoque:'estoque
 const PERM_FUNCOES = {
   deleteOS:'os.excluir', quickUpdateStatus:'os.status', abrirLinkAcompanhamento:'os.rastreio', gerarNovoLinkRastreio:'os.rastreio', printOS:'os.imprimir',
   openOSModal: (id) => id ? 'os.editar' : 'os.criar',
+  testeAutoAbrir: () => pode('os.editar') ? 'os.editar' : 'os.criar',
   openStockModal:'estoque.editar', saveStockItem:'estoque.editar', deleteStockItem:'estoque.excluir', openPedidoModal:'estoque.importar_nf',
   openClientModal:'clientes.editar', openClientModalFromOS:'clientes.editar', saveClient:'clientes.editar', deleteClient:'clientes.excluir',
   openCompraModal:'compras.editar', saveCompra:'compras.editar', openLancarNFModal:'compras.editar',
@@ -10489,6 +10753,7 @@ function primeiraPaginaPermitida(){
   renderClientsTable();
   restaurarPagina();
   iniciarNotificacoes();
+  testeAutoIniciarVerificador();
 })();
 
 /* =========================================================
