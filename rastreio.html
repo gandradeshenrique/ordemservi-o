@@ -257,25 +257,15 @@
     </div>
 
     <div class="card">
-      <div class="section-title">Detalhes do reparo</div>
+      <div class="section-title">Detalhes da OS</div>
       <div class="kv-list" id="os-detalhes"></div>
     </div>
 
-    <div class="card" id="card-checklist" style="display:none;">
-      <div class="section-title">Checklist de recebimento</div>
-      <div class="checklist-grid" id="os-checklist"></div>
-    </div>
+    <div id="os-aparelhos"></div>
 
-    <div class="card" id="card-fotos" style="display:none;">
-      <div class="section-title">Fotos</div>
-      <div id="os-fotos"></div>
-    </div>
-
-    <div class="card" id="card-pecas" style="display:none;">
-      <div class="section-title">Peças e serviços</div>
-      <div id="os-pecas"></div>
-      <div style="text-align:right; font-weight:700; font-size:15px; color:var(--accent); padding-top:10px;">
-        Total: <span id="os-total"></span>
+    <div class="card" id="card-total" style="display:none;">
+      <div style="text-align:right; font-weight:700; font-size:15px; color:var(--accent);">
+        Total da OS: <span id="os-total"></span>
       </div>
     </div>
 
@@ -604,18 +594,15 @@ async function mostrarAcompanhamento(o){
 
   // Detalhes
   const det = [];
-  if(o.defeito) det.push(['Defeito relatado', escapeHtml(o.defeito)]);
-  if(o.diagnostico) det.push(['Diagnóstico técnico', escapeHtml(o.diagnostico)]);
   det.push(['Entrada', formatDate(o.data_entrada)]);
   det.push(['Previsão', formatDate(o.data_prevista)]);
   if(o.pagamento) det.push(['Forma de pagamento', escapeHtml(o.pagamento)]);
   if(o.garantia) det.push(['Garantia', escapeHtml(String(o.garantia)) + ' dias']);
-  if(o.acessorios) det.push(['Acessórios', escapeHtml(o.acessorios)]);
   document.getElementById('os-detalhes').innerHTML = det.map(([l,v]) =>
     `<div class="kv-row"><span class="kv-label">${l}</span><span class="kv-value">${v}</span></div>`
   ).join('');
 
-  // Checklist
+  // Aparelhos: tudo de cada aparelho junto (dados, checklist, fotos, peças e serviços)
   const clLabels = [
     ['cl-liga','Liga?'],['cl-carrega','Carrega?'],['cl-display','Display'],['cl-touch','Touch'],
     ['cl-vidro','Vidro'],['cl-tampa','Tampa Traseira'],['cl-camtraseira','Câmera Traseira'],['cl-camfrontal','Câmera Frontal'],
@@ -623,46 +610,13 @@ async function mostrarAcompanhamento(o){
     ['cl-auricular','Auricular'],['cl-sinal','Sinal Operadora'],['cl-wifi','Wifi'],['cl-bluetooth','Bluetooth'],
     ['cl-sensor','Sensor de Proximidade'],['cl-gaveta','Gaveta de Chip'],['cl-power','Botão Power'],['cl-volume','Botão Volume']
   ];
-  const cl = o.checklist || {};
-  if(Object.keys(cl).length){
-    document.getElementById('card-checklist').style.display = 'block';
-    document.getElementById('os-checklist').innerHTML = clLabels.map(([k,label]) => {
-      const v = cl[k] || '—';
-      const color = v === 'Sim' ? 'var(--green)' : v === 'Não' ? 'var(--red)' : 'var(--text-faint)';
-      return `<div class="cl-row"><span class="text-dim">${label}</span><span style="font-weight:600; color:${color};">${v}</span></div>`;
-    }).join('');
-  } else {
-    document.getElementById('card-checklist').style.display = 'none';
-  }
-
-  // Fotos
-  const devs = [{ id:'principal', n:1, nome:o.aparelho }].concat((o.aparelhos_extras || []).map((a,i) => ({ id:a.id || ('x'+i), n:i+2, nome:a.modelo })));
   const ap = (o.fotos && o.fotos.ap) || {};
-  const temFotos = devs.some(d => ((ap[d.id]||{}).entrada||[]).length || ((ap[d.id]||{}).saida||[]).length);
-  if(temFotos){
-    document.getElementById('card-fotos').style.display = 'block';
-    const col = (d, stage, label) => {
-      const fs = (ap[d.id]||{})[stage] || [];
-      if(!fs.length) return '';
-      return `<div style="margin-bottom:10px;">
-        <div style="font-size:11px; color:var(--text-faint); margin-bottom:4px;">Aparelho ${d.n} — ${label}</div>
-        <div class="fotos-grid">${fs.map(f => `<img src="${f.url}" alt="" loading="lazy" onclick="window.open('${f.url}','_blank')">`).join('')}</div>
-      </div>`;
-    };
-    document.getElementById('os-fotos').innerHTML = devs.map(d => col(d,'entrada','Entrada') + col(d,'saida','Saída')).join('');
-  } else {
-    document.getElementById('card-fotos').style.display = 'none';
-  }
-
-  // Peças e serviços
-  const parts = o.parts || [];
   const extras = o.aparelhos_extras || [];
-  const temPecas = parts.length || o.mao_obra || extras.length;
-  if(temPecas){
-    document.getElementById('card-pecas').style.display = 'block';
-    const tabelaPecas = (lista, maoObra) => {
-      const subtotal = lista.reduce((s,p) => s + p.qtd*p.preco, 0) + (maoObra || 0);
-      return `
+  const devs = [{ id:'principal', n:1, nome:o.aparelho, imei:o.imei, defeito:o.defeito, diagnostico:o.diagnostico, acessorios:o.acessorios, checklist:o.checklist, parts:o.parts || [], maoObra:o.mao_obra }]
+    .concat(extras.map((a,i) => ({ id:a.id || ('x'+i), n:i+2, nome:a.modelo, imei:a.imei, defeito:a.defeito, diagnostico:a.diagnostico, acessorios:a.acessorios, checklist:a.checklist, parts:a.parts || [], maoObra:a.maoObra })));
+  const tabelaPecas = (lista, maoObra) => {
+    const subtotal = lista.reduce((s,p) => s + p.qtd*p.preco, 0) + (maoObra || 0);
+    return `
       <table style="margin-bottom:10px;">
         <thead><tr><th>Item</th><th>Qtd.</th><th>Preço</th><th>Subtotal</th></tr></thead>
         <tbody>
@@ -671,16 +625,36 @@ async function mostrarAcompanhamento(o){
         </tbody>
         <tfoot><tr><td colspan="3" style="text-align:right; font-weight:700;">Subtotal do aparelho</td><td class="mono" style="font-weight:700; color:var(--accent);">${formatCurrency(subtotal)}</td></tr></tfoot>
       </table>`;
+  };
+  const sub = t => `<div style="font-size:11px; font-weight:700; color:var(--text-dim); text-transform:uppercase; letter-spacing:.4px; margin:14px 0 6px;">${t}</div>`;
+  document.getElementById('os-aparelhos').innerHTML = devs.map(d => {
+    const kv = [];
+    if(d.defeito) kv.push(['Defeito relatado', escapeHtml(d.defeito)]);
+    if(d.diagnostico) kv.push(['Diagnóstico técnico', escapeHtml(d.diagnostico)]);
+    if(d.acessorios) kv.push(['Acessórios', escapeHtml(d.acessorios)]);
+    let h = `<div class="card"><div class="section-title">Aparelho ${d.n}${d.nome ? ' — ' + escapeHtml(d.nome) : ''}${d.imei ? ` <span style="font-weight:400; color:var(--text-dim); font-size:11px;">(IMEI: ${escapeHtml(d.imei)})</span>` : ''}</div>`;
+    if(kv.length) h += `<div class="kv-list">${kv.map(([l,v]) => `<div class="kv-row"><span class="kv-label">${l}</span><span class="kv-value">${v}</span></div>`).join('')}</div>`;
+    const cl = d.checklist || {};
+    if(Object.keys(cl).length){
+      h += sub('Checklist de recebimento') + `<div class="checklist-grid">${clLabels.map(([k,label]) => {
+        const v = cl[k] || '—';
+        const color = v === 'Sim' ? 'var(--green)' : v === 'Não' ? 'var(--red)' : 'var(--text-faint)';
+        return `<div class="cl-row"><span class="text-dim">${label}</span><span style="font-weight:600; color:${color};">${v}</span></div>`;
+      }).join('')}</div>`;
+    }
+    const fotoCol = (stage, label) => {
+      const fs = ((ap[d.id] || {})[stage]) || [];
+      if(!fs.length) return '';
+      return `<div style="margin-bottom:6px;"><div style="font-size:11px; color:var(--text-faint);">${label}</div><div class="fotos-grid">${fs.map(f => `<img src="${f.url}" alt="" loading="lazy" onclick="window.open('${f.url}','_blank')">`).join('')}</div></div>`;
     };
-    let html = `<div style="font-size:12px; font-weight:700; color:var(--accent); margin-bottom:6px;">Aparelho 1 — ${escapeHtml(o.aparelho||'')}${o.imei ? ` <span style="font-weight:400; color:var(--text-dim); font-size:11px;">(IMEI: ${escapeHtml(o.imei)})</span>` : ''}</div>` + tabelaPecas(parts, o.mao_obra);
-    extras.forEach((a,i) => {
-      html += `<div style="font-size:12px; font-weight:700; color:var(--accent); margin:12px 0 6px;">Aparelho ${i+2} — ${escapeHtml(a.modelo||'')}${a.imei ? ` <span style="font-weight:400; color:var(--text-dim); font-size:11px;">(IMEI: ${escapeHtml(a.imei)})</span>` : ''}</div>` + tabelaPecas(a.parts||[], a.maoObra);
-    });
-    document.getElementById('os-pecas').innerHTML = html;
-    document.getElementById('os-total').textContent = formatCurrency(o.total);
-  } else {
-    document.getElementById('card-pecas').style.display = 'none';
-  }
+    const fotosH = fotoCol('entrada','Entrada') + fotoCol('saida','Saída');
+    if(fotosH) h += sub('Fotos') + fotosH;
+    if(d.parts.length || d.maoObra) h += sub('Peças e serviços') + tabelaPecas(d.parts, d.maoObra);
+    return h + '</div>';
+  }).join('');
+  const temTotal = (o.parts || []).length || o.mao_obra || extras.length;
+  document.getElementById('card-total').style.display = (temTotal && devs.length > 1) || (temTotal && o.total) ? 'block' : 'none';
+  document.getElementById('os-total').textContent = formatCurrency(o.total);
 
   // Observações
   if(o.observacoes){

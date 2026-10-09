@@ -399,13 +399,32 @@ $script:HasBat=$false
 $Cfg=@{ Cpu=150; RamPct=75; RamLoops=2; DiscoGB=2.0; Comb=90; Nome='COMPLETO' }
 
 function T-Info {
-    Set-Screen 'Identificação do equipamento' 'Lendo modelo e número de série...'
+    Set-Screen 'Identificação do equipamento' 'Lendo fabricante, modelo, numero de série, BIOS, CPU, memória, discos, tela e Windows...'
     $cs=Get-CimInstance Win32_ComputerSystem; $bios=Get-CimInstance Win32_BIOS
+    $cpu=Get-CimInstance Win32_Processor | Select-Object -First 1
+    $os=Get-CimInstance Win32_OperatingSystem
+    $mem=@(Get-CimInstance Win32_PhysicalMemory)
+    $ramGB=[math]::Round($cs.TotalPhysicalMemory/1GB,1)
+    $memTxt= if($mem.Count){ ($mem | ForEach-Object { "{0}GB {1}MHz {2}" -f [math]::Round($_.Capacity/1GB),$_.Speed,$_.Manufacturer }) -join ' + ' } else { 'n/d' }
+    $disks=@(Get-PhysicalDisk -ErrorAction SilentlyContinue | ForEach-Object { "{0} ({1}, {2}GB, {3})" -f $_.FriendlyName,$_.MediaType,[math]::Round($_.Size/1GB),$_.BusType }) -join ' | '
+    $gpus=@(Get-CimInstance Win32_VideoController | ForEach-Object { $_.Name }) -join ' | '
+    $scr=[Windows.Forms.Screen]::PrimaryScreen.Bounds
+    $lic='n/d'
+    try{ $p=Get-CimInstance SoftwareLicensingProduct | Where-Object { $_.PartialProductKey -and $_.Name -like 'Windows*' } | Select-Object -First 1; $lic= if($p.LicenseStatus -eq 1){'Ativado'}else{'NÃO ativado'} }catch{}
+    $tpm='n/d'; try{ $t=Get-Tpm -ErrorAction Stop; $tpm= if($t.TpmPresent){'Presente'}else{'Ausente'} }catch{}
+    $sb='n/d'; try{ $sb= if(Confirm-SecureBootUEFI -ErrorAction Stop){'Ativo'}else{'Desativado'} }catch{ $sb='Indisponível/BIOS legado' }
     $serial=([string]$bios.SerialNumber).Trim(); if(-not $serial){ $serial='SEM-SERIAL' }
     $script:Info['Fabricante']=$cs.Manufacturer; $script:Info['Modelo']=$cs.Model; $script:Info['Número de série']=$serial
+    $script:Info['BIOS']=("{0} ({1})" -f $bios.SMBIOSBIOSVersion,$(if($bios.ReleaseDate){$bios.ReleaseDate.ToString('yyyy-MM-dd')}else{'n/d'}))
+    $script:Info['Processador']=("{0} - {1} nucleos / {2} threads" -f ([string]$cpu.Name).Trim(),$cpu.NumberOfCores,$cpu.NumberOfLogicalProcessors)
+    $script:Info['Memória RAM']=("{0} GB  [{1}]" -f $ramGB,$memTxt)
+    $script:Info['Discos']=$disks; $script:Info['Video']=$gpus
+    $script:Info['Tela principal']=("{0}x{1}" -f $scr.Width,$scr.Height)
+    $script:Info['Windows']=("{0} (build {1}) - {2}" -f $os.Caption,$os.BuildNumber,$lic)
+    $script:Info['TPM / Secure Boot']="$tpm / $sb"
     $ui_Sub.Text=("{0} {1}  |  S/N {2}" -f $cs.Manufacturer,$cs.Model,$serial)
     $script:Serial=$serial
-    Live (($script:Info.GetEnumerator() | ForEach-Object { "{0,-18}: {1}" -f $_.Key,$_.Value }) -join "`r`n") 26
+    Live (($script:Info.GetEnumerator() | ForEach-Object { "{0,-18}: {1}" -f $_.Key,$_.Value }) -join "`r`n") 15
     Set-T 'info' 'OK' ("{0} {1} | S/N {2}" -f $cs.Manufacturer,$cs.Model,$serial)
 }
 
@@ -501,27 +520,75 @@ function T-Bateria {
     if($saude -ge 80){ Set-T 'bat' 'OK' $d } elseif($saude -ge 60){ Set-T 'bat' 'ALERTA' "Bateria desgastada: $d" } else { Set-T 'bat' 'FALHA' "Bateria no fim da vida: $d" }
 }
 
+# Windows 11 24H2+: sem a Localizacao ligada o "netsh wlan" nao mostra SSID/sinal nem lista redes
+function Enable-Location {
+    $cs='SOFTWARE\Microsoft\Windows\CurrentVersion\CapabilityAccessManager\ConsentStore\location'
+    foreach($k in "HKLM:\$cs","HKCU:\$cs","HKCU:\$cs\NonPackaged"){
+        try{ if(-not (Test-Path $k)){ New-Item -Path $k -Force | Out-Null }; Set-ItemProperty -Path $k -Name Value -Value 'Allow' -Type String -Force }catch{}
+    }
+    try{ Set-ItemProperty -Path 'HKLM:\SYSTEM\CurrentControlSet\Services\lfsvc\Service\Configuration' -Name Status -Value 1 -Type DWord -Force }catch{}
+    try{ Start-Service lfsvc -ErrorAction SilentlyContinue }catch{}
+}
+function Get-WifiInfo($a){
+    $r=[ordered]@{ Ssid=''; Sinal=$null; Link=''; Padrao=''; Fonte='netsh' }
+    $ni=(netsh wlan show interfaces) -join "`n"
+    if($ni -match '(?m)^\s*(Sinal|Signal)\s*:\s*(\d+)%'){ $r.Sinal=[int]$Matches[2] }
+    if($ni -match '(?m)^\s*SSID\s*:\s*(.+)$'){ $r.Ssid=$Matches[1].Trim() }
+    if($ni -match '(?m)^\s*(Taxa de recep[^:]*|Receive rate[^:]*)\s*:\s*([\d\.,]+)'){ $r.Link=$Matches[2] }
+    if($ni -match '(?m)^\s*(Tipo de r[^:]*|Radio type)\s*:\s*(.+)$'){ $r.Padrao=$Matches[2].Trim() }
+    if(-not $r.Ssid){
+        $st=(Get-NetAdapter -InterfaceIndex $a.ifIndex -ErrorAction SilentlyContinue).Status
+        if($st -eq 'Up'){
+            try{ $r.Ssid=[string](Get-NetConnectionProfile -InterfaceIndex $a.ifIndex -ErrorAction Stop | Select-Object -First 1).Name; $r.Fonte='perfil de rede (netsh bloqueado pela permissao de localizacao)' }catch{}
+        }
+    }
+    return [pscustomobject]$r
+}
+
 function T-Rede {
     Set-Screen 'Wi-Fi e rede' 'Verificando adaptador, sinal, perda de pacotes e velocidade real de download.'
     [Net.ServicePointManager]::SecurityProtocol=[Net.SecurityProtocolType]::Tls12
-    $wifi=@(Get-NetAdapter -Physical -ErrorAction SilentlyContinue | Where-Object { $_.PhysicalMediaType -match '802.11' -or $_.InterfaceDescription -match 'Wireless|Wi-?Fi|WLAN|802\.11' })
-    $eth=@(Get-NetAdapter -Physical -ErrorAction SilentlyContinue | Where-Object { $_.PhysicalMediaType -match '802.3' -and $_.InterfaceDescription -notmatch 'Bluetooth|Wireless' })
+    Enable-Location
+    $wifi=@(Get-NetAdapter -Physical -ErrorAction SilentlyContinue | Where-Object { $_.PhysicalMediaType -match '802\.11' -or $_.InterfaceDescription -match 'Wireless|Wi-?Fi|WLAN|802\.11' })
+    $eth=@(Get-NetAdapter -Physical -ErrorAction SilentlyContinue | Where-Object { $_.PhysicalMediaType -match '802\.3' -and $_.InterfaceDescription -notmatch 'Bluetooth|Wireless|Wi-?Fi' })
     if(-not $wifi.Count){ Set-T 'rede' 'FALHA' 'Nenhum adaptador Wi-Fi encontrado (placa ausente ou sem driver)'; return }
-    $a=$wifi[0]; $notas=@("Adaptador: $($a.InterfaceDescription) [$($a.Status)]")
+    $a=@($wifi | Sort-Object @{Expression={ if($_.Status -eq 'Up'){0}else{1} }})[0]
+    if($a.Status -eq 'Disabled'){ try{ Enable-NetAdapter -Name $a.Name -Confirm:$false -ErrorAction Stop; Wait-UI 4000 }catch{} }
+    $notas=@("Adaptador: $($a.InterfaceDescription)")
+    $ethUp=@($eth | Where-Object { $_.Status -eq 'Up' })
     if($eth.Count){ $notas+="Ethernet: $($eth[0].InterfaceDescription) [$($eth[0].Status), $($eth[0].LinkSpeed)]" }
-    $sinal=$null; $ssid=''
-    $ni=(netsh wlan show interfaces) -join "`n"
-    if($ni -match '(?m)^\s*(Sinal|Signal)\s*:\s*(\d+)%'){ $sinal=[int]$Matches[2] }
-    if($ni -match '(?m)^\s*SSID\s*:\s*(.+)$'){ $ssid=$Matches[1].Trim() }
-    if($ni -match '(?m)^\s*(Taxa de recep[^:]*|Receive rate[^:]*)\s*:\s*([\d\.,]+)'){ $notas+="Link: $($Matches[2]) Mbps" }
-    if($ni -match '(?m)^\s*(Tipo de r[^:]*|Radio type)\s*:\s*(.+)$'){ $notas+="Padrao: $($Matches[2].Trim())" }
-    if(-not $ssid){ Set-T 'rede' 'ALERTA' (($notas -join ' | ') + ' | Wi-Fi não esta conectado'); return }
-    $notas+="Rede: $ssid, sinal $sinal%"
-    $j=Test-Connection 1.1.1.1 -Count 10 -AsJob
-    while($j.State -eq 'Running'){ UI-Pump; Start-Sleep -Milliseconds 100 }
-    $pr=@(Receive-Job $j -ErrorAction SilentlyContinue); Remove-Job $j -Force
-    $perda=100-($pr.Count*10); $lat=if($pr.Count){[math]::Round(($pr | Measure-Object ResponseTime -Average).Average)}else{0}
-    $notas+="Ping 1.1.1.1: perda $perda%, $lat ms"
+    $wi=Get-WifiInfo $a
+    if(-not $wi.Ssid){
+        # tenta reconectar nas redes da MOB que o assistente deixou salvas no Windows
+        $cfg=Get-ItemProperty -Path 'HKLM:\SOFTWARE\MOB' -ErrorAction SilentlyContinue
+        $lista=@(@($cfg.WifiSSID,$cfg.WifiSSID2,$cfg.WifiSSID3) | Where-Object { $_ })
+        foreach($s in $lista){
+            Live ("Wi-Fi desconectado. Tentando conectar na rede salva '{0}'..." -f $s) 20
+            $o=netsh wlan connect name="$s" interface="$($a.Name)"; Log ("netsh connect {0}: {1}" -f $s,($o -join ' '))
+            $sw=[Diagnostics.Stopwatch]::StartNew()
+            while($sw.Elapsed.TotalSeconds -lt 15){ Wait-UI 1000; if((Get-NetAdapter -InterfaceIndex $a.ifIndex -ErrorAction SilentlyContinue).Status -eq 'Up'){ break } }
+            Wait-UI 3000
+            $wi=Get-WifiInfo $a
+            if($wi.Ssid){ break }
+        }
+    }
+    if($wi.Padrao){ $notas+="Padrao: $($wi.Padrao)" }
+    if($wi.Link){ $notas+="Link: $($wi.Link) Mbps" }
+    if(-not $wi.Ssid){ Set-T 'rede' 'ALERTA' (($notas -join ' | ') + ' | Wi-Fi não está conectado (a placa existe, mas não conectou em nenhuma rede)'); return }
+    $notas+=("Rede: {0}, sinal {1}" -f $wi.Ssid,$(if($null -ne $wi.Sinal){"$($wi.Sinal)%"}else{'n/d'}))
+    if($wi.Fonte -ne 'netsh'){ $notas+="SSID lido pelo $($wi.Fonte)" }
+    if($ethUp.Count){ $notas+='ATENÇÃO: cabo de rede conectado - a velocidade pode ter sido medida pelo cabo' }
+    # ping com .NET (Test-Connection -AsJob conta pings perdidos como recebidos)
+    $pg=New-Object Net.NetworkInformation.Ping; $alvo=''; $okP=0; $tms=@()
+    foreach($dst in '1.1.1.1','8.8.8.8'){
+        $okP=0; $tms=@(); $alvo=$dst
+        for($i=0;$i -lt 10;$i++){
+            try{ $rp=$pg.Send($dst,1000); if($rp.Status -eq 'Success'){ $okP++; $tms+=[int]$rp.RoundtripTime } }catch{}
+            UI-Pump; Start-Sleep -Milliseconds 150
+        }
+        if($okP -gt 0){ break }
+    }
+    $perda=100-($okP*10); $lat=if($tms.Count){[math]::Round(($tms | Measure-Object -Average).Average)}else{0}
     $speeds=@()
     for($i=1;$i -le 3;$i++){
         try{
@@ -531,13 +598,15 @@ function T-Rede {
             while(-not $tk.IsCompleted){ UI-Pump; Start-Sleep -Milliseconds 50 }
             if($tk.Status -eq 'RanToCompletion'){ $mb=($tk.Result.Length*8)/1e6; $speeds+=[math]::Round($mb/$sw.Elapsed.TotalSeconds,1) }
         }catch{}
-        Live ("Velocidades medidas (Mbps): {0}" -f ($speeds -join ', '))
+        Live ("Rede: {0}`r`nPing {1}: perda {2}%, {3} ms`r`nVelocidades medidas (Mbps): {4}" -f $wi.Ssid,$alvo,$perda,$lat,($speeds -join ', '))
     }
     $avg= if($speeds.Count){[math]::Round(($speeds | Measure-Object -Average).Average,1)}else{0}
+    $icmpBloq=($okP -eq 0 -and $avg -gt 0)
+    if($icmpBloq){ $notas+='Ping: sem resposta (ICMP provavelmente bloqueado pela rede)' } else { $notas+="Ping ${alvo}: perda $perda%, $lat ms" }
     $notas+="Download medio: $avg Mbps"
     $d=$notas -join ' | '
-    if($perda -ge 30 -or $avg -eq 0){ Set-T 'rede' 'FALHA' $d }
-    elseif(($sinal -ne $null -and $sinal -lt 40) -or $perda -ge 10 -or $avg -lt 10){ Set-T 'rede' 'ALERTA' $d }
+    if($avg -eq 0 -or ($perda -ge 30 -and -not $icmpBloq)){ Set-T 'rede' 'FALHA' $d }
+    elseif(($null -ne $wi.Sinal -and $wi.Sinal -lt 40) -or ($perda -ge 10 -and -not $icmpBloq) -or $avg -lt 10){ Set-T 'rede' 'ALERTA' $d }
     else { Set-T 'rede' 'OK' $d }
 }
 
@@ -1105,7 +1174,7 @@ Refresh-List
 
 $Win.Show(); $Win.Activate() | Out-Null
 Log 'MOB-CHECK PC iniciado'
-Set-Screen 'Bem-vindo ao MOB-CHECK PC' 'Fase 1 roda sozinha (CPU, RAM, disco, bateria, rede, Bluetooth, vídeo, drivers e estresse combinado). Depois a Fase 2 pede ações suas: tela, teclado, touchpad, áudio, câmera, USB, HDMI, carregador, tampa. Sem resposta em 20 s, inicia o teste COMPLETO.'
+Set-Screen 'Bem-vindo ao MOB-CHECK PC' 'Fase 1 roda sozinha (CPU, RAM, disco, bateria, rede, Bluetooth, vídeo, drivers e estresse combinado). Depois a Fase 2 pede ações suas: tela, teclado, touchpad, áudio, câmera, USB, HDMI, carregador, tampa. Sem resposta em 6 s, inicia o teste COMPLETO.'
 $modo= if($Rapido){'R'} elseif($Completo){'C'} else { $r=Wait-Click @('Teste COMPLETO','Teste RÁPIDO') 6; if($r -like '*PIDO*'){'R'}else{'C'} }
 if($modo -eq 'R'){ $Cfg=@{ Cpu=20; RamPct=50; RamLoops=1; DiscoGB=0.5; Comb=20; Nome='RAPIDO' } }
 Log ("Modo: "+$Cfg.Nome)
@@ -1149,13 +1218,20 @@ $tb=New-Object Windows.Controls.TextBlock; $tb.Text=$ver; $tb.FontSize=54; $tb.F
 $ui_Painel.Content=$tb; $ui_Barra.Value=100
 Log "Veredito: $ver"
 while($true){
-    $r=Wait-Click @('Abrir relatório','Copiar para pendrive','Refazer testes','Fechar')
+    $r=Wait-Click @('Abrir relatório','Copiar para pendrive','Refazer testes','Fechar','Apagar Wi-Fi MOB e fechar')
     switch($r){
         'Abrir relatório' { Start-Process $script:ReportFile }
         'Copiar para pendrive' {
             $u=@(Get-UsbDrives); if($u.Count){ foreach($d in $u){ New-Item -ItemType Directory -Force -Path "$d\MOB-RELATORIOS" | Out-Null; Copy-Item $script:ReportFile "$d\MOB-RELATORIOS\" -Force }; Log ("Copiado para: "+($u -join ', ')) } else { Log 'Nenhum pendrive encontrado' }
         }
-        'Refazer testes' { Remove-Item "$Base\done.flag" -ErrorAction SilentlyContinue; Start-Process powershell -ArgumentList "-NoProfile -ExecutionPolicy Bypass -STA -File `"$PSCommandPath`""; $Win.Close() }
+        'Refazer testes' { Remove-Item "$Base\done.flag" -ErrorAction SilentlyContinue; try{ $script:Mutex.ReleaseMutex() }catch{}; Start-Process powershell -ArgumentList "-NoProfile -ExecutionPolicy Bypass -STA -File `"$PSCommandPath`"$extra"; $Win.Close() }
         'Fechar' { $Win.Close() }
+        'Apagar Wi-Fi MOB e fechar' {
+            # remove as redes/senhas da MOB deste notebook (use antes de entregar ao cliente)
+            $cfg=Get-ItemProperty -Path 'HKLM:\SOFTWARE\MOB' -ErrorAction SilentlyContinue
+            foreach($s in @(@($cfg.WifiSSID,$cfg.WifiSSID2,$cfg.WifiSSID3) | Where-Object { $_ })){ $o=netsh wlan delete profile name="$s"; Log ("Removido perfil Wi-Fi {0}: {1}" -f $s,($o -join ' ')) }
+            foreach($n in 'WifiSSID','WifiSenha','WifiAuth','WifiSSID2','WifiSenha2','WifiAuth2','WifiSSID3','WifiSenha3','WifiAuth3'){ Remove-ItemProperty -Path 'HKLM:\SOFTWARE\MOB' -Name $n -ErrorAction SilentlyContinue }
+            Wait-UI 1500; $Win.Close()
+        }
     }
 }

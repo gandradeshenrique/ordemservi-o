@@ -6086,6 +6086,7 @@ async function fotoSelecionar(input, did, stage){
   } catch(e){
     showToast('Erro ao enviar foto: ' + e.message, true);
   } finally {
+    document.querySelectorAll('#os-modal-overlay .fotos-box.enviando').forEach(b => b.classList.remove('enviando'));
     fotosRender(); wzRefresh();
   }
 }
@@ -6112,6 +6113,7 @@ function fotosBoxHtml(did, stage, titulo, obrigatoria){
 function fotosRender(){
   const obrig = fotosAtivas();
   document.querySelectorAll('#os-modal-overlay .fotos-box').forEach(box => {
+    box.classList.remove('enviando');
     let did = box.dataset.did;
     if(!did){ const c = box.closest('.aparelho-extra-card'); did = c ? c.dataset.did : 'principal'; }
     const stage = box.dataset.stage;
