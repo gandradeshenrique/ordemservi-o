@@ -1218,6 +1218,10 @@
 #os-modal-overlay[data-wz="6"] .fotos-box[data-stage="entrada"]{ display:none; }
 .ta-bar{ display:flex; align-items:center; gap:10px; flex-wrap:wrap; padding:10px 12px; margin-bottom:10px; border:1px dashed var(--accent); border-radius:var(--radius); background:var(--tint, rgba(45,160,224,.08)); }
 .ta-bar span{ font-size:12px; color:var(--text-dim); flex:1; min-width:160px; }
+.ta-info{ display:none; margin:-4px 0 10px; padding:8px 12px; border-radius:var(--radius); background:var(--panel-2); font-size:12px; color:var(--text-dim); line-height:1.6; }
+.ta-info.on{ display:block; }
+.ta-info b{ color:var(--text); }
+.ta-val{ font-size:11px; font-weight:700; color:var(--accent); margin-left:6px; }
 .cl-item.ta-auto > span::after{ content:' ⚡ auto'; font-size:10px; font-weight:700; color:var(--accent); }
 .ta-plat{ display:flex; gap:8px; margin:6px 0 12px; }
 .ta-plat button{ flex:1; padding:12px; border-radius:var(--radius); border:2px solid var(--border); background:transparent; color:var(--text); font:inherit; font-weight:600; cursor:pointer; }
@@ -2023,6 +2027,7 @@
       <!-- CHECKLIST -->
       <div id="os-checklist-wrap">
       <div class="ta-bar"><button type="button" class="btn btn-sm" onclick="testeAutoAbrir('principal')">⚡ Checklist automático</button><span>Testa o aparelho pelo celular e preenche a lista. Se preferir, preencha manualmente abaixo.</span></div>
+      <div class="ta-info" id="os-ta-info"></div>
       <fieldset style="border:1px solid var(--border); border-radius:var(--radius); padding:14px 18px; margin-bottom:4px;">
         <legend style="font-size:13px; font-weight:600; color:var(--accent); padding:0 6px;">
           ✔ Lista de Checagem — Os itens abaixo estão em condições de utilização? <span style="color:var(--red);">*</span>
@@ -5557,6 +5562,8 @@ function openOSModal(osId){
   // Limpar checklist
   const clNames = ['cl-liga','cl-carrega','cl-display','cl-touch','cl-vidro','cl-tampa','cl-camtraseira','cl-camfrontal','cl-faceid','cl-biometria','cl-microfone','cl-altofalante','cl-auricular','cl-sinal','cl-wifi','cl-bluetooth','cl-sensor','cl-gaveta','cl-power','cl-volume'];
   clNames.forEach(n => { document.querySelectorAll(`input[name="${n}"]`).forEach(r => r.checked = false); });
+  document.querySelectorAll('#os-checklist-wrap .cl-item').forEach(i => i.classList.remove('ta-auto'));
+  taAutoMostrar('principal', null);
   document.getElementById('checklist-error').style.display = 'none';
   document.getElementById('os-diagnostico').value = '';
   document.getElementById('os-mao-obra').value = '';
@@ -5604,6 +5611,7 @@ function openOSModal(osId){
       const val = cl[n];
       if(val){ const r = document.querySelector(`input[name="${n}"][value="${val}"]`); if(r) r.checked = true; }
     });
+    taAutoMostrar('principal', cl._auto || null);
     // Acessórios (checkboxes)
     const acs = o.acessorios || '';
     document.getElementById('os-acs-capa').checked = acs.includes('Capa');
@@ -6618,6 +6626,7 @@ async function _saveOSInner(opts){
     const oAtual = id ? state.os.find(x => x.id === id) : null;
     Object.assign(checklist, (oAtual && oAtual.checklist) || {});
   } else {
+    const _au = taAutoLer('principal'); if(_au) checklist._auto = _au;
     let clIncompleto = false;
     clNames.forEach(n => {
       const checked = document.querySelector(`input[name="${n}"]:checked`);
@@ -6702,6 +6711,7 @@ async function _saveOSInner(opts){
       checklist: (() => {
         const ck = {};
         card.querySelectorAll('.ae-checklist-wrap input[type=radio]:checked').forEach(r => { ck[r.dataset.ck] = r.value; });
+        const _au = taAutoLer(card.dataset.did); if(_au) ck._auto = _au;
         return ck;
       })()
     });
@@ -7047,6 +7057,7 @@ function addAparelhoExtra(existing){
 
       <div class="ae-checklist-wrap">
         <div class="ta-bar"><button type="button" class="btn btn-sm" onclick="testeAutoAbrir(this.closest('.aparelho-extra-card').dataset.did)">⚡ Checklist automático</button><span>Testa este aparelho pelo celular e preenche a lista. Ou preencha manualmente abaixo.</span></div>
+        <div class="ta-info"></div>
         <fieldset style="border:1px solid var(--border); border-radius:var(--radius); padding:14px 18px; margin-bottom:4px;">
           <legend style="font-size:13px; font-weight:600; color:var(--accent); padding:0 6px;">
             ✔ Lista de Checagem — Os itens abaixo estão em condições de utilização? <span style="color:var(--red);">*</span>
@@ -7118,6 +7129,7 @@ function addAparelhoExtra(existing){
   `;
 
   list.appendChild(card);
+  if(clEx._auto) taAutoMostrar(card.dataset.did, clEx._auto);
 
   // Ao adicionar novo aparelho manualmente, recolhe o anterior se houver
   if(!existing){
@@ -7521,9 +7533,52 @@ function taResumoFalhas(t){
   return Object.entries(t.checklist || {}).filter(([k,v]) => v === 'Não' && k !== 'cl-liga').map(([k]) => TA_ROTULOS[k] || k);
 }
 
+// Valores medidos pelo app que não têm item próprio no checklist (saúde da bateria, tensão, NFC…)
+const TA_DADOS = ['bateria_saude','bateria_ciclos','bateria_temp','carga_tensao','carga_corrente','nfc'];
+function taAutoDe(t){
+  const ap = t.info_aparelho || {}, a = {};
+  TA_DADOS.forEach(k => { if(ap[k]) a[k] = String(ap[k]); });
+  return Object.keys(a).length ? a : null;
+}
+function taAutoCarrega(a){ return a ? [a.carga_tensao, a.carga_corrente].filter(Boolean).join(' · ') : ''; }
+function taAutoLinhas(a){
+  if(!a) return [];
+  const l = [];
+  if(a.bateria_saude) l.push(['Saúde da bateria', a.bateria_saude + (a.bateria_ciclos ? ' · ' + a.bateria_ciclos + ' ciclos' : '') + (a.bateria_temp ? ' · ' + a.bateria_temp : '')]);
+  if(taAutoCarrega(a)) l.push(['Carregamento', taAutoCarrega(a)]);
+  if(a.nfc) l.push(['NFC', a.nfc]);
+  return l;
+}
+function taAutoRaiz(did){
+  return did === 'principal' ? document.getElementById('os-checklist-wrap') : document.querySelector(`#aparelhos-extras-list .aparelho-extra-card[data-did="${did}"]`);
+}
+function taAutoLer(did){
+  const r = taAutoRaiz(did); if(!r || !r.dataset.auto) return null;
+  try { return JSON.parse(r.dataset.auto); } catch(e){ return null; }
+}
+// Guarda no formulário e mostra a caixa de informações + a tensão ao lado de "Carrega?"
+function taAutoMostrar(did, a){
+  const r = taAutoRaiz(did); if(!r) return;
+  if(a) r.dataset.auto = JSON.stringify(a); else delete r.dataset.auto;
+  const box = did === 'principal' ? document.getElementById('os-ta-info') : r.querySelector('.ta-info');
+  if(box){
+    const l = taAutoLinhas(a);
+    box.innerHTML = l.map(([k,v]) => `<div><b>${k}:</b> ${escapeHtml(v)}</div>`).join('');
+    box.classList.toggle('on', l.length > 0);
+  }
+  const rs = taRadios(did, 'cl-carrega'); const item = rs.length ? rs[0].closest('.cl-item') : null;
+  if(item){
+    const sp = item.querySelector(':scope > span'); let v = sp.querySelector('.ta-val');
+    const txt = taAutoCarrega(a);
+    if(txt){ if(!v){ v = document.createElement('small'); v.className = 'ta-val'; sp.appendChild(v); } v.textContent = txt; }
+    else if(v) v.remove();
+  }
+}
+
 // Preenche os radios do formulário. sobrescrever=false mantém o que o técnico já marcou.
 function taPreencherForm(did, t, sobrescrever){
   let n = 0;
+  taAutoMostrar(did, taAutoDe(t));
   Object.entries(t.checklist || {}).forEach(([k, v]) => {
     const rs = taRadios(did, k); if(!rs.length) return;
     if(!sobrescrever && rs.some(r => r.checked)) return;
@@ -7559,6 +7614,8 @@ async function taAplicarSalvo(t){
     ((o.aparelhosExtras || []).find((a, i) => (a.id || ('x' + i)) === t.dispositivo_id) || {}).checklist || {};
   Object.entries(t.checklist || {}).forEach(([k, v]) => { if(!fonte[k]) novo[k] = v; });
   const n = Object.keys(novo).length;
+  const auto = taAutoDe(t);
+  if(auto) novo._auto = auto;
   addHistoryEntry(o.id, taTextoHistorico(t, n));
   if(t.dispositivo_id === 'principal'){
     o.checklist = Object.assign({}, o.checklist || {}, novo);
@@ -7710,6 +7767,10 @@ async function testeAutoConsultar(){
 
 /* ---------- Visualizar OS ---------- */
 // Grade compacta do checklist (usada na visualização dos aparelhos extras)
+function taAutoViewHtml(cl){
+  const l = taAutoLinhas((cl || {})._auto);
+  return l.length ? `<div style="font-size:12px;margin:-4px 0 10px;color:var(--text-dim);">${l.map(([k,v]) => `<div><b style="color:var(--text);">${k}:</b> ${escapeHtml(v)}</div>`).join('')}</div>` : '';
+}
 function checklistViewHtml(cl){
   return `<div class="section-title" style="margin-top:8px;">Checklist de recebimento</div>
     <div style="display:grid; grid-template-columns:1fr 1fr; gap:4px 16px; font-size:12px; margin-bottom:10px;">
@@ -7719,7 +7780,7 @@ function checklistViewHtml(cl){
         return `<div style="display:flex;justify-content:space-between;padding:3px 6px;background:var(--panel-2);border-radius:4px;">
           <span style="color:var(--text-dim);">${label}</span><span style="font-weight:600;color:${color};">${v}</span></div>`;
       }).join('')}
-    </div>`;
+    </div>` + taAutoViewHtml(cl);
 }
 
 function viewOS(osId){
@@ -8100,6 +8161,8 @@ function printOS(){
 
   // Bloco do checklist de UM aparelho (mesmo modelo do formulário físico)
   function clBloco(cl, acsStr, titulo){
+    const autoL = taAutoLinhas((cl || {})._auto);
+    const autoHtml = autoL.length ? '<div style="font-size:7.5pt;color:#444;margin-top:2pt;">' + autoL.map(([k,v]) => '<b>'+k+':</b> '+escapeHtml(v)).join(' &nbsp;|&nbsp; ') + '</div>' : '';
     const acs = acsStr ? acsStr.split(',').map(a => a.trim()).filter(Boolean) : [];
     return `
   ${titulo ? '<div style="font-size:8.5pt; font-weight:700; color:#0094d4; border-bottom:0.5pt solid #0094d4; padding-bottom:2pt; margin:5pt 0 4pt;">'+titulo+'</div>' : ''}
@@ -8112,7 +8175,7 @@ function printOS(){
         ${['Capa','Chip','Carregador'].map(a => { const m = acs.includes(a); return '<tr><td class="p-cl-label">'+a+'</td><td class="p-cl-opts"><span class="p-cb'+(m?' p-cb-sim':'')+'">'+(m?'✔':'')+'</span>Sim&nbsp;&nbsp;<span class="p-cb'+(!m?' p-cb-nao':'')+'">'+((!m)?'✔':'')+'</span>Não</td></tr>'; }).join('')}
       </table>
     </div>
-  </div>`;
+  </div>${autoHtml}`;
   }
 
   // Checklist de todos os aparelhos: 1 aparelho = igual ao modelo antigo; vários = 1 bloco por aparelho que tenha checklist
